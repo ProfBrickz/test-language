@@ -1,8 +1,0 @@
-var a: integer{size: 8};
-var b: integer{size: 16};
-
-a = 50;
-b = 100;
-
-var c: integer{size: 8};
-c = a + b;

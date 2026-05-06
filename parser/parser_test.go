@@ -1,0 +1,798 @@
+package parser
+
+import (
+	"testing"
+
+	"lang-interpreter/ast"
+	"lang-interpreter/lexer"
+)
+
+func TestVarDecl(t *testing.T) {
+	input := "var x: integer{size: 32, signed: true, nullable: false} = 42;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+
+	stmt, ok := program.Stmts[0].(*ast.VarDecl)
+	if !ok {
+		t.Fatalf("expected *ast.VarDecl, got %T", program.Stmts[0])
+	}
+
+	if stmt.Name != "x" {
+		t.Errorf("expected name 'x', got %q", stmt.Name)
+	}
+
+	if stmt.IType.Size != 32 {
+		t.Errorf("expected size 32, got %d", stmt.IType.Size)
+	}
+
+	if !stmt.IType.Signed {
+		t.Errorf("expected signed true")
+	}
+
+	if stmt.IType.Nullable {
+		t.Errorf("expected nullable false")
+	}
+
+	if stmt.Expr == nil {
+		t.Fatalf("expected expression, got nil")
+	}
+
+	intLit, ok := stmt.Expr.(*ast.IntegerLit)
+	if !ok {
+		t.Fatalf("expected *ast.IntegerLit, got %T", stmt.Expr)
+	}
+
+	if intLit.Value != 42 {
+		t.Errorf("expected value 42, got %d", intLit.Value)
+	}
+}
+
+func TestVarDeclWithoutInit(t *testing.T) {
+	input := "var x: integer{size: 64, signed: true, nullable: true};"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+
+	stmt, ok := program.Stmts[0].(*ast.VarDecl)
+	if !ok {
+		t.Fatalf("expected *ast.VarDecl, got %T", program.Stmts[0])
+	}
+
+	if stmt.Expr != nil {
+		t.Errorf("expected nil expression, got %v", stmt.Expr)
+	}
+}
+
+func TestPrintStmt(t *testing.T) {
+	input := "print(x);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+
+	stmt, ok := program.Stmts[0].(*ast.PrintStmt)
+	if !ok {
+		t.Fatalf("expected *ast.PrintStmt, got %T", program.Stmts[0])
+	}
+
+	varRef, ok := stmt.Expr.(*ast.VarRef)
+	if !ok {
+		t.Fatalf("expected *ast.VarRef, got %T", stmt.Expr)
+	}
+
+	if varRef.Name != "x" {
+		t.Errorf("expected name 'x', got %q", varRef.Name)
+	}
+}
+
+func TestAssignment(t *testing.T) {
+	input := "x = 42;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+
+	stmt, ok := program.Stmts[0].(*ast.Assignment)
+	if !ok {
+		t.Fatalf("expected *ast.Assignment, got %T", program.Stmts[0])
+	}
+
+	if stmt.Name != "x" {
+		t.Errorf("expected name 'x', got %q", stmt.Name)
+	}
+
+	if stmt.Op != "=" {
+		t.Errorf("expected op '=', got %q", stmt.Op)
+	}
+
+	intLit, ok := stmt.Expr.(*ast.IntegerLit)
+	if !ok {
+		t.Fatalf("expected *ast.IntegerLit, got %T", stmt.Expr)
+	}
+
+	if intLit.Value != 42 {
+		t.Errorf("expected value 42, got %d", intLit.Value)
+	}
+}
+
+func TestCompoundAssignment(t *testing.T) {
+	tests := []struct {
+		input string
+		op    string
+	}{
+		{"x += 10;", "+="},
+		{"x -= 10;", "-="},
+		{"x *= 10;", "*="},
+		{"x /= 10;", "/="},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+
+		if len(program.Stmts) != 1 {
+			t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+		}
+
+		stmt, ok := program.Stmts[0].(*ast.Assignment)
+		if !ok {
+			t.Fatalf("expected *ast.Assignment, got %T", program.Stmts[0])
+		}
+
+		if stmt.Op != tt.op {
+			t.Errorf("expected op %q, got %q", tt.op, stmt.Op)
+		}
+	}
+}
+
+func TestBinaryExpr(t *testing.T) {
+	input := "print(x + 1 * 2);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+
+	stmt, ok := program.Stmts[0].(*ast.PrintStmt)
+	if !ok {
+		t.Fatalf("expected *ast.PrintStmt, got %T", program.Stmts[0])
+	}
+
+	// Should be a binary expression: x + (1 * 2)
+	binExpr, ok := stmt.Expr.(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected *ast.BinaryExpr, got %T", stmt.Expr)
+	}
+
+	if binExpr.Op != "+" {
+		t.Errorf("expected op '+', got %q", binExpr.Op)
+	}
+
+	// Right side should be another binary expr: 1 * 2
+	rightBinExpr, ok := binExpr.Right.(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected *ast.BinaryExpr on right, got %T", binExpr.Right)
+	}
+
+	if rightBinExpr.Op != "*" {
+		t.Errorf("expected op '*', got %q", rightBinExpr.Op)
+	}
+}
+
+func TestNullLit(t *testing.T) {
+	input := "var x: integer{size: 32, nullable: true} = null;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+
+	stmt, ok := program.Stmts[0].(*ast.VarDecl)
+	if !ok {
+		t.Fatalf("expected *ast.VarDecl, got %T", program.Stmts[0])
+	}
+
+	if _, ok := stmt.Expr.(*ast.NullLit); !ok {
+		t.Fatalf("expected *ast.NullLit, got %T", stmt.Expr)
+	}
+}
+
+func TestParserErrors(t *testing.T) {
+	tests := []struct {
+		input       string
+		expectError bool
+	}{
+		{"var: integer;", true},
+		{"var x integer;", true},
+		{"print;", true},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		p.ParseProgram()
+
+		if tt.expectError && len(p.Errors()) == 0 {
+			t.Errorf("expected errors for input %q, got none", tt.input)
+		}
+	}
+}
+
+func TestParseSingleStmt(t *testing.T) {
+	input := "var x: integer{size: 32} = 42;"
+	l := lexer.New(input)
+	p := New(l)
+
+	stmt, errors := p.ParseSingleStmt()
+	if errors != nil && len(errors) > 0 {
+		t.Fatalf("unexpected errors: %v", errors)
+	}
+
+	if stmt == nil {
+		t.Fatalf("expected statement, got nil")
+	}
+
+	_, ok := stmt.(*ast.VarDecl)
+	if !ok {
+		t.Fatalf("expected *ast.VarDecl, got %T", stmt)
+	}
+}
+
+func TestParseSingleStmtEOF(t *testing.T) {
+	input := ""
+	l := lexer.New(input)
+	p := New(l)
+
+	stmt, errors := p.ParseSingleStmt()
+	if stmt != nil {
+		t.Errorf("expected nil statement for EOF")
+	}
+	if errors != nil && len(errors) > 0 {
+		t.Errorf("unexpected errors: %v", errors)
+	}
+}
+
+func TestParseIntegerTypeFull(t *testing.T) {
+	input := "var x: integer{size: 16, signed: false, nullable: true} = 42;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+
+	stmt, ok := program.Stmts[0].(*ast.VarDecl)
+	if !ok {
+		t.Fatalf("expected *ast.VarDecl, got %T", program.Stmts[0])
+	}
+
+	if stmt.IType.Size != 16 {
+		t.Errorf("expected size 16, got %d", stmt.IType.Size)
+	}
+	if stmt.IType.Signed {
+		t.Errorf("expected signed false")
+	}
+	if !stmt.IType.Nullable {
+		t.Errorf("expected nullable true")
+	}
+}
+
+func TestParseIntegerTypeDefault(t *testing.T) {
+	input := "var x: integer = 42;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+
+	stmt, ok := program.Stmts[0].(*ast.VarDecl)
+	if !ok {
+		t.Fatalf("expected *ast.VarDecl, got %T", program.Stmts[0])
+	}
+
+	if stmt.IType.Size != 64 {
+		t.Errorf("expected default size 64, got %d", stmt.IType.Size)
+	}
+	if !stmt.IType.Signed {
+		t.Errorf("expected default signed true")
+	}
+	if !stmt.IType.Nullable {
+		t.Errorf("expected default nullable true")
+	}
+}
+
+func TestParsePrintErrors(t *testing.T) {
+	tests := []string{
+		"print x);",
+		"print(;",
+		"print);",
+		"print(1 2);", // missing operator
+	}
+
+	for _, input := range tests {
+		l := lexer.New(input)
+		p := New(l)
+		p.ParseProgram()
+
+		if len(p.Errors()) == 0 {
+			t.Errorf("expected errors for input %q, got none", input)
+		}
+	}
+}
+
+func TestParsePrimaryParensNested(t *testing.T) {
+	input := "print(((42)));"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+}
+
+func TestParsePrintMissingParen(t *testing.T) {
+	input := "print(1;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing )")
+	}
+}
+
+func TestParsePrintMissingRParen(t *testing.T) {
+	input := "print(1;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing )")
+	}
+}
+
+func TestParsePrintMissingSemicolon(t *testing.T) {
+	input := "print(1)"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ;")
+	}
+}
+
+func TestParsePrimaryErrors(t *testing.T) {
+	tests := []string{
+		"print(@);",
+		"print(x + );",
+	}
+
+	for _, input := range tests {
+		l := lexer.New(input)
+		p := New(l)
+		p.ParseProgram()
+
+		if len(p.Errors()) == 0 {
+			t.Errorf("expected errors for input %q, got none", input)
+		}
+	}
+}
+
+func TestParseIntegerTypeErrors(t *testing.T) {
+	tests := []string{
+		"var x: notinteger{size: 32};",
+		"var x: integer{size: 12};",
+		"var x: integer{size: 32, signed: yes};",
+		"var x: integer{size: 32, invalid: true};",
+		"var x: integer{size: 32 signed: true};", // missing colon
+	}
+
+	for _, input := range tests {
+		l := lexer.New(input)
+		p := New(l)
+		p.ParseProgram()
+
+		if len(p.Errors()) == 0 {
+			t.Errorf("expected errors for input %q, got none", input)
+		}
+	}
+}
+
+func TestParseIntegerTypeWithComma(t *testing.T) {
+	input := "var x: integer{size: 32, signed: true} = 42;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+}
+
+func TestParseIntegerTypeWithAllFields(t *testing.T) {
+	input := "var x: integer{size: 16, signed: false, nullable: true} = 42;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	if stmt.IType.Size != 16 {
+		t.Errorf("expected size 16, got %d", stmt.IType.Size)
+	}
+	if stmt.IType.Signed {
+		t.Errorf("expected signed false")
+	}
+	if !stmt.IType.Nullable {
+		t.Errorf("expected nullable true")
+	}
+}
+
+func TestParseIntegerTypeWithOnlyBrace(t *testing.T) {
+	input := "var x: integer{} = 42;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+}
+
+func TestParseAssignmentWithAllOperators(t *testing.T) {
+	tests := []string{
+		"x += 5;",
+		"x -= 5;",
+		"x *= 5;",
+		"x /= 5;",
+	}
+
+	for _, input := range tests {
+		l := lexer.New("var x: integer{size: 32} = 10;" + input)
+		p := New(l)
+		p.ParseProgram()
+
+		if len(p.Errors()) > 0 {
+			t.Fatalf("unexpected errors for %q: %v", input, p.Errors())
+		}
+	}
+}
+
+func TestParseAssignmentErrors(t *testing.T) {
+	tests := []string{
+		"x = ;",
+		"x += ;",
+		"x = x + ;",
+	}
+
+	for _, input := range tests {
+		l := lexer.New("var x: integer{size: 32} = 10;" + input)
+		p := New(l)
+		p.ParseProgram()
+
+		if len(p.Errors()) == 0 {
+			t.Errorf("expected errors for input %q, got none", input)
+		}
+	}
+}
+
+func TestParseAssignmentNoSemicolon(t *testing.T) {
+	input := "var x: integer{size: 32} = 10; x = 5"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing semicolon")
+	}
+}
+
+func TestParseAssignmentInvalidOp(t *testing.T) {
+	input := "var x: integer{size: 32} = 10; x + 5;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid assignment operator")
+	}
+}
+
+func TestParsePrintComplexExpr(t *testing.T) {
+	input := "print(1 + 2 * 3 - 4 / 2);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+}
+
+func TestParsePrimaryInteger(t *testing.T) {
+	input := "print(42);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	intLit, ok := stmt.Expr.(*ast.IntegerLit)
+	if !ok {
+		t.Fatalf("expected *ast.IntegerLit, got %T", stmt.Expr)
+	}
+
+	if intLit.Value != 42 {
+		t.Errorf("expected 42, got %d", intLit.Value)
+	}
+	if !intLit.Untyped {
+		t.Errorf("expected untyped true")
+	}
+}
+
+func TestParsePrimaryParens(t *testing.T) {
+	input := "print((42));"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+}
+
+func TestParsePrintWithParens(t *testing.T) {
+	input := "print(1 + 2);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+}
+
+func TestParsePrimaryIdent(t *testing.T) {
+	input := "print(x);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	_, ok := stmt.Expr.(*ast.VarRef)
+	if !ok {
+		t.Errorf("expected *ast.VarRef, got %T", stmt.Expr)
+	}
+}
+
+func TestParsePrimaryInvalidToken(t *testing.T) {
+	tests := []string{
+		"print(@);",
+		"print($);",
+	}
+
+	for _, input := range tests {
+		l := lexer.New(input)
+		p := New(l)
+		p.ParseProgram()
+
+		if len(p.Errors()) == 0 {
+			t.Errorf("expected errors for input %q, got none", input)
+		}
+	}
+}
+
+func TestParsePrimaryMissingRParen(t *testing.T) {
+	input := "print(42;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing )")
+	}
+}
+
+func TestParsePrimaryNestedParensMissingRParen(t *testing.T) {
+	input := "print((42);"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ), got none")
+	}
+}
+
+func TestParsePrimaryNull(t *testing.T) {
+	input := "print(null);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	_, ok := stmt.Expr.(*ast.NullLit)
+	if !ok {
+		t.Errorf("expected *ast.NullLit, got %T", stmt.Expr)
+	}
+}
+
+func TestParseIntegerTypeMissingColon(t *testing.T) {
+	input := "var x: integer{size 32};"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing colon")
+	}
+}
+
+func TestParseIntegerTypeInvalidSizeString(t *testing.T) {
+	input := "var x: integer{size: abc};"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for non-integer size")
+	}
+}
+
+func TestParseIntegerTypeInvalidSizeNumber(t *testing.T) {
+	input := "var x: integer{size: 7};"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid size number")
+	}
+}
+
+func TestParseIntegerTypeInvalidSigned(t *testing.T) {
+	input := "var x: integer{signed: maybe};"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid signed value")
+	}
+}
+
+func TestParseIntegerTypeInvalidNullable(t *testing.T) {
+	input := "var x: integer{nullable: maybe};"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid nullable value")
+	}
+}
+
+func TestParseAssignmentWithVarRef(t *testing.T) {
+	input := `
+var x: integer{size: 32, signed: true, nullable: false} = 10;
+x = y;
+`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	// Should parse correctly even with undefined var (semantic check happens in interpreter)
+	if len(program.Stmts) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(program.Stmts))
+	}
+}
+
+func TestParsePrintWithComplexExpr(t *testing.T) {
+	input := "print(x + y * 2);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+}
+
+func TestParsePrimaryMissingRParenInExpr(t *testing.T) {
+	// print(1 + 2;  <- missing )
+	// This should trigger the error at line 263-265 in parsePrimary
+	input := "print(1 + 2;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ), got none. Errors: %v", p.Errors())
+	}
+}
+
+func TestParsePrimaryDirectMissingRParen(t *testing.T) {
+	// This directly tests the TOK_LPAREN case in parsePrimary
+	// with a missing closing paren
+	// Input: (1 + 2  <- missing )
+	// The inner parseExpr will parse 1+2, then we check for )
+	input := "print((1 + 2;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ), got none. Errors: %v", p.Errors())
+	}
+}

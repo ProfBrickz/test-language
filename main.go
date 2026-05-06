@@ -12,15 +12,24 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	if len(os.Args) < 2 {
 		repl()
-		return
+		return nil
 	}
+	return runFile(os.Args[1])
+}
 
-	source, err := os.ReadFile(os.Args[1])
+func runFile(filename string) error {
+	source, err := os.ReadFile(filename)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("Error reading file: %v", err)
 	}
 
 	l := lexer.New(string(source))
@@ -31,14 +40,14 @@ func main() {
 		for _, err := range p.Errors() {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 		}
-		os.Exit(1)
+		return fmt.Errorf("parse errors")
 	}
 
 	inter := interpreter.New()
 	if err := inter.Run(program); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("Error: %v", err)
 	}
+	return nil
 }
 
 func repl() {
