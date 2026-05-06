@@ -139,9 +139,6 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 	switch s := stmt.(type) {
 	case *ast.VarDecl:
 		val := Value{IType: s.IType}
-		if s.IType.Nullable {
-			val.Null = true
-		}
 		if s.Expr != nil {
 			rightVal, err := i.evalExpr(s.Expr)
 			if err != nil {
@@ -167,6 +164,8 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 				}
 				val.Data = rightVal.Data
 			}
+		} else if s.IType.Nullable {
+			val.Null = true
 		}
 		i.env.Set(s.Name, val)
 	case *ast.Assignment:
