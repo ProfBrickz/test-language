@@ -190,8 +190,41 @@ func TestComments(t *testing.T) {
 	}
 }
 
+func TestFloatKeyword(t *testing.T) {
+	input := "float"
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_FLOAT {
+		t.Errorf("expected FLOAT, got %s", tok.Type)
+	}
+}
+
+func TestFloatLit(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedType TokenType
+		expectedLit  string
+	}{
+		{"3.14", TOK_FLOAT_LIT, "3.14"},
+		{"1.5", TOK_FLOAT_LIT, "1.5"},
+		{"0.0", TOK_FLOAT_LIT, "0.0"},
+		{"123.456", TOK_FLOAT_LIT, "123.456"},
+	}
+
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("expected %s, got %s", tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLit {
+			t.Errorf("expected literal %q, got %q", tt.expectedLit, tok.Literal)
+		}
+	}
+}
+
 func TestTokenString(t *testing.T) {
-	tok := Token{Type: TOK_INT_LIT, Literal: "42", Line: 1}
+	tok := Token{Type: TOK_FLOAT_LIT, Literal: "3.14", Line: 1}
 	str := tok.String()
 	if str == "" {
 		t.Errorf("expected non-empty string")

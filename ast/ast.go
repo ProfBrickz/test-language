@@ -17,9 +17,20 @@ type IntegerType struct {
 	Nullable bool
 }
 
+type FloatType struct {
+	Size     int
+	Nullable bool
+}
+
 type IntegerLit struct {
 	Value   int64
 	IType   IntegerType
+	Untyped bool
+}
+
+type FloatLit struct {
+	Value   float64
+	FType   FloatType
 	Untyped bool
 }
 
@@ -37,9 +48,11 @@ type BinaryExpr struct {
 }
 
 type VarDecl struct {
-	Name  string
-	IType IntegerType
-	Expr  Expr
+	Name    string
+	IType   IntegerType
+	FType   FloatType
+	Expr    Expr
+	IsFloat bool
 }
 
 type Assignment struct {

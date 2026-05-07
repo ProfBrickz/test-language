@@ -79,7 +79,17 @@ func (p *Parser) parseVarDecl() *ast.VarDecl {
 	}
 
 	p.nextToken()
-	iType := p.parseIntegerType()
+
+	var iType ast.IntegerType
+	var fType ast.FloatType
+	isFloat := false
+
+	if p.curToken.Type == lexer.TOK_FLOAT {
+		fType = p.parseFloatType()
+		isFloat = true
+	} else {
+		iType = p.parseIntegerType()
+	}
 
 	var expr ast.Expr
 	if p.curToken.Type == lexer.TOK_ASSIGN {
@@ -92,7 +102,67 @@ func (p *Parser) parseVarDecl() *ast.VarDecl {
 		return nil
 	}
 
-	return &ast.VarDecl{Name: name, IType: iType, Expr: expr}
+	return &ast.VarDecl{Name: name, IType: iType, FType: fType, Expr: expr, IsFloat: isFloat}
+}
+
+func (p *Parser) parseFloatType() ast.FloatType {
+	fType := ast.FloatType{Size: 64, Nullable: true}
+
+	p.nextToken()
+	if p.curToken.Type == lexer.TOK_LBRACE {
+		for {
+			p.nextToken()
+			if p.curToken.Type == lexer.TOK_RBRACE {
+				p.nextToken()
+				break
+			}
+			if p.curToken.Type != lexer.TOK_SIZE && p.curToken.Type != lexer.TOK_NULLABLE {
+				p.addError("expected 'size' or 'nullable', got %s", p.curToken.Type)
+				break
+			}
+			key := p.curToken.Literal
+
+			p.nextToken()
+			if p.curToken.Type != lexer.TOK_COLON {
+				p.addError("expected ':', got %s", p.curToken.Type)
+				break
+			}
+
+			p.nextToken()
+			switch key {
+			case "size":
+				if p.curToken.Type != lexer.TOK_INT_LIT {
+					p.addError("expected integer literal for size, got %s", p.curToken.Type)
+					break
+				}
+				size, err := strconv.Atoi(p.curToken.Literal)
+				if err != nil || (size != 16 && size != 32 && size != 64) {
+					p.addError("invalid size: %s, must be 16, 32, or 64", p.curToken.Literal)
+					break
+				}
+				fType.Size = size
+			case "nullable":
+				if p.curToken.Type != lexer.TOK_TRUE && p.curToken.Type != lexer.TOK_FALSE {
+					p.addError("expected 'true' or 'false', got %s", p.curToken.Type)
+					break
+				}
+				fType.Nullable = p.curToken.Type == lexer.TOK_TRUE
+			}
+
+			p.nextToken()
+			if p.curToken.Type == lexer.TOK_COMMA {
+				continue
+			}
+			if p.curToken.Type == lexer.TOK_RBRACE {
+				p.nextToken()
+				break
+			}
+			p.addError("expected ',' or '}', got %s", p.curToken.Type)
+			break
+		}
+	}
+
+	return fType
 }
 
 func (p *Parser) parseIntegerType() ast.IntegerType {
@@ -253,6 +323,14 @@ func (p *Parser) parsePrimary() ast.Expr {
 		}
 		p.nextToken()
 		return &ast.IntegerLit{Value: val, Untyped: true}
+	case lexer.TOK_FLOAT_LIT:
+		val, err := strconv.ParseFloat(p.curToken.Literal, 64)
+		if err != nil {
+			p.addError("invalid float literal: %s", p.curToken.Literal)
+			return nil
+		}
+		p.nextToken()
+		return &ast.FloatLit{Value: val, Untyped: true}
 	case lexer.TOK_IDENT:
 		tok := p.curToken
 		p.nextToken()

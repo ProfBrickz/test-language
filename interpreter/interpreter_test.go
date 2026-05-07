@@ -192,21 +192,47 @@ func TestBinaryExprEval(t *testing.T) {
 
 func TestCanImplicitConvert(t *testing.T) {
 	tests := []struct {
-		src      ast.IntegerType
-		dst      ast.IntegerType
-		expected bool
+		srcInt     ast.IntegerType
+		srcFloat   ast.FloatType
+		srcIsFloat bool
+		dstInt     ast.IntegerType
+		dstFloat   ast.FloatType
+		dstIsFloat bool
+		expected   bool
 	}{
-		{ast.IntegerType{Size: 32, Signed: true}, ast.IntegerType{Size: 32, Signed: true}, true},
-		{ast.IntegerType{Size: 8, Signed: true}, ast.IntegerType{Size: 32, Signed: true}, true},
-		{ast.IntegerType{Size: 32, Signed: true}, ast.IntegerType{Size: 8, Signed: true}, false},
-		{ast.IntegerType{Size: 32, Signed: false}, ast.IntegerType{Size: 32, Signed: false}, true},
-		{ast.IntegerType{Size: 8, Signed: false}, ast.IntegerType{Size: 32, Signed: true}, true},
+		{ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{}, false,
+			ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{}, false, true},
+		{ast.IntegerType{Size: 8, Signed: true}, ast.FloatType{}, false,
+			ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{}, false, true},
+		{ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{}, false,
+			ast.IntegerType{Size: 8, Signed: true}, ast.FloatType{}, false, false},
+		{ast.IntegerType{Size: 32, Signed: false}, ast.FloatType{}, false,
+			ast.IntegerType{Size: 32, Signed: false}, ast.FloatType{}, false, true},
+		{ast.IntegerType{Size: 8, Signed: false}, ast.FloatType{}, false,
+			ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{}, false, true},
+		// Int to float conversions
+		{ast.IntegerType{Size: 8, Signed: true}, ast.FloatType{}, false,
+			ast.IntegerType{}, ast.FloatType{Size: 16}, true, true},
+		{ast.IntegerType{Size: 16, Signed: true}, ast.FloatType{}, false,
+			ast.IntegerType{}, ast.FloatType{Size: 32}, true, true},
+		{ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{}, false,
+			ast.IntegerType{}, ast.FloatType{Size: 64}, true, true},
+		// Float to float conversions
+		{ast.IntegerType{}, ast.FloatType{Size: 16}, true,
+			ast.IntegerType{}, ast.FloatType{Size: 32}, true, true},
+		{ast.IntegerType{}, ast.FloatType{Size: 32}, true,
+			ast.IntegerType{}, ast.FloatType{Size: 64}, true, true},
+		// Float to int - not allowed
+		{ast.IntegerType{}, ast.FloatType{Size: 32}, true,
+			ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{}, false, false},
 	}
 
 	for _, tt := range tests {
-		result := canImplicitConvert(tt.src, tt.dst)
+		result := canImplicitConvert(tt.srcInt, tt.srcFloat, tt.srcIsFloat, tt.dstInt, tt.dstFloat, tt.dstIsFloat)
 		if result != tt.expected {
-			t.Errorf("canImplicitConvert(%v, %v) = %v, expected %v", tt.src, tt.dst, result, tt.expected)
+			t.Errorf("canImplicitConvert(%v, %v, %v, %v, %v, %v) = %v, expected %v",
+				tt.srcInt, tt.srcFloat, tt.srcIsFloat, tt.dstInt, tt.dstFloat, tt.dstIsFloat,
+				result, tt.expected)
 		}
 	}
 }
@@ -246,8 +272,9 @@ func TestValueString(t *testing.T) {
 	}{
 		{Value{Null: true}, "null"},
 		{Value{Untyped: true, Data: 42}, "42"},
-		{Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 10}, "integer{size: 32, signed: true}(10)"},
-		{Value{IType: ast.IntegerType{Size: 16, Signed: false}, Data: 5}, "integer{size: 16, signed: false}(5)"},
+		{Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 10, IsFloat: false}, "32-bit signed integer(10)"},
+		{Value{IType: ast.IntegerType{Size: 16, Signed: false}, Data: 5, IsFloat: false}, "16-bit unsigned integer(5)"},
+		{Value{FType: ast.FloatType{Size: 32}, FData: 3.14, IsFloat: true}, "32-bit float(3.14)"},
 	}
 
 	for _, tt := range tests {
@@ -261,17 +288,21 @@ func TestValueString(t *testing.T) {
 func TestTypeDesc(t *testing.T) {
 	tests := []struct {
 		itype    ast.IntegerType
+		ftype    ast.FloatType
+		isFloat  bool
 		expected string
 	}{
-		{ast.IntegerType{Size: 32, Signed: true, Nullable: false}, "32 bit signed integer"},
-		{ast.IntegerType{Size: 16, Signed: false, Nullable: true}, "16 bit nullable unsigned integer"},
-		{ast.IntegerType{Size: 64, Signed: true, Nullable: true}, "64 bit nullable signed integer"},
+		{ast.IntegerType{Size: 32, Signed: true, Nullable: false}, ast.FloatType{}, false, "32-bit signed integer"},
+		{ast.IntegerType{Size: 16, Signed: false, Nullable: true}, ast.FloatType{}, false, "nullable 16-bit unsigned integer"},
+		{ast.IntegerType{Size: 64, Signed: true, Nullable: true}, ast.FloatType{}, false, "nullable 64-bit signed integer"},
+		{ast.IntegerType{}, ast.FloatType{Size: 32}, true, "32-bit float"},
+		{ast.IntegerType{}, ast.FloatType{Size: 64}, true, "64-bit float"},
 	}
 
 	for _, tt := range tests {
-		result := typeDesc(tt.itype)
+		result := typeDesc(tt.itype, tt.ftype, tt.isFloat)
 		if result != tt.expected {
-			t.Errorf("typeDesc(%v) = %q, expected %q", tt.itype, result, tt.expected)
+			t.Errorf("typeDesc(%v, %v, %v) = %q, expected %q", tt.itype, tt.ftype, tt.isFloat, result, tt.expected)
 		}
 	}
 }
@@ -448,21 +479,47 @@ func TestClamp(t *testing.T) {
 
 func TestCanImplicitConvertMore(t *testing.T) {
 	tests := []struct {
-		src      ast.IntegerType
-		dst      ast.IntegerType
-		expected bool
+		srcInt     ast.IntegerType
+		srcFloat   ast.FloatType
+		srcIsFloat bool
+		dstInt     ast.IntegerType
+		dstFloat   ast.FloatType
+		dstIsFloat bool
+		expected   bool
 	}{
-		{ast.IntegerType{Size: 32, Signed: false}, ast.IntegerType{Size: 32, Signed: true}, false},
-		{ast.IntegerType{Size: 32, Signed: true}, ast.IntegerType{Size: 32, Signed: false}, false},
-		{ast.IntegerType{Size: 64, Signed: true}, ast.IntegerType{Size: 32, Signed: true}, false},
-		{ast.IntegerType{Size: 8, Signed: false}, ast.IntegerType{Size: 16, Signed: false}, true},
-		{ast.IntegerType{Size: 16, Signed: true}, ast.IntegerType{Size: 32, Signed: true}, true},
+		{ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{}, false,
+			ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{}, false, true},
+		{ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{}, false,
+			ast.IntegerType{Size: 32, Signed: false}, ast.FloatType{}, false, false},
+		{ast.IntegerType{Size: 64, Signed: true}, ast.FloatType{}, false,
+			ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{}, false, false},
+		{ast.IntegerType{Size: 8, Signed: false}, ast.FloatType{}, false,
+			ast.IntegerType{Size: 16, Signed: false}, ast.FloatType{}, false, true},
+		{ast.IntegerType{Size: 16, Signed: true}, ast.FloatType{}, false,
+			ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{}, false, true},
+		// Int to float
+		{ast.IntegerType{Size: 8, Signed: true}, ast.FloatType{}, false,
+			ast.IntegerType{}, ast.FloatType{Size: 16}, true, true},
+		{ast.IntegerType{Size: 16, Signed: true}, ast.FloatType{}, false,
+			ast.IntegerType{}, ast.FloatType{Size: 32}, true, true},
+		{ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{}, false,
+			ast.IntegerType{}, ast.FloatType{Size: 64}, true, true},
+		// Float to float
+		{ast.IntegerType{}, ast.FloatType{Size: 16}, true,
+			ast.IntegerType{}, ast.FloatType{Size: 32}, true, true},
+		{ast.IntegerType{}, ast.FloatType{Size: 32}, true,
+			ast.IntegerType{}, ast.FloatType{Size: 64}, true, true},
+		// Float to int - not allowed
+		{ast.IntegerType{}, ast.FloatType{Size: 32}, true,
+			ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{}, false, false},
 	}
 
 	for _, tt := range tests {
-		result := canImplicitConvert(tt.src, tt.dst)
+		result := canImplicitConvert(tt.srcInt, tt.srcFloat, tt.srcIsFloat, tt.dstInt, tt.dstFloat, tt.dstIsFloat)
 		if result != tt.expected {
-			t.Errorf("canImplicitConvert(%v, %v) = %v, expected %v", tt.src, tt.dst, result, tt.expected)
+			t.Errorf("canImplicitConvert(%v, %v, %v, %v, %v, %v) = %v, expected %v",
+				tt.srcInt, tt.srcFloat, tt.srcIsFloat, tt.dstInt, tt.dstFloat, tt.dstIsFloat,
+				result, tt.expected)
 		}
 	}
 }
@@ -1011,12 +1068,11 @@ func TestExecuteVarDeclWithVarRefAndTypeMismatch(t *testing.T) {
 	}
 }
 
-
 func TestExecuteVarDeclWithLiteralOverflow(t *testing.T) {
 	i := New()
 	stmt := &ast.VarDecl{
 		Name:  "x",
-	IType: ast.IntegerType{Size: 8, Signed: true, Nullable: false},
+		IType: ast.IntegerType{Size: 8, Signed: true, Nullable: false},
 		Expr:  &ast.IntegerLit{Value: 200, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
@@ -1212,5 +1268,722 @@ func TestExecuteAssignmentWithExprError(t *testing.T) {
 	err := i.executeAssignment(stmt)
 	if err == nil {
 		t.Errorf("expected error from invalid expression")
+	}
+}
+
+func TestFloatVarDecl(t *testing.T) {
+	input := `
+var a: float{size: 32} = 3.14;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "3.14") {
+		t.Errorf("expected output to contain '3.14', got %q", output)
+	}
+}
+
+func TestFloat16VarDecl(t *testing.T) {
+	input := `
+var a: float{size: 16} = 3.14;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "3.14") {
+		t.Errorf("expected output to contain '3.14', got %q", output)
+	}
+}
+
+func TestFloat64VarDecl(t *testing.T) {
+	input := `
+var a: float{size: 64} = 3.14;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "3.14") {
+		t.Errorf("expected output to contain '3.14', got %q", output)
+	}
+}
+
+func TestIntToFloatConversion(t *testing.T) {
+	input := `
+var a: integer{size: 32} = 42;
+var b: float{size: 64} = a;
+print(b);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "42") {
+		t.Errorf("expected output to contain '42', got %q", output)
+	}
+}
+
+func TestFloatToFloatConversion(t *testing.T) {
+	input := `
+var a: float{size: 16} = 1.5;
+var b: float{size: 32} = a;
+print(b);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "1.5") {
+		t.Errorf("expected output to contain '1.5', got %q", output)
+	}
+}
+
+func TestFloatToFloatUpConversion(t *testing.T) {
+	input := `
+var a: float{size: 32} = 1.5;
+var b: float{size: 64} = a;
+print(b);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "1.5") {
+		t.Errorf("expected output to contain '1.5', got %q", output)
+	}
+}
+
+func TestFloatAssignment(t *testing.T) {
+	input := `
+var a: float{size: 32} = 1.5;
+a = 2.5;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "2.5") {
+		t.Errorf("expected output to contain '2.5', got %q", output)
+	}
+}
+
+func TestFloatBinaryExpr(t *testing.T) {
+	input := `
+var a: float{size: 32} = 1.5;
+var b: float{size: 32} = 2.5;
+print(a + b);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "4") {
+		t.Errorf("expected output to contain '4', got %q", output)
+	}
+}
+
+func TestFloatNullAssign(t *testing.T) {
+	input := `
+var a: float{size: 32, nullable: true} = null;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "null") {
+		t.Errorf("expected output to contain 'null', got %q", output)
+	}
+}
+
+func TestFloatInvalidSize(t *testing.T) {
+	input := `
+var a: float{size: 128} = 1.0;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	p.ParseProgram()
+
+	// Check if parser caught the error
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected parser error for invalid float size")
+	}
+}
+
+func TestFloatTypeDesc(t *testing.T) {
+	tests := []struct {
+		ftype    ast.FloatType
+		expected string
+	}{
+		{ast.FloatType{Size: 16}, "16-bit float"},
+		{ast.FloatType{Size: 32}, "32-bit float"},
+		{ast.FloatType{Size: 64}, "64-bit float"},
+	}
+
+	for _, tt := range tests {
+		// Test via Value.String()
+		v := Value{FType: tt.ftype, IsFloat: true, FData: 1.5}
+		result := v.String()
+		if !strings.Contains(result, tt.expected) {
+			t.Errorf("Value.String() = %q, expected to contain %q", result, tt.expected)
+		}
+	}
+}
+
+func TestCanFitInFloat(t *testing.T) {
+	// Test float16 range
+	result := canFitInFloat(65504, ast.FloatType{Size: 16})
+	if !result {
+		t.Errorf("expected 65504 to fit in float16")
+	}
+
+	result = canFitInFloat(65505, ast.FloatType{Size: 16})
+	if result {
+		t.Errorf("expected 65505 to not fit in float16")
+	}
+
+	// Test float32 range
+	result = canFitInFloat(math.MaxFloat32, ast.FloatType{Size: 32})
+	if !result {
+		t.Errorf("expected MaxFloat32 to fit in float32")
+	}
+
+	// Test float64 - should fit anything
+	result = canFitInFloat(math.MaxFloat64, ast.FloatType{Size: 64})
+	if !result {
+		t.Errorf("expected MaxFloat64 to fit in float64")
+	}
+}
+
+func TestEvalFloatLit(t *testing.T) {
+	i := New()
+	expr := &ast.FloatLit{Value: 3.14, Untyped: true}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsFloat {
+		t.Errorf("expected IsFloat to be true")
+	}
+	if val.FData != 3.14 {
+		t.Errorf("expected 3.14, got %g", val.FData)
+	}
+}
+
+func TestEvalFloatBinaryExpr(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 1.5, Untyped: true},
+		Op:    "+",
+		Right: &ast.FloatLit{Value: 2.5, Untyped: true},
+	}
+	val, err := i.evalBinary(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsFloat {
+		t.Errorf("expected IsFloat to be true")
+	}
+	if val.FData != 4.0 {
+		t.Errorf("expected 4.0, got %g", val.FData)
+	}
+}
+
+func TestFloatCompoundAssignmentAdd(t *testing.T) {
+	input := `
+var a: float{size: 32} = 1.5;
+a += 2.5;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "4") {
+		t.Errorf("expected output to contain '4', got %q", output)
+	}
+}
+
+func TestFloatCompoundAssignmentSub(t *testing.T) {
+	input := `
+var a: float{size: 32} = 5.5;
+a -= 2.0;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "3.5") {
+		t.Errorf("expected output to contain '3.5', got %q", output)
+	}
+}
+
+func TestFloatCompoundAssignmentMul(t *testing.T) {
+	input := `
+var a: float{size: 32} = 2.0;
+a *= 3.5;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "7") {
+		t.Errorf("expected output to contain '7', got %q", output)
+	}
+}
+
+func TestFloatCompoundAssignmentDiv(t *testing.T) {
+	input := `
+var a: float{size: 32} = 10.0;
+a /= 2.0;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "5") {
+		t.Errorf("expected output to contain '5', got %q", output)
+	}
+}
+
+func TestFloatDivisionByZero(t *testing.T) {
+	input := `
+var a: float{size: 32} = 10.0;
+a /= 0.0;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected division by zero error")
+	}
+}
+
+func TestFloatBinaryExprSub(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 5.5, Untyped: true},
+		Op:    "-",
+		Right: &ast.FloatLit{Value: 2.0, Untyped: true},
+	}
+	val, err := i.evalBinary(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.FData != 3.5 {
+		t.Errorf("expected 3.5, got %g", val.FData)
+	}
+}
+
+func TestFloatBinaryExprMul(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 2.5, Untyped: true},
+		Op:    "*",
+		Right: &ast.FloatLit{Value: 3.0, Untyped: true},
+	}
+	val, err := i.evalBinary(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.FData != 7.5 {
+		t.Errorf("expected 7.5, got %g", val.FData)
+	}
+}
+
+func TestFloatBinaryExprDiv(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 10.0, Untyped: true},
+		Op:    "/",
+		Right: &ast.FloatLit{Value: 4.0, Untyped: true},
+	}
+	val, err := i.evalBinary(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.FData != 2.5 {
+		t.Errorf("expected 2.5, got %g", val.FData)
+	}
+}
+
+func TestFloatBinaryExprDivByZero(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 10.0, Untyped: true},
+		Op:    "/",
+		Right: &ast.FloatLit{Value: 0.0, Untyped: true},
+	}
+	_, err := i.evalBinary(expr)
+	if err == nil {
+		t.Errorf("expected division by zero error")
+	}
+}
+
+func TestMixedIntFloatExpr(t *testing.T) {
+	input := `
+var a: integer{size: 32} = 10;
+var b: float{size: 32} = 2.5;
+print(a + b);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "12.5") {
+		t.Errorf("expected output to contain '12.5', got %q", output)
+	}
+}
+
+func TestMixedFloatIntExpr(t *testing.T) {
+	input := `
+var a: float{size: 32} = 2.5;
+var b: integer{size: 32} = 10;
+print(a + b);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "12.5") {
+		t.Errorf("expected output to contain '12.5', got %q", output)
+	}
+}
+
+func TestIntToFloatCompoundAssignment(t *testing.T) {
+	input := `
+var a: float{size: 32} = 2.5;
+a += 3;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "5.5") {
+		t.Errorf("expected output to contain '5.5', got %q", output)
+	}
+}
+
+func TestFloatOverflowDetection(t *testing.T) {
+	input := `
+var a: float{size: 16} = 65504.0;
+a += 1.0;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected overflow error for float16")
+	}
+}
+
+func TestFloatAssignmentOverflow(t *testing.T) {
+	input := `
+var a: float{size: 16} = 70000.0;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected overflow error for float16")
+	}
+}
+
+func TestNullableFloatAssignment(t *testing.T) {
+	input := `
+var a: float{size: 32, nullable: true} = null;
+a = 3.14;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "3.14") {
+		t.Errorf("expected output to contain '3.14', got %q", output)
+	}
+}
+
+func TestNullableFloatCompoundAssignment(t *testing.T) {
+	input := `
+var a: float{size: 32, nullable: true} = 1.5;
+a += 2.5;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "4") {
+		t.Errorf("expected output to contain '4', got %q", output)
+	}
+}
+
+func TestCanImplicitConvertInt64ToFloat(t *testing.T) {
+	// int64 should not implicitly convert to float
+	result := canImplicitConvert(
+		ast.IntegerType{Size: 64, Signed: true}, ast.FloatType{}, false,
+		ast.IntegerType{}, ast.FloatType{Size: 64}, true,
+	)
+	if result {
+		t.Errorf("expected int64 to not convert to float")
+	}
+}
+
+func TestCanImplicitConvertFloatToFloatDowngrade(t *testing.T) {
+	// float64 to float32 should not be allowed
+	result := canImplicitConvert(
+		ast.IntegerType{}, ast.FloatType{Size: 64}, true,
+		ast.IntegerType{}, ast.FloatType{Size: 32}, true,
+	)
+	if result {
+		t.Errorf("expected float64 to not convert to float32")
+	}
+}
+
+func TestCanFitInFloatEdgeCases(t *testing.T) {
+	tests := []struct {
+		val      float64
+		ftype    ast.FloatType
+		expected bool
+	}{
+		{65504.0, ast.FloatType{Size: 16}, true},
+		{65504.1, ast.FloatType{Size: 16}, false},
+		{math.MaxFloat32, ast.FloatType{Size: 32}, true},
+		{math.MaxFloat32 * 2, ast.FloatType{Size: 32}, false},
+		{math.MaxFloat64, ast.FloatType{Size: 64}, true},
+		{-65504.0, ast.FloatType{Size: 16}, true},
+		{-65505.0, ast.FloatType{Size: 16}, false},
+	}
+
+	for _, tt := range tests {
+		result := canFitInFloat(tt.val, tt.ftype)
+		if result != tt.expected {
+			t.Errorf("canFitInFloat(%g, %v) = %v, expected %v", tt.val, tt.ftype, result, tt.expected)
+		}
+	}
+}
+
+func TestValueStringNullableFloat(t *testing.T) {
+	v := Value{FType: ast.FloatType{Size: 32, Nullable: true}, FData: 3.14, IsFloat: true}
+	result := v.String()
+	if !strings.Contains(result, "nullable") {
+		t.Errorf("expected string to contain 'nullable', got %q", result)
+	}
+}
+
+func TestValueStringNullableInt(t *testing.T) {
+	v := Value{IType: ast.IntegerType{Size: 32, Signed: true, Nullable: true}, Data: 42, IsFloat: false}
+	result := v.String()
+	if !strings.Contains(result, "nullable") {
+		t.Errorf("expected string to contain 'nullable', got %q", result)
+	}
+}
+
+func TestEnvironmentNewAndSetGet(t *testing.T) {
+	env := NewEnv()
+	val := Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 42}
+	env.Set("x", val)
+
+	got, ok := env.Get("x")
+	if !ok {
+		t.Fatalf("expected to find variable 'x'")
+	}
+	if got.Data != 42 {
+		t.Errorf("expected 42, got %d", got.Data)
+	}
+}
+
+func TestEnvironmentUndefinedVar(t *testing.T) {
+	env := NewEnv()
+	_, ok := env.Get("undefined")
+	if ok {
+		t.Errorf("expected variable 'undefined' to not exist")
+	}
+}
+
+func TestRunMultipleStatements(t *testing.T) {
+	input := `
+var x: integer{size: 32} = 10;
+var y: integer{size: 32} = 20;
+print(x + y);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "30") {
+		t.Errorf("expected output to contain '30', got %q", output)
 	}
 }

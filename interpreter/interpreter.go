@@ -9,8 +9,11 @@ import (
 
 type Value struct {
 	IType   ast.IntegerType
+	FType   ast.FloatType
 	Data    int64
+	FData   float64
 	Untyped bool
+	IsFloat bool
 	Null    bool
 }
 
@@ -18,40 +21,87 @@ func (v Value) String() string {
 	if v.Null {
 		return "null"
 	}
+	if v.IsFloat {
+		if v.Untyped {
+			return fmt.Sprintf("%g", v.FData)
+		}
+		return fmt.Sprintf("%s(%g)", typeDesc(ast.IntegerType{}, v.FType, true), v.FData)
+	}
 	if v.Untyped {
 		return fmt.Sprintf("%d", v.Data)
 	}
-	return fmt.Sprintf("integer{size: %d, signed: %t}(%d)", v.IType.Size, v.IType.Signed, v.Data)
+	return fmt.Sprintf("%s(%d)", typeDesc(v.IType, ast.FloatType{}, false), v.Data)
 }
 
-func typeDesc(it ast.IntegerType) string {
+func typeDesc(it ast.IntegerType, ft ast.FloatType, isFloat bool) string {
+	if isFloat {
+		nullable := ""
+		if ft.Nullable {
+			nullable = "nullable "
+		}
+		return fmt.Sprintf("%s%d-bit float", nullable, ft.Size)
+	}
 	sign := "signed"
 	if !it.Signed {
 		sign = "unsigned"
 	}
 	nullable := ""
 	if it.Nullable {
-		nullable = " nullable"
+		nullable = "nullable "
 	}
-	return fmt.Sprintf("%d bit%s %s integer", it.Size, nullable, sign)
+	return fmt.Sprintf("%s%d-bit %s integer", nullable, it.Size, sign)
 }
 
-func canImplicitConvert(src ast.IntegerType, dst ast.IntegerType) bool {
-	if src.Size == dst.Size && src.Signed == dst.Signed {
-		return true
+func canImplicitConvert(srcInt ast.IntegerType, srcFloat ast.FloatType, srcIsFloat bool,
+	dstInt ast.IntegerType, dstFloat ast.FloatType, dstIsFloat bool) bool {
+
+	// Float to float
+	if srcIsFloat && dstIsFloat {
+		return srcFloat.Size <= dstFloat.Size
 	}
-	if src.Size > dst.Size {
+
+	// Integer to float
+	if !srcIsFloat && dstIsFloat {
+		// int8, uint8 -> float16
+		if srcInt.Size <= 8 {
+			return dstFloat.Size >= 16
+		}
+		// int16, uint16 -> float32
+		if srcInt.Size <= 16 {
+			return dstFloat.Size >= 32
+		}
+		// int32, uint32 -> float64
+		if srcInt.Size <= 32 {
+			return dstFloat.Size >= 64
+		}
+		// int64, uint64 -> no implicit float conversion
 		return false
 	}
-	if src.Signed && dst.Signed {
-		return true
+
+	// Float to integer - not allowed implicitly
+	if srcIsFloat && !dstIsFloat {
+		return false
 	}
-	if !src.Signed && !dst.Signed {
-		return true
+
+	// Integer to integer
+	if !srcIsFloat && !dstIsFloat {
+		if srcInt.Size == dstInt.Size && srcInt.Signed == dstInt.Signed {
+			return true
+		}
+		if srcInt.Size > dstInt.Size {
+			return false
+		}
+		if srcInt.Signed && dstInt.Signed {
+			return true
+		}
+		if !srcInt.Signed && !dstInt.Signed {
+			return true
+		}
+		if !srcInt.Signed && dstInt.Signed && srcInt.Size < dstInt.Size {
+			return true
+		}
 	}
-	if !src.Signed && dst.Signed && src.Size < dst.Size {
-		return true
-	}
+
 	return false
 }
 
@@ -97,6 +147,18 @@ func canFitInType(val int64, itype ast.IntegerType) bool {
 	return val >= min && val <= max
 }
 
+func canFitInFloat(val float64, ftype ast.FloatType) bool {
+	switch ftype.Size {
+	case 16:
+		return val >= -65504 && val <= 65504 // float16 max
+	case 32:
+		return val >= -math.MaxFloat32 && val <= math.MaxFloat32
+	case 64:
+		return true // float64 can hold anything Go float64 can
+	}
+	return false
+}
+
 type Environment struct {
 	variables map[string]Value
 }
@@ -138,33 +200,54 @@ func (i *Interpreter) ExecuteStmt(stmt ast.Stmt) error {
 func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 	switch s := stmt.(type) {
 	case *ast.VarDecl:
-		val := Value{IType: s.IType}
+		val := Value{IType: s.IType, FType: s.FType, IsFloat: s.IsFloat}
 		if s.Expr != nil {
 			rightVal, err := i.evalExpr(s.Expr)
 			if err != nil {
 				return err
 			}
 			if rightVal.Null {
-				if !s.IType.Nullable {
-					return fmt.Errorf("cannot assign null to %s", typeDesc(s.IType))
+				if !s.IType.Nullable && !s.FType.Nullable {
+					return fmt.Errorf("cannot assign null to %s", typeDesc(s.IType, s.FType, s.IsFloat))
 				}
 				val.Null = true
 			} else {
-				if isVarRef(s.Expr) {
-					if !canImplicitConvert(rightVal.IType, s.IType) {
-						return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDesc(rightVal.IType), typeDesc(s.IType))
+				if rightVal.IsFloat {
+					if !s.IsFloat {
+						return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDesc(rightVal.IType, rightVal.FType, true), typeDesc(s.IType, s.FType, false))
+					}
+					if !canImplicitConvert(rightVal.IType, rightVal.FType, true, s.IType, s.FType, true) {
+						return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDesc(rightVal.IType, rightVal.FType, true), typeDesc(s.IType, s.FType, true))
+					}
+					if !canFitInFloat(rightVal.FData, s.FType) {
+						return fmt.Errorf("overflow: value %g cannot fit in %s", rightVal.FData, typeDesc(ast.IntegerType{}, s.FType, true))
+					}
+					val.FData = rightVal.FData
+				} else {
+					if s.IsFloat {
+						// Integer to float conversion
+						if !canImplicitConvert(rightVal.IType, ast.FloatType{}, false, ast.IntegerType{}, s.FType, true) {
+							return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDesc(rightVal.IType, ast.FloatType{}, false), typeDesc(ast.IntegerType{}, s.FType, true))
+						}
+						fresult := float64(rightVal.Data)
+						if !canFitInFloat(fresult, s.FType) {
+							return fmt.Errorf("overflow: value %g cannot fit in %s", fresult, typeDesc(ast.IntegerType{}, s.FType, true))
+						}
+						val.FData = fresult
+					} else {
+						// Integer to integer
+						if rightVal.Untyped {
+							if !canFitInType(rightVal.Data, s.IType) {
+								return fmt.Errorf("overflow: value %d cannot fit in %s", rightVal.Data, typeDesc(s.IType, s.FType, false))
+							}
+						} else if !canImplicitConvert(rightVal.IType, rightVal.FType, false, s.IType, s.FType, false) {
+							return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDesc(rightVal.IType, rightVal.FType, false), typeDesc(s.IType, s.FType, false))
+						}
+						val.Data = rightVal.Data
 					}
 				}
-				if rightVal.Untyped {
-					if !canFitInType(rightVal.Data, s.IType) {
-						return fmt.Errorf("overflow: value %d cannot fit in %s", rightVal.Data, typeDesc(s.IType))
-					}
-				} else if !canImplicitConvert(rightVal.IType, s.IType) {
-					return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDesc(rightVal.IType), typeDesc(s.IType))
-				}
-				val.Data = rightVal.Data
 			}
-		} else if s.IType.Nullable {
+		} else if (s.IsFloat && s.FType.Nullable) || (!s.IsFloat && s.IType.Nullable) {
 			val.Null = true
 		}
 		i.env.Set(s.Name, val)
@@ -177,6 +260,8 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 		}
 		if val.Null {
 			fmt.Println("null")
+		} else if val.IsFloat {
+			fmt.Println(val.FData)
 		} else {
 			fmt.Println(val.Data)
 		}
@@ -184,16 +269,6 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 		return fmt.Errorf("unknown statement type")
 	}
 	return nil
-}
-
-func isLiteralExpr(expr ast.Expr) bool {
-	_, ok := expr.(*ast.IntegerLit)
-	return ok
-}
-
-func isVarRef(expr ast.Expr) bool {
-	_, ok := expr.(*ast.VarRef)
-	return ok
 }
 
 func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
@@ -208,11 +283,12 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 	}
 
 	if rightVal.Null {
-		if !val.IType.Nullable {
-			return fmt.Errorf("cannot assign null to %s", typeDesc(val.IType))
+		if !val.IType.Nullable && !val.FType.Nullable {
+			return fmt.Errorf("cannot assign null to %s", typeDesc(val.IType, val.FType, val.IsFloat))
 		}
 		val.Null = true
 		val.Data = 0
+		val.FData = 0
 		i.env.Set(stmt.Name, val)
 		return nil
 	}
@@ -221,40 +297,87 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 		return fmt.Errorf("cannot use null variable in %s operation", stmt.Op)
 	}
 
-	if isLiteralExpr(stmt.Expr) {
-		// literals are handled by canFitInType check below
-	} else if rightVal.Untyped {
-		// untyped expression result - just check it fits
-	} else {
-		if !canImplicitConvert(rightVal.IType, val.IType) {
-			return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDesc(rightVal.IType), typeDesc(val.IType))
-		}
-	}
-
 	var result int64
-	switch stmt.Op {
-	case "=":
-		result = rightVal.Data
-	case "+=":
-		result = val.Data + rightVal.Data
-	case "-=":
-		result = val.Data - rightVal.Data
-	case "*=":
-		result = val.Data * rightVal.Data
-	case "/=":
-		if rightVal.Data == 0 {
-			return fmt.Errorf("division by zero")
+	var fresult float64
+
+	if val.IsFloat && !rightVal.IsFloat {
+		// Integer to float assignment
+		if !canImplicitConvert(rightVal.IType, rightVal.FType, false, val.IType, val.FType, true) {
+			return fmt.Errorf("type mismatch: cannot assign %s to %s", typeDesc(rightVal.IType, rightVal.FType, false), typeDesc(val.IType, val.FType, true))
 		}
-		result = val.Data / rightVal.Data
-	default:
-		return fmt.Errorf("unknown operator: %s", stmt.Op)
+		switch stmt.Op {
+		case "=":
+			fresult = float64(rightVal.Data)
+		case "+=":
+			fresult = val.FData + float64(rightVal.Data)
+		case "-=":
+			fresult = val.FData - float64(rightVal.Data)
+		case "*=":
+			fresult = val.FData * float64(rightVal.Data)
+		case "/=":
+			if rightVal.Data == 0 {
+				return fmt.Errorf("division by zero")
+			}
+			fresult = val.FData / float64(rightVal.Data)
+		default:
+			return fmt.Errorf("unknown operator: %s", stmt.Op)
+		}
+		if !canFitInFloat(fresult, val.FType) {
+			return fmt.Errorf("overflow: value %g cannot fit in %s", fresult, typeDesc(val.IType, val.FType, true))
+		}
+		val.FData = fresult
+	} else if !val.IsFloat && rightVal.IsFloat {
+		// Float to integer - not allowed implicitly
+		return fmt.Errorf("type mismatch: cannot assign %s to %s", typeDesc(rightVal.IType, rightVal.FType, true), typeDesc(val.IType, val.FType, false))
+	} else if val.IsFloat {
+		// Float to float
+		fresult = val.FData
+		switch stmt.Op {
+		case "=":
+			fresult = rightVal.FData
+		case "+=":
+			fresult = fresult + rightVal.FData
+		case "-=":
+			fresult = fresult - rightVal.FData
+		case "*=":
+			fresult = fresult * rightVal.FData
+		case "/=":
+			if rightVal.FData == 0 {
+				return fmt.Errorf("division by zero")
+			}
+			fresult = fresult / rightVal.FData
+		default:
+			return fmt.Errorf("unknown operator: %s", stmt.Op)
+		}
+		if !canFitInFloat(fresult, val.FType) {
+			return fmt.Errorf("overflow: value %g cannot fit in %s", fresult, typeDesc(val.IType, val.FType, true))
+		}
+		val.FData = fresult
+	} else {
+		// Integer to integer
+		result = val.Data
+		switch stmt.Op {
+		case "=":
+			result = rightVal.Data
+		case "+=":
+			result = result + rightVal.Data
+		case "-=":
+			result = result - rightVal.Data
+		case "*=":
+			result = result * rightVal.Data
+		case "/=":
+			if rightVal.Data == 0 {
+				return fmt.Errorf("division by zero")
+			}
+			result = result / rightVal.Data
+		default:
+			return fmt.Errorf("unknown operator: %s", stmt.Op)
+		}
+		if !canFitInType(result, val.IType) {
+			return fmt.Errorf("overflow: value %d cannot fit in %s", result, typeDesc(val.IType, val.FType, false))
+		}
+		val.Data = result
 	}
-
-	if !canFitInType(result, val.IType) {
-		return fmt.Errorf("overflow: value %d cannot fit in %s", result, typeDesc(val.IType))
-	}
-
-	val.Data = result
 	val.Null = false
 	i.env.Set(stmt.Name, val)
 	return nil
@@ -266,7 +389,12 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 		if e.Untyped {
 			return Value{Untyped: true, Data: e.Value}, nil
 		}
-		return Value{IType: e.IType, Data: e.Value}, nil
+		return Value{IType: e.IType, Data: e.Value, IsFloat: false}, nil
+	case *ast.FloatLit:
+		if e.Untyped {
+			return Value{Untyped: true, FData: e.Value, IsFloat: true}, nil
+		}
+		return Value{FType: e.FType, FData: e.Value, IsFloat: true}, nil
 	case *ast.VarRef:
 		val, ok := i.env.Get(e.Name)
 		if !ok {
@@ -296,55 +424,113 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 		return Value{Null: true}, nil
 	}
 
+	// Determine result type
+	isFloat := left.IsFloat || right.IsFloat
 	var resultType ast.IntegerType
-	if left.Untyped && right.Untyped {
-		resultType = ast.IntegerType{Size: 64, Signed: true}
-	} else if left.Untyped {
-		resultType = right.IType
-	} else if right.Untyped {
-		resultType = left.IType
-	} else {
-		resultType = left.IType
-		if !canImplicitConvert(right.IType, left.IType) && !canImplicitConvert(left.IType, right.IType) {
-			return Value{}, fmt.Errorf("type mismatch: cannot compute %s %s %s", typeDesc(left.IType), expr.Op, typeDesc(right.IType))
+	var resultFType ast.FloatType
+
+	if isFloat {
+		// Float result
+		if left.IsFloat && right.IsFloat {
+			resultFType.Size = left.FType.Size
+			if right.FType.Size > left.FType.Size {
+				resultFType.Size = right.FType.Size
+			}
+		} else if left.IsFloat {
+			resultFType = left.FType
+		} else {
+			resultFType = right.FType
 		}
-		if canImplicitConvert(right.IType, left.IType) && left.IType.Size >= right.IType.Size {
-			right.Data = clamp(right.Data, left.IType)
-			right.IType = left.IType
-			right.Untyped = false
-		} else if canImplicitConvert(left.IType, right.IType) {
-			left.Data = clamp(left.Data, right.IType)
-			left.IType = right.IType
-			left.Untyped = false
+	} else {
+		// Integer result
+		if left.Untyped && right.Untyped {
+			resultType = ast.IntegerType{Size: 64, Signed: true}
+		} else if left.Untyped {
 			resultType = right.IType
+		} else if right.Untyped {
+			resultType = left.IType
+		} else {
+			resultType = left.IType
+			if !canImplicitConvert(right.IType, right.FType, false, left.IType, left.FType, false) && !canImplicitConvert(left.IType, left.FType, false, right.IType, right.FType, false) {
+				return Value{}, fmt.Errorf("type mismatch: cannot compute %s %s %s", typeDesc(left.IType, left.FType, false), expr.Op, typeDesc(right.IType, right.FType, false))
+			}
+			if canImplicitConvert(right.IType, right.FType, false, left.IType, left.FType, false) && left.IType.Size >= right.IType.Size {
+				right.Data = clamp(right.Data, left.IType)
+				right.IType = left.IType
+				right.Untyped = false
+			} else if canImplicitConvert(left.IType, left.FType, false, right.IType, right.FType, false) {
+				left.Data = clamp(left.Data, right.IType)
+				left.IType = right.IType
+				left.Untyped = false
+				resultType = right.IType
+			}
 		}
 	}
 
 	var result int64
+	var fresult float64
+
+	// Get float values for both operands (convert int to float if needed)
+	getFloat := func(v Value) float64 {
+		if v.IsFloat {
+			return v.FData
+		}
+		return float64(v.Data)
+	}
+	leftF := getFloat(left)
+	rightF := getFloat(right)
+
 	switch expr.Op {
 	case "+":
-		result = left.Data + right.Data
-	case "-":
-		result = left.Data - right.Data
-	case "*":
-		result = left.Data * right.Data
-	case "/":
-		if right.Data == 0 {
-			return Value{}, fmt.Errorf("division by zero")
+		if isFloat {
+			fresult = leftF + rightF
+		} else {
+			result = left.Data + right.Data
 		}
-		result = left.Data / right.Data
+	case "-":
+		if isFloat {
+			fresult = leftF - rightF
+		} else {
+			result = left.Data - right.Data
+		}
+	case "*":
+		if isFloat {
+			fresult = leftF * rightF
+		} else {
+			result = left.Data * right.Data
+		}
+	case "/":
+		if isFloat {
+			if rightF == 0 {
+				return Value{}, fmt.Errorf("division by zero")
+			}
+			fresult = leftF / rightF
+		} else {
+			if right.Data == 0 {
+				return Value{}, fmt.Errorf("division by zero")
+			}
+			result = left.Data / right.Data
+		}
 	default:
 		return Value{}, fmt.Errorf("unknown operator: %s", expr.Op)
 	}
 
+	if isFloat {
+		if left.Untyped || right.Untyped {
+			return Value{Untyped: true, FData: fresult, IsFloat: true}, nil
+		}
+		if !canFitInFloat(fresult, resultFType) {
+			return Value{}, fmt.Errorf("overflow: result %g cannot fit in %s", fresult, typeDesc(ast.IntegerType{}, resultFType, true))
+		}
+		return Value{FType: resultFType, FData: fresult, IsFloat: true}, nil
+	}
+
 	if left.Untyped || right.Untyped {
-		return Value{Untyped: true, IType: resultType, Data: result}, nil
+		return Value{Untyped: true, Data: result}, nil
 	}
-
 	if !canFitInType(result, resultType) {
-		return Value{}, fmt.Errorf("overflow: result %d cannot fit in %s", result, typeDesc(resultType))
+		return Value{}, fmt.Errorf("overflow: result %d cannot fit in %s", result, typeDesc(resultType, ast.FloatType{}, false))
 	}
-
 	return Value{IType: resultType, Data: result}, nil
 }
 

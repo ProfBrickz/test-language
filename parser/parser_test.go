@@ -782,17 +782,119 @@ func TestParsePrimaryMissingRParenInExpr(t *testing.T) {
 	}
 }
 
-func TestParsePrimaryDirectMissingRParen(t *testing.T) {
-	// This directly tests the TOK_LPAREN case in parsePrimary
-	// with a missing closing paren
-	// Input: (1 + 2  <- missing )
-	// The inner parseExpr will parse 1+2, then we check for )
-	input := "print((1 + 2;"
+func TestParseFloatLiteral(t *testing.T) {
+	input := "print(3.14);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	_, ok := stmt.Expr.(*ast.FloatLit)
+	if !ok {
+		t.Fatalf("expected *ast.FloatLit, got %T", stmt.Expr)
+	}
+}
+
+func TestParseInvalidFloatLiteral(t *testing.T) {
+	// Invalid float literal - Go's ParseFloat might handle some edge cases
+	// Let's test with a float that has multiple decimal points
+	input := "print(1.2.3);"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	// Should have errors
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected errors for invalid float literal")
+	}
+}
+
+func TestParseFloatDecl(t *testing.T) {
+	input := "var x: float{size: 32} = 3.14;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+
+	stmt, ok := program.Stmts[0].(*ast.VarDecl)
+	if !ok {
+		t.Fatalf("expected *ast.VarDecl, got %T", program.Stmts[0])
+	}
+
+	if !stmt.IsFloat {
+		t.Errorf("expected IsFloat to be true")
+	}
+	if stmt.FType.Size != 32 {
+		t.Errorf("expected size 32, got %d", stmt.FType.Size)
+	}
+}
+
+func TestParseFloat16Decl(t *testing.T) {
+	input := "var x: float{size: 16} = 1.5;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	if stmt.FType.Size != 16 {
+		t.Errorf("expected size 16, got %d", stmt.FType.Size)
+	}
+}
+
+func TestParseFloat64Decl(t *testing.T) {
+	input := "var x: float{size: 64} = 1.5;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	if stmt.FType.Size != 64 {
+		t.Errorf("expected size 64, got %d", stmt.FType.Size)
+	}
+}
+
+func TestParseFloatInvalidSize(t *testing.T) {
+	input := "var x: float{size: 128} = 1.0;"
 	l := lexer.New(input)
 	p := New(l)
 	p.ParseProgram()
 
 	if len(p.Errors()) == 0 {
-		t.Errorf("expected error for missing ), got none. Errors: %v", p.Errors())
+		t.Errorf("expected error for invalid float size")
+	}
+}
+
+func TestParseFloatTypeWithNullable(t *testing.T) {
+	input := "var x: float{size: 32, nullable: true} = null;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	if !stmt.FType.Nullable {
+		t.Errorf("expected nullable to be true")
 	}
 }

@@ -8,17 +8,19 @@ import (
 type TokenType string
 
 const (
-	TOK_INTEGER  TokenType = "INTEGER"
-	TOK_VAR      TokenType = "VAR"
-	TOK_PRINT    TokenType = "PRINT"
-	TOK_IDENT    TokenType = "IDENT"
-	TOK_INT_LIT  TokenType = "INT_LIT"
-	TOK_SIZE     TokenType = "SIZE"
-	TOK_SIGNED   TokenType = "SIGNED"
-	TOK_NULL     TokenType = "NULL"
-	TOK_NULLABLE TokenType = "NULLABLE"
-	TOK_TRUE     TokenType = "TRUE"
-	TOK_FALSE    TokenType = "FALSE"
+	TOK_INTEGER   TokenType = "INTEGER"
+	TOK_FLOAT     TokenType = "FLOAT"
+	TOK_VAR       TokenType = "VAR"
+	TOK_PRINT     TokenType = "PRINT"
+	TOK_IDENT     TokenType = "IDENT"
+	TOK_INT_LIT   TokenType = "INT_LIT"
+	TOK_FLOAT_LIT TokenType = "FLOAT_LIT"
+	TOK_SIZE      TokenType = "SIZE"
+	TOK_SIGNED    TokenType = "SIGNED"
+	TOK_NULL      TokenType = "NULL"
+	TOK_NULLABLE  TokenType = "NULLABLE"
+	TOK_TRUE      TokenType = "TRUE"
+	TOK_FALSE     TokenType = "FALSE"
 
 	TOK_COLON     TokenType = ":"
 	TOK_SEMICOLON TokenType = ";"
@@ -142,10 +144,27 @@ func (l *Lexer) skipWhitespace() {
 
 func (l *Lexer) readNumber() Token {
 	start := l.pos
-	for l.pos < len(l.input) && unicode.IsDigit(rune(l.input[l.pos])) {
-		l.pos++
+	hasDecimal := false
+	for l.pos < len(l.input) {
+		if unicode.IsDigit(rune(l.input[l.pos])) {
+			l.pos++
+		} else if l.input[l.pos] == '.' && !hasDecimal {
+			// Check if next char is a digit (not another dot)
+			if l.pos+1 < len(l.input) && unicode.IsDigit(rune(l.input[l.pos+1])) {
+				hasDecimal = true
+				l.pos++
+			} else {
+				break
+			}
+		} else {
+			break
+		}
 	}
-	return Token{TOK_INT_LIT, l.input[start:l.pos], l.line}
+	lit := l.input[start:l.pos]
+	if hasDecimal {
+		return Token{TOK_FLOAT_LIT, lit, l.line}
+	}
+	return Token{TOK_INT_LIT, lit, l.line}
 }
 
 func (l *Lexer) readIdentifier() Token {
@@ -159,6 +178,8 @@ func (l *Lexer) readIdentifier() Token {
 		return Token{TOK_VAR, word, l.line}
 	case "integer":
 		return Token{TOK_INTEGER, word, l.line}
+	case "float":
+		return Token{TOK_FLOAT, word, l.line}
 	case "print":
 		return Token{TOK_PRINT, word, l.line}
 	case "size":
