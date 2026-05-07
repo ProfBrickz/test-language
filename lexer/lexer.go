@@ -144,27 +144,151 @@ func (l *Lexer) skipWhitespace() {
 
 func (l *Lexer) readNumber() Token {
 	start := l.pos
-	hasDecimal := false
+
+	if l.input[l.pos] == '0' && l.pos+1 < len(l.input) {
+		next := l.input[l.pos+1]
+		if next == 'x' || next == 'X' {
+			return l.readHexNumber(start)
+		}
+		if next == 'b' || next == 'B' {
+			return l.readBinNumber(start)
+		}
+		if next == 'o' || next == 'O' {
+			return l.readOctNumber(start)
+		}
+	}
+
+	// Decimal integer or float with optional underscores and scientific notation
 	for l.pos < len(l.input) {
-		if unicode.IsDigit(rune(l.input[l.pos])) {
+		ch := l.input[l.pos]
+		if ch == '_' || unicode.IsDigit(rune(ch)) {
 			l.pos++
-		} else if l.input[l.pos] == '.' && !hasDecimal {
-			// Check if next char is a digit (not another dot)
-			if l.pos+1 < len(l.input) && unicode.IsDigit(rune(l.input[l.pos+1])) {
-				hasDecimal = true
-				l.pos++
-			} else {
-				break
-			}
 		} else {
 			break
 		}
 	}
+
+	hasDecimal := false
+	hasExponent := false
+
+	if l.pos < len(l.input) && l.input[l.pos] == '.' {
+		if l.pos+1 < len(l.input) && unicode.IsDigit(rune(l.input[l.pos+1])) {
+			hasDecimal = true
+			l.pos++
+			for l.pos < len(l.input) {
+				ch := l.input[l.pos]
+				if ch == '_' || unicode.IsDigit(rune(ch)) {
+					l.pos++
+				} else {
+					break
+				}
+			}
+		}
+	}
+
+	if l.pos < len(l.input) && (l.input[l.pos] == 'e' || l.input[l.pos] == 'E') {
+		expStart := l.pos
+		l.pos++
+		if l.pos < len(l.input) && (l.input[l.pos] == '+' || l.input[l.pos] == '-') {
+			l.pos++
+		}
+		digitCount := 0
+		for l.pos < len(l.input) {
+			ch := l.input[l.pos]
+			if ch == '_' || unicode.IsDigit(rune(ch)) {
+				digitCount++
+				l.pos++
+			} else {
+				break
+			}
+		}
+		if digitCount > 0 {
+			hasExponent = true
+		} else {
+			l.pos = expStart
+		}
+	}
+
 	lit := l.input[start:l.pos]
-	if hasDecimal {
+	if hasDecimal || hasExponent {
 		return Token{TOK_FLOAT_LIT, lit, l.line}
 	}
 	return Token{TOK_INT_LIT, lit, l.line}
+}
+
+func (l *Lexer) readHexNumber(start int) Token {
+	l.pos += 2
+	for l.pos < len(l.input) {
+		ch := l.input[l.pos]
+		if ch == '_' || unicode.IsDigit(rune(ch)) || unicode.IsLetter(rune(ch)) {
+			l.pos++
+		} else {
+			break
+		}
+	}
+	if l.pos < len(l.input) && l.input[l.pos] == '.' {
+		l.pos++
+		for l.pos < len(l.input) {
+			ch := l.input[l.pos]
+			if ch == '_' || unicode.IsDigit(rune(ch)) || unicode.IsLetter(rune(ch)) {
+				l.pos++
+			} else {
+				break
+			}
+		}
+		return Token{TOK_FLOAT_LIT, l.input[start:l.pos], l.line}
+	}
+	return Token{TOK_INT_LIT, l.input[start:l.pos], l.line}
+}
+
+func (l *Lexer) readBinNumber(start int) Token {
+	l.pos += 2
+	for l.pos < len(l.input) {
+		ch := l.input[l.pos]
+		if ch == '_' || unicode.IsDigit(rune(ch)) || unicode.IsLetter(rune(ch)) {
+			l.pos++
+		} else {
+			break
+		}
+	}
+	if l.pos < len(l.input) && l.input[l.pos] == '.' {
+		l.pos++
+		for l.pos < len(l.input) {
+			ch := l.input[l.pos]
+			if ch == '_' || unicode.IsDigit(rune(ch)) || unicode.IsLetter(rune(ch)) {
+				l.pos++
+			} else {
+				break
+			}
+		}
+		return Token{TOK_FLOAT_LIT, l.input[start:l.pos], l.line}
+	}
+	return Token{TOK_INT_LIT, l.input[start:l.pos], l.line}
+}
+
+func (l *Lexer) readOctNumber(start int) Token {
+	l.pos += 2
+	for l.pos < len(l.input) {
+		ch := l.input[l.pos]
+		if ch == '_' || unicode.IsDigit(rune(ch)) || unicode.IsLetter(rune(ch)) {
+			l.pos++
+		} else {
+			break
+		}
+	}
+	if l.pos < len(l.input) && l.input[l.pos] == '.' {
+		l.pos++
+		for l.pos < len(l.input) {
+			ch := l.input[l.pos]
+			if ch == '_' || unicode.IsDigit(rune(ch)) || unicode.IsLetter(rune(ch)) {
+				l.pos++
+			} else {
+				break
+			}
+		}
+		return Token{TOK_FLOAT_LIT, l.input[start:l.pos], l.line}
+	}
+	return Token{TOK_INT_LIT, l.input[start:l.pos], l.line}
 }
 
 func (l *Lexer) readIdentifier() Token {

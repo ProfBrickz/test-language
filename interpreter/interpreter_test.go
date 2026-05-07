@@ -142,15 +142,21 @@ print(x);
 func TestTypeMismatch(t *testing.T) {
 	input := `
 var x: integer{size: 8, signed: true, nullable: false} = 1000;
+print(x);
 `
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
 
 	i := New()
-	err := i.Run(program)
-	if err == nil {
-		t.Errorf("expected type mismatch error")
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "-24") {
+		t.Errorf("expected output to contain '-24', got %q", output)
 	}
 }
 
@@ -233,34 +239,6 @@ func TestCanImplicitConvert(t *testing.T) {
 			t.Errorf("canImplicitConvert(%v, %v, %v, %v, %v, %v) = %v, expected %v",
 				tt.srcInt, tt.srcFloat, tt.srcIsFloat, tt.dstInt, tt.dstFloat, tt.dstIsFloat,
 				result, tt.expected)
-		}
-	}
-}
-
-func TestCanFitInType(t *testing.T) {
-	tests := []struct {
-		val      int64
-		itype    ast.IntegerType
-		expected bool
-	}{
-		{100, ast.IntegerType{Size: 8, Signed: true}, true},
-		{200, ast.IntegerType{Size: 8, Signed: true}, false},
-		{255, ast.IntegerType{Size: 8, Signed: false}, true},
-		{256, ast.IntegerType{Size: 8, Signed: false}, false},
-		{32767, ast.IntegerType{Size: 16, Signed: true}, true},
-		{32768, ast.IntegerType{Size: 16, Signed: true}, false},
-		{65535, ast.IntegerType{Size: 16, Signed: false}, true},
-		{65536, ast.IntegerType{Size: 16, Signed: false}, false},
-		{2147483647, ast.IntegerType{Size: 32, Signed: true}, true},
-		{-2147483648, ast.IntegerType{Size: 32, Signed: true}, true},
-		{4294967295, ast.IntegerType{Size: 32, Signed: false}, true},
-		{9223372036854775807, ast.IntegerType{Size: 64, Signed: true}, true},
-	}
-
-	for _, tt := range tests {
-		result := canFitInType(tt.val, tt.itype)
-		if result != tt.expected {
-			t.Errorf("canFitInType(%d, %v) = %v, expected %v", tt.val, tt.itype, result, tt.expected)
 		}
 	}
 }
@@ -443,27 +421,6 @@ x += 5;
 	}
 }
 
-func TestClamp(t *testing.T) {
-	tests := []struct {
-		val      int64
-		itype    ast.IntegerType
-		expected int64
-	}{
-		{200, ast.IntegerType{Size: 8, Signed: true}, 127},
-		{-200, ast.IntegerType{Size: 8, Signed: true}, -128},
-		{300, ast.IntegerType{Size: 8, Signed: false}, 255},
-		{-10, ast.IntegerType{Size: 8, Signed: false}, 0},
-		{100000, ast.IntegerType{Size: 16, Signed: true}, 32767},
-	}
-
-	for _, tt := range tests {
-		result := clamp(tt.val, tt.itype)
-		if result != tt.expected {
-			t.Errorf("clamp(%d, %v) = %d, expected %d", tt.val, tt.itype, result, tt.expected)
-		}
-	}
-}
-
 func TestCanImplicitConvertMore(t *testing.T) {
 	tests := []struct {
 		srcInt     ast.IntegerType
@@ -561,15 +518,21 @@ func TestExecuteAssignmentWithLiteralOverflow(t *testing.T) {
 	input := `
 var x: integer{size: 8, signed: true, nullable: false} = 10;
 x = 200;
+print(x);
 `
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
 
 	i := New()
-	err := i.Run(program)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "-56") {
+		t.Errorf("expected output to contain '-56', got %q", output)
 	}
 }
 
@@ -639,60 +602,12 @@ func TestEvalBinaryResultOverflow(t *testing.T) {
 		Op:    "+",
 		Right: &ast.IntegerLit{Value: 200, IType: ast.IntegerType{Size: 8, Signed: true}, Untyped: false},
 	}
-	_, err := i.evalBinary(expr)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	val, err := i.evalBinary(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-}
-
-func TestCanFitInTypeEdgeCases(t *testing.T) {
-	tests := []struct {
-		val      int64
-		itype    ast.IntegerType
-		expected bool
-	}{
-		{math.MaxInt8, ast.IntegerType{Size: 8, Signed: true}, true},
-		{math.MinInt8, ast.IntegerType{Size: 8, Signed: true}, true},
-		{math.MaxUint8, ast.IntegerType{Size: 8, Signed: false}, true},
-		{math.MaxInt16, ast.IntegerType{Size: 16, Signed: true}, true},
-		{math.MinInt16, ast.IntegerType{Size: 16, Signed: true}, true},
-		{math.MaxUint16, ast.IntegerType{Size: 16, Signed: false}, true},
-		{math.MaxInt32, ast.IntegerType{Size: 32, Signed: true}, true},
-		{math.MinInt32, ast.IntegerType{Size: 32, Signed: true}, true},
-		{math.MaxUint32, ast.IntegerType{Size: 32, Signed: false}, true},
-	}
-
-	for _, tt := range tests {
-		result := canFitInType(tt.val, tt.itype)
-		if result != tt.expected {
-			t.Errorf("canFitInType(%d, %v) = %v, expected %v", tt.val, tt.itype, result, tt.expected)
-		}
-	}
-}
-
-func TestClampEdgeCases(t *testing.T) {
-	tests := []struct {
-		val      int64
-		itype    ast.IntegerType
-		expected int64
-	}{
-		{math.MaxInt8 + 1, ast.IntegerType{Size: 8, Signed: true}, math.MaxInt8},
-		{math.MinInt8 - 1, ast.IntegerType{Size: 8, Signed: true}, math.MinInt8},
-		{math.MaxUint8 + 1, ast.IntegerType{Size: 8, Signed: false}, math.MaxUint8},
-		{-1, ast.IntegerType{Size: 8, Signed: false}, 0},
-		{math.MaxInt16 + 1, ast.IntegerType{Size: 16, Signed: true}, math.MaxInt16},
-		{math.MinInt16 - 1, ast.IntegerType{Size: 16, Signed: true}, math.MinInt16},
-		{math.MaxUint16 + 1, ast.IntegerType{Size: 16, Signed: false}, math.MaxUint16},
-		{math.MaxInt32 + 1, ast.IntegerType{Size: 32, Signed: true}, math.MaxInt32},
-		{math.MinInt32 - 1, ast.IntegerType{Size: 32, Signed: true}, math.MinInt32},
-		{math.MaxUint32 + 1, ast.IntegerType{Size: 32, Signed: false}, math.MaxUint32},
-	}
-
-	for _, tt := range tests {
-		result := clamp(tt.val, tt.itype)
-		if result != tt.expected {
-			t.Errorf("clamp(%d, %v) = %d, expected %d", tt.val, tt.itype, result, tt.expected)
-		}
+	if val.Data != -112 {
+		t.Errorf("expected -112, got %d", val.Data)
 	}
 }
 
@@ -802,61 +717,6 @@ print(x);
 	}
 }
 
-func TestCanFitInType64BitUnsigned(t *testing.T) {
-	// 64-bit unsigned uses math.MaxInt64 as max
-	tests := []struct {
-		val      int64
-		itype    ast.IntegerType
-		expected bool
-	}{
-		{math.MaxInt64, ast.IntegerType{Size: 64, Signed: false}, true},
-		{math.MaxInt64, ast.IntegerType{Size: 64, Signed: false}, true},
-		{-1, ast.IntegerType{Size: 64, Signed: false}, false},
-	}
-
-	for _, tt := range tests {
-		result := canFitInType(tt.val, tt.itype)
-		if result != tt.expected {
-			t.Errorf("canFitInType(%d, %v) = %v, expected %v", tt.val, tt.itype, result, tt.expected)
-		}
-	}
-}
-
-func TestClampDefaultCase(t *testing.T) {
-	// Test the default case in clamp (invalid size)
-	// Since Go won't let us create invalid sizes easily,
-	// let's just verify the function works for valid sizes
-	result := clamp(0, ast.IntegerType{Size: 64, Signed: true})
-	if result != 0 {
-		t.Errorf("expected 0, got %d", result)
-	}
-
-	// Test with invalid size (triggers default case)
-	// Use reflection to set invalid size
-	itype := ast.IntegerType{Size: 123, Signed: true} // invalid size
-	result = clamp(100, itype)
-	// Default case uses MinInt64/MaxInt64
-	if result != 100 {
-		t.Errorf("expected 100, got %d", result)
-	}
-}
-
-func TestCanFitInTypeDefaultCase(t *testing.T) {
-	// Test the default case in canFitInType (invalid size)
-	// Use an invalid size to trigger default case
-	itype := ast.IntegerType{Size: 123, Signed: true} // invalid size
-	result := canFitInType(100, itype)
-	// Default case uses MinInt64/MaxInt64
-	if !result {
-		t.Errorf("expected true for value within int64 range")
-	}
-
-	result = canFitInType(-100, itype)
-	if !result {
-		t.Errorf("expected true for negative value within int64 range")
-	}
-}
-
 func TestExecuteAssignmentWithUntypedExpr(t *testing.T) {
 	input := `
 var x: integer{size: 32, signed: true, nullable: false} = 10;
@@ -915,26 +775,6 @@ func TestEvalBinaryWithBothTypedLeftConvert(t *testing.T) {
 	}
 }
 
-func TestClamp64Bit(t *testing.T) {
-	tests := []struct {
-		val      int64
-		itype    ast.IntegerType
-		expected int64
-	}{
-		{math.MaxInt64, ast.IntegerType{Size: 64, Signed: true}, math.MaxInt64},
-		{math.MinInt64, ast.IntegerType{Size: 64, Signed: true}, math.MinInt64},
-		{math.MaxInt64, ast.IntegerType{Size: 64, Signed: false}, math.MaxInt64},
-		{-1, ast.IntegerType{Size: 64, Signed: false}, 0},
-	}
-
-	for _, tt := range tests {
-		result := clamp(tt.val, tt.itype)
-		if result != tt.expected {
-			t.Errorf("clamp(%d, %v) = %d, expected %d", tt.val, tt.itype, result, tt.expected)
-		}
-	}
-}
-
 func TestEvalBinaryRightConvertsToLeft(t *testing.T) {
 	i := New()
 	// Right can convert to left, left.IType.Size >= right.IType.Size
@@ -979,9 +819,12 @@ func TestEvalBinaryWithMultiplicationOverflow(t *testing.T) {
 		Op:    "*",
 		Right: &ast.IntegerLit{Value: 2, IType: ast.IntegerType{Size: 8, Signed: true}, Untyped: false},
 	}
-	_, err := i.evalBinary(expr)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	val, err := i.evalBinary(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != -112 {
+		t.Errorf("expected -112, got %d", val.Data)
 	}
 }
 
@@ -990,15 +833,21 @@ func TestExecuteAssignmentWithTypeMismatch(t *testing.T) {
 var x: integer{size: 8, signed: true, nullable: false} = 10;
 var y: integer{size: 32, signed: true, nullable: false} = 1000;
 x = y;
+print(x);
 `
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
 
 	i := New()
-	err := i.Run(program)
-	if err == nil {
-		t.Errorf("expected type mismatch error")
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "-24") {
+		t.Errorf("expected output to contain '-24', got %q", output)
 	}
 }
 
@@ -1063,8 +912,12 @@ func TestExecuteVarDeclWithLiteralOverflow(t *testing.T) {
 		Expr:  &ast.IntegerLit{Value: 200, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.Data != -56 {
+		t.Errorf("expected -56, got %d", val.Data)
 	}
 }
 
@@ -1495,31 +1348,6 @@ func TestFloatTypeDesc(t *testing.T) {
 	}
 }
 
-func TestCanFitInFloat(t *testing.T) {
-	// Test float16 range
-	result := canFitInFloat(65504, ast.FloatType{Size: 16})
-	if !result {
-		t.Errorf("expected 65504 to fit in float16")
-	}
-
-	result = canFitInFloat(65505, ast.FloatType{Size: 16})
-	if result {
-		t.Errorf("expected 65505 to not fit in float16")
-	}
-
-	// Test float32 range
-	result = canFitInFloat(math.MaxFloat32, ast.FloatType{Size: 32})
-	if !result {
-		t.Errorf("expected MaxFloat32 to fit in float32")
-	}
-
-	// Test float64 - should fit anything
-	result = canFitInFloat(math.MaxFloat64, ast.FloatType{Size: 64})
-	if !result {
-		t.Errorf("expected MaxFloat64 to fit in float64")
-	}
-}
-
 func TestEvalFloatLit(t *testing.T) {
 	i := New()
 	expr := &ast.FloatLit{Value: 3.14, Untyped: true}
@@ -1650,15 +1478,21 @@ func TestFloatDivisionByZero(t *testing.T) {
 	input := `
 var a: float{size: 32} = 10.0;
 a /= 0.0;
+print(a);
 `
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
 
 	i := New()
-	err := i.Run(program)
-	if err == nil {
-		t.Errorf("expected division by zero error")
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "Inf") {
+		t.Errorf("expected output to contain 'Inf', got %q", output)
 	}
 }
 
@@ -1717,9 +1551,12 @@ func TestFloatBinaryExprDivByZero(t *testing.T) {
 		Op:    "/",
 		Right: &ast.FloatLit{Value: 0.0, Untyped: true},
 	}
-	_, err := i.evalBinary(expr)
-	if err == nil {
-		t.Errorf("expected division by zero error")
+	val, err := i.evalBinary(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !math.IsInf(val.FData, 1) {
+		t.Errorf("expected +Inf, got %g", val.FData)
 	}
 }
 
@@ -1796,30 +1633,42 @@ func TestFloatOverflowDetection(t *testing.T) {
 	input := `
 var a: float{size: 16} = 65504.0;
 a += 1.0;
+print(a);
 `
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
 
 	i := New()
-	err := i.Run(program)
-	if err == nil {
-		t.Errorf("expected overflow error for float16")
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "65504") {
+		t.Errorf("expected output to contain '65504', got %q", output)
 	}
 }
 
 func TestFloatAssignmentOverflow(t *testing.T) {
 	input := `
 var a: float{size: 16} = 70000.0;
+print(a);
 `
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
 
 	i := New()
-	err := i.Run(program)
-	if err == nil {
-		t.Errorf("expected overflow error for float16")
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "Inf") {
+		t.Errorf("expected output to contain 'Inf', got %q", output)
 	}
 }
 
@@ -1946,29 +1795,6 @@ func TestCanImplicitConvertNonNullableFloatToNullableFloat(t *testing.T) {
 	}
 }
 
-func TestCanFitInFloatEdgeCases(t *testing.T) {
-	tests := []struct {
-		val      float64
-		ftype    ast.FloatType
-		expected bool
-	}{
-		{65504.0, ast.FloatType{Size: 16}, true},
-		{65504.1, ast.FloatType{Size: 16}, false},
-		{math.MaxFloat32, ast.FloatType{Size: 32}, true},
-		{math.MaxFloat32 * 2, ast.FloatType{Size: 32}, false},
-		{math.MaxFloat64, ast.FloatType{Size: 64}, true},
-		{-65504.0, ast.FloatType{Size: 16}, true},
-		{-65505.0, ast.FloatType{Size: 16}, false},
-	}
-
-	for _, tt := range tests {
-		result := canFitInFloat(tt.val, tt.ftype)
-		if result != tt.expected {
-			t.Errorf("canFitInFloat(%g, %v) = %v, expected %v", tt.val, tt.ftype, result, tt.expected)
-		}
-	}
-}
-
 func TestEnvironmentNewAndSetGet(t *testing.T) {
 	env := NewEnv()
 	val := Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 42}
@@ -2027,17 +1853,6 @@ func TestValueStringNullableInt(t *testing.T) {
 	result := v.String()
 	if !strings.Contains(result, "nullable") {
 		t.Errorf("expected string to contain 'nullable', got %q", result)
-	}
-}
-
-func TestCanFitInFloatDefaultCase(t *testing.T) {
-	// Test the default case in canFitInFloat (invalid size)
-	// Use an invalid size to trigger default case
-	ftype := ast.FloatType{Size: 123} // invalid size
-	result := canFitInFloat(100.0, ftype)
-	// Default case returns false
-	if result {
-		t.Errorf("expected false for invalid float type size")
 	}
 }
 
@@ -2234,8 +2049,8 @@ func TestVarDeclWithFloatExpr(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	val, _ := i.env.Get("x")
-	if val.FData != 3.14 {
-		t.Errorf("expected 3.14, got %g", val.FData)
+	if math.Abs(val.FData-3.14) > 1e-6 {
+		t.Errorf("expected ~3.14, got %g", val.FData)
 	}
 }
 
@@ -2356,7 +2171,6 @@ func TestExecuteAssignmentFloatUnknownOp(t *testing.T) {
 	}
 }
 
-
 func TestEvalBinaryFloatTypedBoth(t *testing.T) {
 	i := New()
 	// Both operands are typed floats
@@ -2416,9 +2230,12 @@ func TestEvalBinaryFloatOverflow(t *testing.T) {
 		Op:    "+",
 		Right: &ast.FloatLit{Value: 1.0, FType: ast.FloatType{Size: 16}, Untyped: false},
 	}
-	_, err := i.evalBinary(expr)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	val, err := i.evalBinary(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.FData != 65504.0 {
+		t.Errorf("expected 65504, got %g", val.FData)
 	}
 }
 
@@ -2426,10 +2243,10 @@ func TestVarDeclFloatToFloatConversion(t *testing.T) {
 	i := New()
 	// Assign float to float variable with implicit conversion
 	stmt := &ast.VarDecl{
-		Name:  "x",
-		FType: ast.FloatType{Size: 64},
+		Name:    "x",
+		FType:   ast.FloatType{Size: 64},
 		IsFloat: true,
-		Expr: &ast.FloatLit{Value: 1.5, FType: ast.FloatType{Size: 32}, Untyped: false},
+		Expr:    &ast.FloatLit{Value: 1.5, FType: ast.FloatType{Size: 32}, Untyped: false},
 	}
 	err := i.executeStmt(stmt)
 	if err != nil {
@@ -2441,14 +2258,18 @@ func TestVarDeclFloatOverflow(t *testing.T) {
 	i := New()
 	// Float value overflows the target type
 	stmt := &ast.VarDecl{
-		Name:  "x",
-		FType: ast.FloatType{Size: 16},
+		Name:    "x",
+		FType:   ast.FloatType{Size: 16},
 		IsFloat: true,
-		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+		Expr:    &ast.FloatLit{Value: 70000.0, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if !math.IsInf(val.FData, 1) {
+		t.Errorf("expected +Inf, got %g", val.FData)
 	}
 }
 
@@ -2456,10 +2277,10 @@ func TestVarDeclIntToFloatConversion(t *testing.T) {
 	i := New()
 	// Assign integer to float variable
 	stmt := &ast.VarDecl{
-		Name:  "x",
-		FType: ast.FloatType{Size: 32},
+		Name:    "x",
+		FType:   ast.FloatType{Size: 32},
 		IsFloat: true,
-		Expr: &ast.IntegerLit{Value: 42, Untyped: true},
+		Expr:    &ast.IntegerLit{Value: 42, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
 	if err != nil {
@@ -2471,10 +2292,10 @@ func TestVarDeclIntToFloatTypeMismatch(t *testing.T) {
 	i := New()
 	// Integer (64-bit unsigned) cannot implicitly convert to float32
 	stmt := &ast.VarDecl{
-		Name:  "x",
-		FType: ast.FloatType{Size: 32},
+		Name:    "x",
+		FType:   ast.FloatType{Size: 32},
 		IsFloat: true,
-		Expr: &ast.IntegerLit{Value: 42, IType: ast.IntegerType{Size: 64}, Untyped: false},
+		Expr:    &ast.IntegerLit{Value: 42, IType: ast.IntegerType{Size: 64}, Untyped: false},
 	}
 	err := i.executeStmt(stmt)
 	if err == nil {
@@ -2581,8 +2402,12 @@ func TestExecuteAssignmentFloatDivByZero(t *testing.T) {
 		Expr: &ast.FloatLit{Value: 0.0, Untyped: true},
 	}
 	err := i.executeAssignment(stmt)
-	if err == nil {
-		t.Errorf("expected division by zero error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if !math.IsInf(val.FData, 1) {
+		t.Errorf("expected +Inf, got %g", val.FData)
 	}
 }
 
@@ -2605,10 +2430,10 @@ func TestVarDeclFloatWithIntegerUntyped(t *testing.T) {
 	// rightVal is float but Untyped, so rightVal.IsFloat is true
 	// This should go through the rightVal.IsFloat path
 	stmt := &ast.VarDecl{
-		Name:  "x",
-		FType: ast.FloatType{Size: 32},
+		Name:    "x",
+		FType:   ast.FloatType{Size: 32},
 		IsFloat: true,
-		Expr: &ast.IntegerLit{Value: 42, Untyped: true},
+		Expr:    &ast.IntegerLit{Value: 42, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
 	if err != nil {
@@ -2624,10 +2449,10 @@ func TestVarDeclFloatTypeMismatch(t *testing.T) {
 	i := New()
 	// Integer (typed) cannot convert to float
 	stmt := &ast.VarDecl{
-		Name:  "x",
-		FType: ast.FloatType{Size: 32},
+		Name:    "x",
+		FType:   ast.FloatType{Size: 32},
 		IsFloat: true,
-		Expr: &ast.IntegerLit{Value: 42, IType: ast.IntegerType{Size: 32, Signed: true}, Untyped: false},
+		Expr:    &ast.IntegerLit{Value: 42, IType: ast.IntegerType{Size: 32, Signed: true}, Untyped: false},
 	}
 	err := i.executeStmt(stmt)
 	if err == nil {
@@ -2635,15 +2460,14 @@ func TestVarDeclFloatTypeMismatch(t *testing.T) {
 	}
 }
 
-
 func TestVarDeclTypedIntToFloatError(t *testing.T) {
 	i := New()
 	// Integer (typed) cannot convert to float
 	stmt := &ast.VarDecl{
-		Name:  "x",
-		FType: ast.FloatType{Size: 32},
+		Name:    "x",
+		FType:   ast.FloatType{Size: 32},
 		IsFloat: true,
-		Expr: &ast.IntegerLit{Value: 42, IType: ast.IntegerType{Size: 32, Signed: true}, Untyped: false},
+		Expr:    &ast.IntegerLit{Value: 42, IType: ast.IntegerType{Size: 32, Signed: true}, Untyped: false},
 	}
 	err := i.executeStmt(stmt)
 	if err == nil {
@@ -2655,10 +2479,10 @@ func TestVarDeclRightValUntypedIntToFloat(t *testing.T) {
 	i := New()
 	// rightVal is untyped integer, rightVal.IsFloat is false
 	stmt := &ast.VarDecl{
-		Name:  "x",
-		FType: ast.FloatType{Size: 32},
+		Name:    "x",
+		FType:   ast.FloatType{Size: 32},
 		IsFloat: true,
-		Expr: &ast.IntegerLit{Value: 42, Untyped: true},
+		Expr:    &ast.IntegerLit{Value: 42, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
 	if err != nil {
@@ -2680,8 +2504,12 @@ func TestExecuteAssignmentDivByZeroInt(t *testing.T) {
 		Expr: &ast.IntegerLit{Value: 0},
 	}
 	err := i.executeAssignment(stmt)
-	if err == nil {
-		t.Errorf("expected division by zero error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if !math.IsInf(val.FData, 1) {
+		t.Errorf("expected +Inf, got %g", val.FData)
 	}
 }
 
@@ -2689,14 +2517,14 @@ func TestVarDeclFloatOverflowInConversion(t *testing.T) {
 	i := New()
 	// rightVal is float, convert to float with smaller size
 	stmt := &ast.VarDecl{
-		Name:  "x",
-		FType: ast.FloatType{Size: 16},
+		Name:    "x",
+		FType:   ast.FloatType{Size: 16},
 		IsFloat: true,
-		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+		Expr:    &ast.FloatLit{Value: 70000.0, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -2704,14 +2532,14 @@ func TestVarDeclFloatToFloatOverflow(t *testing.T) {
 	i := New()
 	// Float value too large for target type
 	stmt := &ast.VarDecl{
-		Name:  "x",
-		FType: ast.FloatType{Size: 16},
+		Name:    "x",
+		FType:   ast.FloatType{Size: 16},
 		IsFloat: true,
-		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+		Expr:    &ast.FloatLit{Value: 70000.0, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -2739,8 +2567,8 @@ func TestExecuteAssignmentFloatToFloatOverflow(t *testing.T) {
 		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
 	}
 	err := i.executeAssignment(stmt)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -2753,8 +2581,8 @@ func TestExecuteAssignmentFloatAddOverflow(t *testing.T) {
 		Expr: &ast.FloatLit{Value: 10000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
 	}
 	err := i.executeAssignment(stmt)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -2767,8 +2595,8 @@ func TestExecuteAssignmentFloatDivOverflow(t *testing.T) {
 		Expr: &ast.FloatLit{Value: 0.5, FType: ast.FloatType{Size: 32}, Untyped: false},
 	}
 	err := i.executeAssignment(stmt)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -2789,16 +2617,15 @@ func TestExecuteAssignmentFloatToIntError(t *testing.T) {
 func TestVarDeclFloatOverflowCheck(t *testing.T) {
 	i := New()
 	// rightVal is float with value that overflows target FType
-	// This should trigger canFitInFloat check
 	stmt := &ast.VarDecl{
-		Name:  "x",
-		FType: ast.FloatType{Size: 16},
+		Name:    "x",
+		FType:   ast.FloatType{Size: 16},
 		IsFloat: true,
-		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+		Expr:    &ast.FloatLit{Value: 70000.0, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -2812,46 +2639,39 @@ func TestExecuteAssignmentFloatEqOverflow(t *testing.T) {
 		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
 	}
 	err := i.executeAssignment(stmt)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestVarDeclFloatOverflowInCheck(t *testing.T) {
 	i := New()
 	// rightVal is float32 with value 70000, target is float16
-	// This should trigger canFitInFloat check
 	stmt := &ast.VarDecl{
-		Name:  "x",
-		FType: ast.FloatType{Size: 16},
+		Name:    "x",
+		FType:   ast.FloatType{Size: 16},
 		IsFloat: true,
-		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+		Expr:    &ast.FloatLit{Value: 70000.0, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
-
-
-
-
-
 
 // Test for executeStmt - VarDecl with float conversion that overflows
 func TestVarDeclFloatOverflowCoverage(t *testing.T) {
 	i := New()
 	// rightVal is float32 with value 70000, target is float16
-	// This should trigger canFitInFloat check (line 240)
 	stmt := &ast.VarDecl{
-		Name:  "x",
-		FType: ast.FloatType{Size: 16},
+		Name:    "x",
+		FType:   ast.FloatType{Size: 16},
 		IsFloat: true,
-		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+		Expr:    &ast.FloatLit{Value: 70000.0, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -2881,8 +2701,8 @@ func TestExecuteAssignmentFloatEqOverflowCoverage(t *testing.T) {
 		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
 	}
 	err := i.executeAssignment(stmt)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -2895,7 +2715,127 @@ func TestExecuteAssignmentFloatOverflowCoverage(t *testing.T) {
 		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
 	}
 	err := i.executeAssignment(stmt)
-	if err == nil {
-		t.Errorf("expected overflow error")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestScientificNotationLiteral(t *testing.T) {
+	input := `
+var a: float{size: 64} = 1e20;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "1e+20") {
+		t.Errorf("expected output to contain '1e+20', got %q", output)
+	}
+}
+
+func TestUnderscoreIntegerLiteral(t *testing.T) {
+	input := `
+var x: integer{size: 64} = 100_000;
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "100000") {
+		t.Errorf("expected output to contain '100000', got %q", output)
+	}
+}
+
+func TestBinaryLiteralInInterp(t *testing.T) {
+	input := `
+var x: integer{size: 64} = 0b1010;
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "10") {
+		t.Errorf("expected output to contain '10', got %q", output)
+	}
+}
+
+func TestOctalLiteralInInterp(t *testing.T) {
+	input := `
+var x: integer{size: 64} = 0o777;
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "511") {
+		t.Errorf("expected output to contain '511', got %q", output)
+	}
+}
+
+func TestHexLiteralInInterp(t *testing.T) {
+	input := `
+var x: integer{size: 64} = 0xFF;
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "255") {
+		t.Errorf("expected output to contain '255', got %q", output)
 	}
 }

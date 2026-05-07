@@ -2,7 +2,9 @@ package interpreter
 
 import (
 	"fmt"
-	"math"
+	"strconv"
+
+	"github.com/x448/float16"
 
 	"lang-interpreter/ast"
 )
@@ -35,11 +37,17 @@ func (v Value) String() string {
 
 func typeDesc(it ast.IntegerType, ft ast.FloatType, isFloat bool) string {
 	if isFloat {
+		if ft.Size == 0 {
+			return "untyped float literal"
+		}
 		nullable := ""
 		if ft.Nullable {
 			nullable = "nullable "
 		}
 		return fmt.Sprintf("%s%d-bit float", nullable, ft.Size)
+	}
+	if it.Size == 0 {
+		return "untyped integer literal"
 	}
 	sign := "signed"
 	if !it.Signed {
@@ -112,58 +120,43 @@ func canImplicitConvert(srcInt ast.IntegerType, srcFloat ast.FloatType, srcIsFlo
 	return false
 }
 
-func canFitInType(val int64, itype ast.IntegerType) bool {
-	var min, max int64
-	switch itype.Size {
-	case 8:
-		if itype.Signed {
-			min = math.MinInt8
-			max = math.MaxInt8
-		} else {
-			min = 0
-			max = math.MaxUint8
+func convertInt(val int64, itype ast.IntegerType) int64 {
+	if itype.Signed {
+		switch itype.Size {
+		case 8:
+			return int64(int8(val))
+		case 16:
+			return int64(int16(val))
+		case 32:
+			return int64(int32(val))
+		case 64:
+			return val
 		}
-	case 16:
-		if itype.Signed {
-			min = math.MinInt16
-			max = math.MaxInt16
-		} else {
-			min = 0
-			max = math.MaxUint16
+	} else {
+		switch itype.Size {
+		case 8:
+			return int64(uint8(val))
+		case 16:
+			return int64(uint16(val))
+		case 32:
+			return int64(uint32(val))
+		case 64:
+			return int64(uint64(val))
 		}
-	case 32:
-		if itype.Signed {
-			min = math.MinInt32
-			max = math.MaxInt32
-		} else {
-			min = 0
-			max = math.MaxUint32
-		}
-	case 64:
-		if itype.Signed {
-			min = math.MinInt64
-			max = math.MaxInt64
-		} else {
-			min = 0
-			max = math.MaxInt64
-		}
-	default:
-		min = math.MinInt64
-		max = math.MaxInt64
 	}
-	return val >= min && val <= max
+	return val
 }
 
-func canFitInFloat(val float64, ftype ast.FloatType) bool {
+func convertFloat(val float64, ftype ast.FloatType) float64 {
 	switch ftype.Size {
 	case 16:
-		return val >= -65504 && val <= 65504 // float16 max
+		return float64(float16.Fromfloat32(float32(val)).Float32())
 	case 32:
-		return val >= -math.MaxFloat32 && val <= math.MaxFloat32
+		return float64(float32(val))
 	case 64:
-		return true // float64 can hold anything Go float64 can
+		return val
 	}
-	return false
+	return val
 }
 
 type Environment struct {
@@ -221,36 +214,25 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 			} else {
 				if rightVal.IsFloat {
 					if !s.IsFloat {
-						return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDesc(rightVal.IType, rightVal.FType, true), typeDesc(s.IType, s.FType, false))
+						return fmt.Errorf("cannot assign %s to integer variable", typeDesc(rightVal.IType, rightVal.FType, true))
 					}
-					if !canImplicitConvert(rightVal.IType, rightVal.FType, true, s.IType, s.FType, true) {
+					if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, true, s.IType, s.FType, true) {
 						return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDesc(rightVal.IType, rightVal.FType, true), typeDesc(s.IType, s.FType, true))
 					}
-					if !canFitInFloat(rightVal.FData, s.FType) {
-						return fmt.Errorf("overflow: value %g cannot fit in %s", rightVal.FData, typeDesc(ast.IntegerType{}, s.FType, true))
-					}
-					val.FData = rightVal.FData
+					val.FData = convertFloat(rightVal.FData, s.FType)
 				} else {
 					if s.IsFloat {
 						// Integer to float conversion
-						if !canImplicitConvert(rightVal.IType, ast.FloatType{}, false, ast.IntegerType{}, s.FType, true) {
+						if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, ast.FloatType{}, false, ast.IntegerType{}, s.FType, true) {
 							return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDesc(rightVal.IType, ast.FloatType{}, false), typeDesc(ast.IntegerType{}, s.FType, true))
 						}
-						fresult := float64(rightVal.Data)
-						if !canFitInFloat(fresult, s.FType) {
-							return fmt.Errorf("overflow: value %g cannot fit in %s", fresult, typeDesc(ast.IntegerType{}, s.FType, true))
-						}
-						val.FData = fresult
+						val.FData = convertFloat(float64(rightVal.Data), s.FType)
 					} else {
 						// Integer to integer
-						if rightVal.Untyped {
-							if !canFitInType(rightVal.Data, s.IType) {
-								return fmt.Errorf("overflow: value %d cannot fit in %s", rightVal.Data, typeDesc(s.IType, s.FType, false))
-							}
-						} else if !canImplicitConvert(rightVal.IType, rightVal.FType, false, s.IType, s.FType, false) {
+						if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, false, s.IType, s.FType, false) {
 							return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDesc(rightVal.IType, rightVal.FType, false), typeDesc(s.IType, s.FType, false))
 						}
-						val.Data = rightVal.Data
+						val.Data = convertInt(rightVal.Data, s.IType)
 					}
 				}
 			}
@@ -268,7 +250,7 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 		if val.Null {
 			fmt.Println("null")
 		} else if val.IsFloat {
-			fmt.Println(val.FData)
+			fmt.Println(strconv.FormatFloat(val.FData, 'g', 20, 64))
 		} else {
 			fmt.Println(val.Data)
 		}
@@ -309,7 +291,7 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 
 	if val.IsFloat && !rightVal.IsFloat {
 		// Integer to float assignment
-		if !canImplicitConvert(rightVal.IType, rightVal.FType, false, val.IType, val.FType, true) {
+		if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, false, val.IType, val.FType, true) {
 			return fmt.Errorf("type mismatch: cannot assign %s to %s", typeDesc(rightVal.IType, rightVal.FType, false), typeDesc(val.IType, val.FType, true))
 		}
 		switch stmt.Op {
@@ -322,20 +304,14 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 		case "*=":
 			fresult = val.FData * float64(rightVal.Data)
 		case "/=":
-			if rightVal.Data == 0 {
-				return fmt.Errorf("division by zero")
-			}
 			fresult = val.FData / float64(rightVal.Data)
 		default:
 			return fmt.Errorf("unknown operator: %s", stmt.Op)
 		}
-		if !canFitInFloat(fresult, val.FType) {
-			return fmt.Errorf("overflow: value %g cannot fit in %s", fresult, typeDesc(val.IType, val.FType, true))
-		}
-		val.FData = fresult
+		val.FData = convertFloat(fresult, val.FType)
 	} else if !val.IsFloat && rightVal.IsFloat {
 		// Float to integer - not allowed implicitly
-		return fmt.Errorf("type mismatch: cannot assign %s to %s", typeDesc(rightVal.IType, rightVal.FType, true), typeDesc(val.IType, val.FType, false))
+		return fmt.Errorf("cannot assign %s to integer variable", typeDesc(rightVal.IType, rightVal.FType, true))
 	} else if val.IsFloat {
 		// Float to float
 		fresult = val.FData
@@ -349,17 +325,11 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 		case "*=":
 			fresult = fresult * rightVal.FData
 		case "/=":
-			if rightVal.FData == 0 {
-				return fmt.Errorf("division by zero")
-			}
 			fresult = fresult / rightVal.FData
 		default:
 			return fmt.Errorf("unknown operator: %s", stmt.Op)
 		}
-		if !canFitInFloat(fresult, val.FType) {
-			return fmt.Errorf("overflow: value %g cannot fit in %s", fresult, typeDesc(val.IType, val.FType, true))
-		}
-		val.FData = fresult
+		val.FData = convertFloat(fresult, val.FType)
 	} else {
 		// Integer to integer
 		result = val.Data
@@ -380,10 +350,7 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 		default:
 			return fmt.Errorf("unknown operator: %s", stmt.Op)
 		}
-		if !canFitInType(result, val.IType) {
-			return fmt.Errorf("overflow: value %d cannot fit in %s", result, typeDesc(val.IType, val.FType, false))
-		}
-		val.Data = result
+		val.Data = convertInt(result, val.IType)
 	}
 	val.Null = false
 	i.env.Set(stmt.Name, val)
@@ -437,7 +404,6 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 	var resultFType ast.FloatType
 
 	if isFloat {
-		// Float result
 		if left.IsFloat && right.IsFloat {
 			resultFType.Size = left.FType.Size
 			if right.FType.Size > left.FType.Size {
@@ -449,7 +415,6 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 			resultFType = right.FType
 		}
 	} else {
-		// Integer result
 		if left.Untyped && right.Untyped {
 			resultType = ast.IntegerType{Size: 64, Signed: true}
 		} else if left.Untyped {
@@ -462,11 +427,11 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 				return Value{}, fmt.Errorf("type mismatch: cannot compute %s %s %s", typeDesc(left.IType, left.FType, false), expr.Op, typeDesc(right.IType, right.FType, false))
 			}
 			if canImplicitConvert(right.IType, right.FType, false, left.IType, left.FType, false) && left.IType.Size >= right.IType.Size {
-				right.Data = clamp(right.Data, left.IType)
+				right.Data = convertInt(right.Data, left.IType)
 				right.IType = left.IType
 				right.Untyped = false
 			} else if canImplicitConvert(left.IType, left.FType, false, right.IType, right.FType, false) {
-				left.Data = clamp(left.Data, right.IType)
+				left.Data = convertInt(left.Data, right.IType)
 				left.IType = right.IType
 				left.Untyped = false
 				resultType = right.IType
@@ -477,7 +442,6 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 	var result int64
 	var fresult float64
 
-	// Get float values for both operands (convert int to float if needed)
 	getFloat := func(v Value) float64 {
 		if v.IsFloat {
 			return v.FData
@@ -508,9 +472,6 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 		}
 	case "/":
 		if isFloat {
-			if rightF == 0 {
-				return Value{}, fmt.Errorf("division by zero")
-			}
 			fresult = leftF / rightF
 		} else {
 			if right.Data == 0 {
@@ -526,66 +487,11 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 		if left.Untyped || right.Untyped {
 			return Value{Untyped: true, FData: fresult, IsFloat: true}, nil
 		}
-		if !canFitInFloat(fresult, resultFType) {
-			return Value{}, fmt.Errorf("overflow: result %g cannot fit in %s", fresult, typeDesc(ast.IntegerType{}, resultFType, true))
-		}
-		return Value{FType: resultFType, FData: fresult, IsFloat: true}, nil
+		return Value{FType: resultFType, FData: convertFloat(fresult, resultFType), IsFloat: true}, nil
 	}
 
 	if left.Untyped || right.Untyped {
 		return Value{Untyped: true, Data: result}, nil
 	}
-	if !canFitInType(result, resultType) {
-		return Value{}, fmt.Errorf("overflow: result %d cannot fit in %s", result, typeDesc(resultType, ast.FloatType{}, false))
-	}
-	return Value{IType: resultType, Data: result}, nil
-}
-
-func clamp(val int64, itype ast.IntegerType) int64 {
-	var min, max int64
-	switch itype.Size {
-	case 8:
-		if itype.Signed {
-			min = math.MinInt8
-			max = math.MaxInt8
-		} else {
-			min = 0
-			max = math.MaxUint8
-		}
-	case 16:
-		if itype.Signed {
-			min = math.MinInt16
-			max = math.MaxInt16
-		} else {
-			min = 0
-			max = math.MaxUint16
-		}
-	case 32:
-		if itype.Signed {
-			min = math.MinInt32
-			max = math.MaxInt32
-		} else {
-			min = 0
-			max = math.MaxUint32
-		}
-	case 64:
-		if itype.Signed {
-			min = math.MinInt64
-			max = math.MaxInt64
-		} else {
-			min = 0
-			max = math.MaxInt64
-		}
-	default:
-		min = math.MinInt64
-		max = math.MaxInt64
-	}
-
-	if val < min {
-		val = min
-	}
-	if val > max {
-		val = max
-	}
-	return val
+	return Value{IType: resultType, Data: convertInt(result, resultType)}, nil
 }

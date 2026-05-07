@@ -243,7 +243,7 @@ func TestParseSingleStmt(t *testing.T) {
 	l := lexer.New(input)
 	p := New(l)
 
-	stmt, errors := p.ParseSingleStmt()
+	stmt, errors, _ := p.ParseSingleStmt()
 	if errors != nil && len(errors) > 0 {
 		t.Fatalf("unexpected errors: %v", errors)
 	}
@@ -263,7 +263,7 @@ func TestParseSingleStmtEOF(t *testing.T) {
 	l := lexer.New(input)
 	p := New(l)
 
-	stmt, errors := p.ParseSingleStmt()
+	stmt, errors, _ := p.ParseSingleStmt()
 	if stmt != nil {
 		t.Errorf("expected nil statement for EOF")
 	}
@@ -1057,5 +1057,159 @@ func TestParseFloatTypeSizeLine(t *testing.T) {
 
 	if len(p.Errors()) == 0 {
 		t.Errorf("expected error for non-integer size value")
+	}
+}
+
+func TestParseScientificNotation(t *testing.T) {
+	tests := []string{
+		"print(1e20);",
+		"print(1e+20);",
+		"print(1e-20);",
+		"print(1.5e3);",
+	}
+
+	for _, input := range tests {
+		l := lexer.New(input)
+		p := New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Errorf("input %q: unexpected errors: %v", input, p.Errors())
+			continue
+		}
+		stmt := program.Stmts[0].(*ast.PrintStmt)
+		if _, ok := stmt.Expr.(*ast.FloatLit); !ok {
+			t.Errorf("input %q: expected *ast.FloatLit, got %T", input, stmt.Expr)
+		}
+	}
+}
+
+func TestParseUnderscoreInteger(t *testing.T) {
+	tests := []struct {
+		input     string
+		expectVal int64
+	}{
+		{"print(100_000);", 100000},
+		{"print(1_0_0__0_0_0);", 100000},
+		{"print(1000_1000);", 10001000},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Errorf("input %q: unexpected errors: %v", tt.input, p.Errors())
+			continue
+		}
+		stmt := program.Stmts[0].(*ast.PrintStmt)
+		lit, ok := stmt.Expr.(*ast.IntegerLit)
+		if !ok {
+			t.Errorf("input %q: expected *ast.IntegerLit, got %T", tt.input, stmt.Expr)
+			continue
+		}
+		if lit.Value != tt.expectVal {
+			t.Errorf("input %q: expected %d, got %d", tt.input, tt.expectVal, lit.Value)
+		}
+	}
+}
+
+func TestParseUnderscoreFloat(t *testing.T) {
+	input := "print(1_000.5);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	if _, ok := stmt.Expr.(*ast.FloatLit); !ok {
+		t.Fatalf("expected *ast.FloatLit, got %T", stmt.Expr)
+	}
+}
+
+func TestParseBinaryLiteral(t *testing.T) {
+	tests := []struct {
+		input     string
+		expectVal int64
+	}{
+		{"print(0b0101_0101);", 0b01010101},
+		{"print(0b1010);", 0b1010},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Errorf("input %q: unexpected errors: %v", tt.input, p.Errors())
+			continue
+		}
+		stmt := program.Stmts[0].(*ast.PrintStmt)
+		lit, ok := stmt.Expr.(*ast.IntegerLit)
+		if !ok {
+			t.Errorf("input %q: expected *ast.IntegerLit, got %T", tt.input, stmt.Expr)
+			continue
+		}
+		if lit.Value != tt.expectVal {
+			t.Errorf("input %q: expected %d, got %d", tt.input, tt.expectVal, lit.Value)
+		}
+	}
+}
+
+func TestParseOctalLiteral(t *testing.T) {
+	tests := []struct {
+		input     string
+		expectVal int64
+	}{
+		{"print(0o777);", 0o777},
+		{"print(0o012_345_67);", int64(0o01234567)},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Errorf("input %q: unexpected errors: %v", tt.input, p.Errors())
+			continue
+		}
+		stmt := program.Stmts[0].(*ast.PrintStmt)
+		lit, ok := stmt.Expr.(*ast.IntegerLit)
+		if !ok {
+			t.Errorf("input %q: expected *ast.IntegerLit, got %T", tt.input, stmt.Expr)
+			continue
+		}
+		if lit.Value != tt.expectVal {
+			t.Errorf("input %q: expected %d, got %d", tt.input, tt.expectVal, lit.Value)
+		}
+	}
+}
+
+func TestParseHexLiteral(t *testing.T) {
+	tests := []struct {
+		input     string
+		expectVal int64
+	}{
+		{"print(0xFF);", 0xFF},
+		{"print(0xffee_d2a5);", int64(0xffeed2a5)},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Errorf("input %q: unexpected errors: %v", tt.input, p.Errors())
+			continue
+		}
+		stmt := program.Stmts[0].(*ast.PrintStmt)
+		lit, ok := stmt.Expr.(*ast.IntegerLit)
+		if !ok {
+			t.Errorf("input %q: expected *ast.IntegerLit, got %T", tt.input, stmt.Expr)
+			continue
+		}
+		if lit.Value != tt.expectVal {
+			t.Errorf("input %q: expected %d, got %d", tt.input, tt.expectVal, lit.Value)
+		}
 	}
 }

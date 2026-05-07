@@ -274,3 +274,160 @@ func TestDefaultCaseNextToken(t *testing.T) {
 		t.Errorf("expected INT_LIT for unknown char, got %s", tok.Type)
 	}
 }
+
+func TestScientificNotation(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedType TokenType
+		expectedLit  string
+	}{
+		{"1e20", TOK_FLOAT_LIT, "1e20"},
+		{"1e+20", TOK_FLOAT_LIT, "1e+20"},
+		{"1e-20", TOK_FLOAT_LIT, "1e-20"},
+		{"1.5e3", TOK_FLOAT_LIT, "1.5e3"},
+		{"1.5e+3", TOK_FLOAT_LIT, "1.5e+3"},
+		{"1.5e-3", TOK_FLOAT_LIT, "1.5e-3"},
+	}
+
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("input %q: expected %s, got %s", tt.input, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLit {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.expectedLit, tok.Literal)
+		}
+	}
+}
+
+func TestUnderscoreInNumbers(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedType TokenType
+		expectedLit  string
+	}{
+		{"100_000", TOK_INT_LIT, "100_000"},
+		{"1000_1000", TOK_INT_LIT, "1000_1000"},
+		{"1_0_0__0_0_0", TOK_INT_LIT, "1_0_0__0_0_0"},
+	}
+
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("input %q: expected %s, got %s", tt.input, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLit {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.expectedLit, tok.Literal)
+		}
+	}
+}
+
+func TestUnderscoreInFloats(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedType TokenType
+		expectedLit  string
+	}{
+		{"1_000.5", TOK_FLOAT_LIT, "1_000.5"},
+		{"1_000.5e1_0", TOK_FLOAT_LIT, "1_000.5e1_0"},
+	}
+
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("input %q: expected %s, got %s", tt.input, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLit {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.expectedLit, tok.Literal)
+		}
+	}
+}
+
+func TestBinaryLiteral(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedType TokenType
+		expectedLit  string
+	}{
+		{"0b0101_0101", TOK_INT_LIT, "0b0101_0101"},
+		{"0b1010", TOK_INT_LIT, "0b1010"},
+		{"0B1010", TOK_INT_LIT, "0B1010"},
+	}
+
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("input %q: expected %s, got %s", tt.input, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLit {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.expectedLit, tok.Literal)
+		}
+	}
+}
+
+func TestOctalLiteral(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedType TokenType
+		expectedLit  string
+	}{
+		{"0o012_345_67", TOK_INT_LIT, "0o012_345_67"},
+		{"0o777", TOK_INT_LIT, "0o777"},
+		{"0O777", TOK_INT_LIT, "0O777"},
+	}
+
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("input %q: expected %s, got %s", tt.input, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLit {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.expectedLit, tok.Literal)
+		}
+	}
+}
+
+func TestHexLiteral(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedType TokenType
+		expectedLit  string
+	}{
+		{"0xffee_d2a5", TOK_INT_LIT, "0xffee_d2a5"},
+		{"0xFF", TOK_INT_LIT, "0xFF"},
+		{"0XFF", TOK_INT_LIT, "0XFF"},
+	}
+
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("input %q: expected %s, got %s", tt.input, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLit {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.expectedLit, tok.Literal)
+		}
+	}
+}
+
+func TestNumberSequenceWithEOF(t *testing.T) {
+	input := "1e20"
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_FLOAT_LIT {
+		t.Errorf("expected FLOAT_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "1e20" {
+		t.Errorf("expected '1e20', got %q", tok.Literal)
+	}
+
+	tok2 := l.NextToken()
+	if tok2.Type != TOK_EOF {
+		t.Errorf("expected EOF, got %s", tok2.Type)
+	}
+}

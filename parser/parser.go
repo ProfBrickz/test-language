@@ -2,7 +2,9 @@ package parser
 
 import (
 	"fmt"
+	"math"
 	"strconv"
+	"strings"
 
 	"lang-interpreter/ast"
 	"lang-interpreter/lexer"
@@ -13,6 +15,7 @@ type Parser struct {
 	curToken  lexer.Token
 	peekToken lexer.Token
 	errors    []string
+	warnings  []string
 }
 
 func New(l *lexer.Lexer) *Parser {
@@ -39,15 +42,17 @@ func (p *Parser) ParseProgram() *ast.Program {
 	return program
 }
 
-func (p *Parser) ParseSingleStmt() (ast.Stmt, []string) {
+func (p *Parser) ParseSingleStmt() (ast.Stmt, []string, []string) {
 	if p.curToken.Type == lexer.TOK_EOF {
-		return nil, nil
+		return nil, nil, nil
 	}
 	stmt := p.parseStmt()
 	errors := p.errors
+	warnings := p.warnings
 	p.errors = nil
+	p.warnings = nil
 	p.nextToken()
-	return stmt, errors
+	return stmt, errors, warnings
 }
 
 func (p *Parser) parseStmt() ast.Stmt {
@@ -316,18 +321,52 @@ func (p *Parser) parseMulDiv() ast.Expr {
 func (p *Parser) parsePrimary() ast.Expr {
 	switch p.curToken.Type {
 	case lexer.TOK_INT_LIT:
-		val, err := strconv.ParseInt(p.curToken.Literal, 10, 64)
+		lit := p.curToken.Literal
+		clean := strings.ReplaceAll(lit, "_", "")
+		hasPrefix := strings.HasPrefix(lit, "0x") || strings.HasPrefix(lit, "0X") ||
+			strings.HasPrefix(lit, "0b") || strings.HasPrefix(lit, "0B") ||
+			strings.HasPrefix(lit, "0o") || strings.HasPrefix(lit, "0O")
+		var val int64
+		var err error
+		if hasPrefix {
+			val, err = strconv.ParseInt(clean, 0, 64)
+		} else {
+			val, err = strconv.ParseInt(clean, 10, 64)
+			if len(clean) > 1 && clean[0] == '0' {
+				p.addWarning("leading zeros in decimal literal: %s", lit)
+			}
+		}
 		if err != nil {
-			p.addError("invalid integer literal: %s", p.curToken.Literal)
+			if strings.HasPrefix(lit, "0o") || strings.HasPrefix(lit, "0O") {
+				p.addError("%s is an invalid octal literal", lit)
+			} else if strings.HasPrefix(lit, "0b") || strings.HasPrefix(lit, "0B") {
+				p.addError("%s is an invalid binary literal", lit)
+			} else if strings.HasPrefix(lit, "0x") || strings.HasPrefix(lit, "0X") {
+				p.addError("%s is an invalid hexadecimal literal", lit)
+			} else {
+				p.addError("%s is an invalid integer literal", lit)
+			}
 			return nil
 		}
 		p.nextToken()
 		return &ast.IntegerLit{Value: val, Untyped: true}
 	case lexer.TOK_FLOAT_LIT:
-		val, err := strconv.ParseFloat(p.curToken.Literal, 64)
-		if err != nil {
-			p.addError("invalid float literal: %s", p.curToken.Literal)
-			return nil
+		lit := p.curToken.Literal
+		clean := strings.ReplaceAll(lit, "_", "")
+		var val float64
+		var err error
+		if strings.HasPrefix(clean, "0x") || strings.HasPrefix(clean, "0X") {
+			val = p.parsePrefixedFloat(clean[2:], 16)
+		} else if strings.HasPrefix(clean, "0b") || strings.HasPrefix(clean, "0B") {
+			val = p.parsePrefixedFloat(clean[2:], 2)
+		} else if strings.HasPrefix(clean, "0o") || strings.HasPrefix(clean, "0O") {
+			val = p.parsePrefixedFloat(clean[2:], 8)
+		} else {
+			val, err = strconv.ParseFloat(clean, 64)
+			if err != nil {
+				p.addError("invalid float literal: %s", lit)
+				return nil
+			}
 		}
 		p.nextToken()
 		return &ast.FloatLit{Value: val, Untyped: true}
@@ -353,11 +392,42 @@ func (p *Parser) parsePrimary() ast.Expr {
 	}
 }
 
+func (p *Parser) parsePrefixedFloat(s string, base int) float64 {
+	parts := strings.SplitN(s, ".", 2)
+	var val float64
+	if parts[0] != "" {
+		intVal, err := strconv.ParseInt(parts[0], base, 64)
+		if err != nil {
+			p.addError("invalid float literal: %s", p.curToken.Literal)
+			return 0
+		}
+		val = float64(intVal)
+	}
+	if len(parts) > 1 && parts[1] != "" {
+		fracVal, err := strconv.ParseInt(parts[1], base, 64)
+		if err != nil {
+			p.addError("invalid float literal: %s", p.curToken.Literal)
+			return 0
+		}
+		val += float64(fracVal) / math.Pow(float64(base), float64(len(parts[1])))
+	}
+	return val
+}
+
 func (p *Parser) addError(format string, args ...interface{}) {
 	msg := fmt.Sprintf("line %d: %s", p.curToken.Line, fmt.Sprintf(format, args...))
 	p.errors = append(p.errors, msg)
 }
 
+func (p *Parser) addWarning(format string, args ...interface{}) {
+	msg := fmt.Sprintf("line %d: %s", p.curToken.Line, fmt.Sprintf(format, args...))
+	p.warnings = append(p.warnings, msg)
+}
+
 func (p *Parser) Errors() []string {
 	return p.errors
+}
+
+func (p *Parser) Warnings() []string {
+	return p.warnings
 }

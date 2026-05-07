@@ -36,6 +36,9 @@ func runFile(filename string) error {
 	p := parser.New(l)
 	program := p.ParseProgram()
 
+	for _, warn := range p.Warnings() {
+		fmt.Fprintf(os.Stderr, "Warning: %s\n", warn)
+	}
 	if len(p.Errors()) > 0 {
 		for _, err := range p.Errors() {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", err)
@@ -74,7 +77,10 @@ func repl() {
 
 		l := lexer.New(line)
 		p := parser.New(l)
-		stmt, errs := p.ParseSingleStmt()
+		stmt, errs, warns := p.ParseSingleStmt()
+		for _, warn := range warns {
+			fmt.Fprintf(os.Stderr, "Warning: %s\n", warn)
+		}
 		if stmt == nil {
 			if len(errs) > 0 {
 				for _, err := range errs {
