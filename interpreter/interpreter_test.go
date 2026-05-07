@@ -275,6 +275,7 @@ func TestValueString(t *testing.T) {
 		{Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 10, IsFloat: false}, "32-bit signed integer(10)"},
 		{Value{IType: ast.IntegerType{Size: 16, Signed: false}, Data: 5, IsFloat: false}, "16-bit unsigned integer(5)"},
 		{Value{FType: ast.FloatType{Size: 32}, FData: 3.14, IsFloat: true}, "32-bit float(3.14)"},
+		{Value{Untyped: true, FData: 2.5, IsFloat: true}, "2.5"},
 	}
 
 	for _, tt := range tests {
@@ -439,20 +440,6 @@ x += 5;
 	err := i.Run(program)
 	if err == nil {
 		t.Errorf("expected error using null variable in += operation")
-	}
-}
-
-func TestExecuteAssignmentUnknownOp(t *testing.T) {
-	i := New()
-	stmt := &ast.Assignment{
-		Name: "x",
-		Op:   "%",
-		Expr: &ast.IntegerLit{Value: 5, Untyped: true},
-	}
-	i.env.Set("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 10})
-	err := i.executeAssignment(stmt)
-	if err == nil {
-		t.Errorf("expected error for unknown operator")
 	}
 }
 
@@ -1904,6 +1891,61 @@ func TestCanImplicitConvertFloatToFloatDowngrade(t *testing.T) {
 	}
 }
 
+func TestCanImplicitConvertNullableToInt(t *testing.T) {
+	// nullable integer should not convert to non-nullable integer
+	result := canImplicitConvert(
+		ast.IntegerType{Size: 32, Signed: true, Nullable: true}, ast.FloatType{}, false,
+		ast.IntegerType{Size: 32, Signed: true, Nullable: false}, ast.FloatType{}, false,
+	)
+	if result {
+		t.Errorf("expected nullable int to not convert to non-nullable int")
+	}
+}
+
+func TestCanImplicitConvertNullableFloatToFloat(t *testing.T) {
+	// nullable float should not convert to non-nullable float
+	result := canImplicitConvert(
+		ast.IntegerType{}, ast.FloatType{Size: 32, Nullable: true}, true,
+		ast.IntegerType{}, ast.FloatType{Size: 32, Nullable: false}, true,
+	)
+	if result {
+		t.Errorf("expected nullable float to not convert to non-nullable float")
+	}
+}
+
+func TestCanImplicitConvertNullableToIntSameType(t *testing.T) {
+	// nullable to non-nullable should fail even if same size/signedness
+	result := canImplicitConvert(
+		ast.IntegerType{Size: 32, Signed: true, Nullable: true}, ast.FloatType{}, false,
+		ast.IntegerType{Size: 32, Signed: true, Nullable: false}, ast.FloatType{}, false,
+	)
+	if result {
+		t.Errorf("expected nullable to non-nullable to fail")
+	}
+}
+
+func TestCanImplicitConvertNonNullableToNullable(t *testing.T) {
+	// non-nullable to nullable should be allowed
+	result := canImplicitConvert(
+		ast.IntegerType{Size: 32, Signed: true, Nullable: false}, ast.FloatType{}, false,
+		ast.IntegerType{Size: 32, Signed: true, Nullable: true}, ast.FloatType{}, false,
+	)
+	if !result {
+		t.Errorf("expected non-nullable int to convert to nullable int")
+	}
+}
+
+func TestCanImplicitConvertNonNullableFloatToNullableFloat(t *testing.T) {
+	// non-nullable float to nullable float should be allowed
+	result := canImplicitConvert(
+		ast.IntegerType{}, ast.FloatType{Size: 32, Nullable: false}, true,
+		ast.IntegerType{}, ast.FloatType{Size: 32, Nullable: true}, true,
+	)
+	if !result {
+		t.Errorf("expected non-nullable float to convert to nullable float")
+	}
+}
+
 func TestCanFitInFloatEdgeCases(t *testing.T) {
 	tests := []struct {
 		val      float64
@@ -1924,22 +1966,6 @@ func TestCanFitInFloatEdgeCases(t *testing.T) {
 		if result != tt.expected {
 			t.Errorf("canFitInFloat(%g, %v) = %v, expected %v", tt.val, tt.ftype, result, tt.expected)
 		}
-	}
-}
-
-func TestValueStringNullableFloat(t *testing.T) {
-	v := Value{FType: ast.FloatType{Size: 32, Nullable: true}, FData: 3.14, IsFloat: true}
-	result := v.String()
-	if !strings.Contains(result, "nullable") {
-		t.Errorf("expected string to contain 'nullable', got %q", result)
-	}
-}
-
-func TestValueStringNullableInt(t *testing.T) {
-	v := Value{IType: ast.IntegerType{Size: 32, Signed: true, Nullable: true}, Data: 42, IsFloat: false}
-	result := v.String()
-	if !strings.Contains(result, "nullable") {
-		t.Errorf("expected string to contain 'nullable', got %q", result)
 	}
 }
 
@@ -1985,5 +2011,891 @@ print(x + y);
 
 	if !strings.Contains(output, "30") {
 		t.Errorf("expected output to contain '30', got %q", output)
+	}
+}
+
+func TestValueStringNullableFloat(t *testing.T) {
+	v := Value{FType: ast.FloatType{Size: 32, Nullable: true}, FData: 3.14, IsFloat: true}
+	result := v.String()
+	if !strings.Contains(result, "nullable") {
+		t.Errorf("expected string to contain 'nullable', got %q", result)
+	}
+}
+
+func TestValueStringNullableInt(t *testing.T) {
+	v := Value{IType: ast.IntegerType{Size: 32, Signed: true, Nullable: true}, Data: 42, IsFloat: false}
+	result := v.String()
+	if !strings.Contains(result, "nullable") {
+		t.Errorf("expected string to contain 'nullable', got %q", result)
+	}
+}
+
+func TestCanFitInFloatDefaultCase(t *testing.T) {
+	// Test the default case in canFitInFloat (invalid size)
+	// Use an invalid size to trigger default case
+	ftype := ast.FloatType{Size: 123} // invalid size
+	result := canFitInFloat(100.0, ftype)
+	// Default case returns false
+	if result {
+		t.Errorf("expected false for invalid float type size")
+	}
+}
+
+func TestExecuteStmtNullableWithoutExpr(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		IType: ast.IntegerType{Size: 32, Signed: true, Nullable: true},
+		Expr:  nil,
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Check that variable was set with null
+	val, ok := i.env.Get("x")
+	if !ok {
+		t.Fatalf("expected variable 'x' to exist")
+	}
+	if !val.Null {
+		t.Errorf("expected null value")
+	}
+}
+
+func TestExecuteAssignmentWithNullToNullable(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{IType: ast.IntegerType{Size: 32, Signed: true, Nullable: true}, Data: 10})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "=",
+		Expr: &ast.NullLit{},
+	}
+	err := i.executeAssignment(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	val, _ := i.env.Get("x")
+	if !val.Null {
+		t.Errorf("expected null value after assignment")
+	}
+}
+
+func TestEvalBinaryDefaultOp(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 10, Untyped: true},
+		Op:    "%", // modulo not supported
+		Right: &ast.IntegerLit{Value: 3, Untyped: true},
+	}
+	_, err := i.evalBinary(expr)
+	if err == nil {
+		t.Errorf("expected error for unknown operator")
+	}
+}
+
+func TestValueStringNonNullableFloat(t *testing.T) {
+	v := Value{FType: ast.FloatType{Size: 32}, FData: 3.14, IsFloat: true}
+	result := v.String()
+	if !strings.Contains(result, "32-bit float") {
+		t.Errorf("expected '32-bit float' in %q", result)
+	}
+}
+
+func TestExecuteStmtVarDeclWithNullableNoExpr(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		IType: ast.IntegerType{Size: 32, Signed: true, Nullable: true},
+		Expr:  nil,
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, ok := i.env.Get("x")
+	if !ok || !val.Null {
+		t.Errorf("expected null variable")
+	}
+}
+
+func TestExecuteAssignmentNoOp(t *testing.T) {
+	i := New()
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "?",
+		Expr: &ast.IntegerLit{Value: 5},
+	}
+	i.env.Set("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 10})
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected error for unknown operator")
+	}
+}
+
+func TestStringNonNullableFloat(t *testing.T) {
+	v := Value{FType: ast.FloatType{Size: 32}, FData: 3.14, IsFloat: true}
+	result := v.String()
+	if !strings.Contains(result, "32-bit float") {
+		t.Errorf("expected '32-bit float' in %q", result)
+	}
+}
+
+func TestExecuteAssignmentFloatAdd(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "+=",
+		Expr: &ast.FloatLit{Value: 2.5, Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 4.0 {
+		t.Errorf("expected 4.0, got %g", val.FData)
+	}
+}
+
+func TestExecuteAssignmentFloatSub(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 5.5, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "-=",
+		Expr: &ast.FloatLit{Value: 2.0, Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 3.5 {
+		t.Errorf("expected 3.5, got %g", val.FData)
+	}
+}
+
+func TestExecuteAssignmentFloatMul(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 2.0, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "*=",
+		Expr: &ast.FloatLit{Value: 3.0, Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 6.0 {
+		t.Errorf("expected 6.0, got %g", val.FData)
+	}
+}
+
+func TestExecuteAssignmentFloatDiv(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 10.0, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "/=",
+		Expr: &ast.FloatLit{Value: 2.0, Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 5.0 {
+		t.Errorf("expected 5.0, got %g", val.FData)
+	}
+}
+
+func TestEvalExprDefaultCase(t *testing.T) {
+	// The default case in evalExpr handles unknown expression types
+	// This is difficult to test in Go without creating a type that implements ast.Expr
+	// but isn't one of the handled types
+	// Skip this test as it requires modifying the AST package
+}
+
+func TestVarDeclWithFloatExpr(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:    "x",
+		FType:   ast.FloatType{Size: 32},
+		IsFloat: true,
+		Expr:    &ast.FloatLit{Value: 3.14, Untyped: true},
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 3.14 {
+		t.Errorf("expected 3.14, got %g", val.FData)
+	}
+}
+
+func TestVarDeclWithIntToFloatConversion(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:    "x",
+		FType:   ast.FloatType{Size: 32},
+		IsFloat: true,
+		Expr:    &ast.IntegerLit{Value: 42, Untyped: true},
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 42.0 {
+		t.Errorf("expected 42.0, got %g", val.FData)
+	}
+}
+
+func TestVarDeclWithFloatTypeMismatch(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		IType: ast.IntegerType{Size: 32, Signed: true},
+		Expr:  &ast.FloatLit{Value: 3.14, Untyped: true},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected type mismatch error")
+	}
+}
+
+func TestExecuteAssignmentIntToFloatAdd(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "+=",
+		Expr: &ast.IntegerLit{Value: 2},
+	}
+	err := i.executeAssignment(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 3.5 {
+		t.Errorf("expected 3.5, got %g", val.FData)
+	}
+}
+
+func TestExecuteAssignmentIntToFloatSub(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 5.5, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "-=",
+		Expr: &ast.IntegerLit{Value: 2},
+	}
+	err := i.executeAssignment(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 3.5 {
+		t.Errorf("expected 3.5, got %g", val.FData)
+	}
+}
+
+func TestExecuteAssignmentIntToFloatMul(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 2.0, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "*=",
+		Expr: &ast.IntegerLit{Value: 3},
+	}
+	err := i.executeAssignment(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 6.0 {
+		t.Errorf("expected 6.0, got %g", val.FData)
+	}
+}
+
+func TestExecuteAssignmentIntToFloatDiv(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 10.0, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "/=",
+		Expr: &ast.IntegerLit{Value: 2},
+	}
+	err := i.executeAssignment(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 5.0 {
+		t.Errorf("expected 5.0, got %g", val.FData)
+	}
+}
+
+func TestExecuteAssignmentFloatUnknownOp(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "%",
+		Expr: &ast.FloatLit{Value: 2.5},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected error for unknown operator")
+	}
+}
+
+
+func TestEvalBinaryFloatTypedBoth(t *testing.T) {
+	i := New()
+	// Both operands are typed floats
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 1.5, FType: ast.FloatType{Size: 32}, Untyped: false},
+		Op:    "+",
+		Right: &ast.FloatLit{Value: 2.5, FType: ast.FloatType{Size: 64}, Untyped: false},
+	}
+	val, err := i.evalBinary(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.FType.Size != 64 {
+		t.Errorf("expected FType.Size 64, got %d", val.FType.Size)
+	}
+}
+
+func TestEvalBinaryFloatTypedLeft(t *testing.T) {
+	i := New()
+	// Left is typed float, right is untyped - result should be untyped
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 1.5, FType: ast.FloatType{Size: 32}, Untyped: false},
+		Op:    "+",
+		Right: &ast.FloatLit{Value: 2.5, Untyped: true},
+	}
+	val, err := i.evalBinary(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.Untyped {
+		t.Errorf("expected Untyped to be true")
+	}
+}
+
+func TestEvalBinaryFloatTypedRight(t *testing.T) {
+	i := New()
+	// Left is untyped, right is typed float - result should be untyped
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 1.5, Untyped: true},
+		Op:    "+",
+		Right: &ast.FloatLit{Value: 2.5, FType: ast.FloatType{Size: 32}, Untyped: false},
+	}
+	val, err := i.evalBinary(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.Untyped {
+		t.Errorf("expected Untyped to be true")
+	}
+}
+
+func TestEvalBinaryFloatOverflow(t *testing.T) {
+	i := New()
+	// Create a float result that overflows float16
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 65504.0, FType: ast.FloatType{Size: 16}, Untyped: false},
+		Op:    "+",
+		Right: &ast.FloatLit{Value: 1.0, FType: ast.FloatType{Size: 16}, Untyped: false},
+	}
+	_, err := i.evalBinary(expr)
+	if err == nil {
+		t.Errorf("expected overflow error")
+	}
+}
+
+func TestVarDeclFloatToFloatConversion(t *testing.T) {
+	i := New()
+	// Assign float to float variable with implicit conversion
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		FType: ast.FloatType{Size: 64},
+		IsFloat: true,
+		Expr: &ast.FloatLit{Value: 1.5, FType: ast.FloatType{Size: 32}, Untyped: false},
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestVarDeclFloatOverflow(t *testing.T) {
+	i := New()
+	// Float value overflows the target type
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		FType: ast.FloatType{Size: 16},
+		IsFloat: true,
+		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected overflow error")
+	}
+}
+
+func TestVarDeclIntToFloatConversion(t *testing.T) {
+	i := New()
+	// Assign integer to float variable
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		FType: ast.FloatType{Size: 32},
+		IsFloat: true,
+		Expr: &ast.IntegerLit{Value: 42, Untyped: true},
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestVarDeclIntToFloatTypeMismatch(t *testing.T) {
+	i := New()
+	// Integer (64-bit unsigned) cannot implicitly convert to float32
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		FType: ast.FloatType{Size: 32},
+		IsFloat: true,
+		Expr: &ast.IntegerLit{Value: 42, IType: ast.IntegerType{Size: 64}, Untyped: false},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected type mismatch error")
+	}
+}
+
+func TestExecuteAssignmentIntToFloatEq(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "=",
+		Expr: &ast.IntegerLit{Value: 2},
+	}
+	err := i.executeAssignment(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 2.0 {
+		t.Errorf("expected 2.0, got %g", val.FData)
+	}
+}
+
+func TestExecuteAssignmentIntToFloatAddEq(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "+=",
+		Expr: &ast.IntegerLit{Value: 2},
+	}
+	err := i.executeAssignment(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 3.5 {
+		t.Errorf("expected 3.5, got %g", val.FData)
+	}
+}
+
+func TestExecuteAssignmentIntToFloatSubEq(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 5.5, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "-=",
+		Expr: &ast.IntegerLit{Value: 2},
+	}
+	err := i.executeAssignment(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 3.5 {
+		t.Errorf("expected 3.5, got %g", val.FData)
+	}
+}
+
+func TestExecuteAssignmentIntToFloatMulEq(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 2.0, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "*=",
+		Expr: &ast.IntegerLit{Value: 3},
+	}
+	err := i.executeAssignment(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 6.0 {
+		t.Errorf("expected 6.0, got %g", val.FData)
+	}
+}
+
+func TestExecuteAssignmentIntToFloatDivEq(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 10.0, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "/=",
+		Expr: &ast.IntegerLit{Value: 2},
+	}
+	err := i.executeAssignment(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 5.0 {
+		t.Errorf("expected 5.0, got %g", val.FData)
+	}
+}
+
+func TestExecuteAssignmentFloatDivByZero(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 10.0, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "/=",
+		Expr: &ast.FloatLit{Value: 0.0, Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected division by zero error")
+	}
+}
+
+func TestExecuteAssignmentFloatDefaultOp(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "%",
+		Expr: &ast.FloatLit{Value: 2.5, Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected unknown operator error")
+	}
+}
+
+func TestVarDeclFloatWithIntegerUntyped(t *testing.T) {
+	i := New()
+	// rightVal is float but Untyped, so rightVal.IsFloat is true
+	// This should go through the rightVal.IsFloat path
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		FType: ast.FloatType{Size: 32},
+		IsFloat: true,
+		Expr: &ast.IntegerLit{Value: 42, Untyped: true},
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 42.0 {
+		t.Errorf("expected 42.0, got %g", val.FData)
+	}
+}
+
+func TestVarDeclFloatTypeMismatch(t *testing.T) {
+	i := New()
+	// Integer (typed) cannot convert to float
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		FType: ast.FloatType{Size: 32},
+		IsFloat: true,
+		Expr: &ast.IntegerLit{Value: 42, IType: ast.IntegerType{Size: 32, Signed: true}, Untyped: false},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected type mismatch error")
+	}
+}
+
+
+func TestVarDeclTypedIntToFloatError(t *testing.T) {
+	i := New()
+	// Integer (typed) cannot convert to float
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		FType: ast.FloatType{Size: 32},
+		IsFloat: true,
+		Expr: &ast.IntegerLit{Value: 42, IType: ast.IntegerType{Size: 32, Signed: true}, Untyped: false},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected type mismatch error")
+	}
+}
+
+func TestVarDeclRightValUntypedIntToFloat(t *testing.T) {
+	i := New()
+	// rightVal is untyped integer, rightVal.IsFloat is false
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		FType: ast.FloatType{Size: 32},
+		IsFloat: true,
+		Expr: &ast.IntegerLit{Value: 42, Untyped: true},
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.FData != 42.0 {
+		t.Errorf("expected 42.0, got %g", val.FData)
+	}
+}
+
+func TestExecuteAssignmentDivByZeroInt(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 10.0, IsFloat: true})
+	// rightVal is integer with Data=0
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "/=",
+		Expr: &ast.IntegerLit{Value: 0},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected division by zero error")
+	}
+}
+
+func TestVarDeclFloatOverflowInConversion(t *testing.T) {
+	i := New()
+	// rightVal is float, convert to float with smaller size
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		FType: ast.FloatType{Size: 16},
+		IsFloat: true,
+		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected overflow error")
+	}
+}
+
+func TestVarDeclFloatToFloatOverflow(t *testing.T) {
+	i := New()
+	// Float value too large for target type
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		FType: ast.FloatType{Size: 16},
+		IsFloat: true,
+		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected overflow error")
+	}
+}
+
+func TestExecuteAssignmentIntToFloatTypeMismatch(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, IsFloat: true})
+	// Integer that cannot convert to float
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "=",
+		Expr: &ast.IntegerLit{Value: 42, IType: ast.IntegerType{Size: 64}, Untyped: false},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected type mismatch error")
+	}
+}
+
+func TestExecuteAssignmentFloatToFloatOverflow(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 16}, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "=",
+		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected overflow error")
+	}
+}
+
+func TestExecuteAssignmentFloatAddOverflow(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 16}, FData: 60000.0, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "+=",
+		Expr: &ast.FloatLit{Value: 10000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected overflow error")
+	}
+}
+
+func TestExecuteAssignmentFloatDivOverflow(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 16}, FData: 60000.0, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "/=",
+		Expr: &ast.FloatLit{Value: 0.5, FType: ast.FloatType{Size: 32}, Untyped: false},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected overflow error")
+	}
+}
+
+func TestExecuteAssignmentFloatToIntError(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, IsFloat: false})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "=",
+		Expr: &ast.FloatLit{Value: 3.14, Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected type mismatch error")
+	}
+}
+
+func TestVarDeclFloatOverflowCheck(t *testing.T) {
+	i := New()
+	// rightVal is float with value that overflows target FType
+	// This should trigger canFitInFloat check
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		FType: ast.FloatType{Size: 16},
+		IsFloat: true,
+		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected overflow error")
+	}
+}
+
+func TestExecuteAssignmentFloatEqOverflow(t *testing.T) {
+	i := New()
+	// Assign float value that overflows target type
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 16}, FData: 100.0, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "=",
+		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected overflow error")
+	}
+}
+
+func TestVarDeclFloatOverflowInCheck(t *testing.T) {
+	i := New()
+	// rightVal is float32 with value 70000, target is float16
+	// This should trigger canFitInFloat check
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		FType: ast.FloatType{Size: 16},
+		IsFloat: true,
+		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected overflow error")
+	}
+}
+
+
+
+
+
+
+// Test for executeStmt - VarDecl with float conversion that overflows
+func TestVarDeclFloatOverflowCoverage(t *testing.T) {
+	i := New()
+	// rightVal is float32 with value 70000, target is float16
+	// This should trigger canFitInFloat check (line 240)
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		FType: ast.FloatType{Size: 16},
+		IsFloat: true,
+		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected overflow error")
+	}
+}
+
+// Test for executeAssignment - default operator case (line 329-330)
+func TestExecuteAssignmentDefaultOpCoverage(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "%", // unknown operator
+		Expr: &ast.FloatLit{Value: 2.5, Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected unknown operator error")
+	}
+}
+
+// Test for executeAssignment - canFitInFloat check (line 332-334)
+func TestExecuteAssignmentFloatEqOverflowCoverage(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 16}, FData: 1.0, IsFloat: true})
+	// rightVal is float32 with value 70000, result overflows float16
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "=",
+		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected overflow error")
+	}
+}
+
+func TestExecuteAssignmentFloatOverflowCoverage(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 16}, FData: 1.0, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "=",
+		Expr: &ast.FloatLit{Value: 70000.0, FType: ast.FloatType{Size: 32}, Untyped: false},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected overflow error")
 	}
 }

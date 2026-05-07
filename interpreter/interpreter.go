@@ -55,6 +55,13 @@ func typeDesc(it ast.IntegerType, ft ast.FloatType, isFloat bool) string {
 func canImplicitConvert(srcInt ast.IntegerType, srcFloat ast.FloatType, srcIsFloat bool,
 	dstInt ast.IntegerType, dstFloat ast.FloatType, dstIsFloat bool) bool {
 
+	// Nullability check: nullable cannot convert to non-nullable
+	srcNullable := srcIsFloat && srcFloat.Nullable || !srcIsFloat && srcInt.Nullable
+	dstNullable := dstIsFloat && dstFloat.Nullable || !dstIsFloat && dstInt.Nullable
+	if srcNullable && !dstNullable {
+		return false
+	}
+
 	// Float to float
 	if srcIsFloat && dstIsFloat {
 		return srcFloat.Size <= dstFloat.Size

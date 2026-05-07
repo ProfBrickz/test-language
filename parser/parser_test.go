@@ -813,6 +813,25 @@ func TestParseInvalidFloatLiteral(t *testing.T) {
 	}
 }
 
+func TestParsePrimaryInvalidFloat(t *testing.T) {
+	// Test the error case in parsePrimary for float
+	input := "print(1e10);" // exponential notation not supported
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	// This might not error since lexer treats it as identifier potentially
+	// Let's try something that will definitely cause error
+	input2 := "print(.);"
+	l2 := lexer.New(input2)
+	p2 := New(l2)
+	p2.ParseProgram()
+
+	if len(p2.Errors()) == 0 {
+		t.Errorf("expected error for invalid primary expression")
+	}
+}
+
 func TestParseFloatDecl(t *testing.T) {
 	input := "var x: float{size: 32} = 3.14;"
 	l := lexer.New(input)
@@ -883,6 +902,58 @@ func TestParseFloatInvalidSize(t *testing.T) {
 	}
 }
 
+func TestParseFloatTypeMissingColon(t *testing.T) {
+	input := "var x: float{size 32} = 1.0;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing colon")
+	}
+}
+
+func TestParseFloatTypeInvalidNullableValue(t *testing.T) {
+	input := "var x: float{nullable: maybe} = 1.0;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid nullable value")
+	}
+}
+
+func TestParseFloatTypeWithComma(t *testing.T) {
+	input := "var x: float{size: 32, nullable: true} = 1.0;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+}
+
+func TestParseFloatTypeOnlyBraces(t *testing.T) {
+	input := "var x: float{} = 1.0;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+}
+
 func TestParseFloatTypeWithNullable(t *testing.T) {
 	input := "var x: float{size: 32, nullable: true} = null;"
 	l := lexer.New(input)
@@ -896,5 +967,95 @@ func TestParseFloatTypeWithNullable(t *testing.T) {
 	stmt := program.Stmts[0].(*ast.VarDecl)
 	if !stmt.FType.Nullable {
 		t.Errorf("expected nullable to be true")
+	}
+}
+
+func TestParseFloatTypeInvalidKey(t *testing.T) {
+	input := "var x: float{invalid: 32} = 1.0;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid key")
+	}
+}
+
+func TestParseFloatTypeInvalidSizeValue(t *testing.T) {
+	input := "var x: float{size: abc} = 1.0;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for non-integer size")
+	}
+}
+
+func TestParseFloatTypeInvalidSizeNumber(t *testing.T) {
+	input := "var x: float{size: 128} = 1.0;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid size number")
+	}
+}
+
+func TestParseFloatTypeTrailingComma(t *testing.T) {
+	input := "var x: float{size: 32,} = 1.0;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	// This might error due to unexpected token after comma
+	// Just ensure no panic
+}
+
+func TestParsePrimaryInvalidInt(t *testing.T) {
+	// Test invalid integer literal that causes ParseInt to fail
+	input := "print(99999999999999999999);" // too large for int64
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	// Might or might not error depending on lexer implementation
+	// Just ensure no panic
+}
+
+func TestParseStmtUnexpectedToken(t *testing.T) {
+	input := "@"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for unexpected token")
+	}
+}
+
+func TestParseFloatInvalidLiteral(t *testing.T) {
+	// Test float literal that fails ParseFloat
+	input := "var x: float = 1.2.3;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	// Lexer will produce tokens that cause parse error
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid float literal")
+	}
+}
+
+func TestParseFloatTypeSizeLine(t *testing.T) {
+	// Cover line 134-136: size token but not TOK_INT_LIT
+	input := "var x: float{size: true} = 1.0;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for non-integer size value")
 	}
 }

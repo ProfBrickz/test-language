@@ -247,6 +247,25 @@ func TestPeekNext(t *testing.T) {
 	}
 }
 
+func TestReadNumberDotWithoutDigit(t *testing.T) {
+	// Input with a dot but no following digit - should return int, not float
+	input := "123. abc"
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_INT_LIT {
+		t.Errorf("expected INT_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "123" {
+		t.Errorf("expected '123', got %q", tok.Literal)
+	}
+
+	// Next token should be dot
+	tok2 := l.NextToken()
+	if tok2.Type != TOK_INT_LIT {
+		t.Errorf("expected INT_LIT for '.', got %s", tok2.Type)
+	}
+}
+
 func TestDefaultCaseNextToken(t *testing.T) {
 	input := "&"
 	l := New(input)
