@@ -87,9 +87,14 @@ func (p *Parser) parseVarDecl() *ast.VarDecl {
 
 	var iType ast.IntegerType
 	var fType ast.FloatType
+	var bType ast.BoolType
 	isFloat := false
+	isBool := false
 
-	if p.curToken.Type == lexer.TOK_FLOAT {
+	if p.curToken.Type == lexer.TOK_BOOL {
+		bType = p.parseBoolType()
+		isBool = true
+	} else if p.curToken.Type == lexer.TOK_FLOAT {
 		fType = p.parseFloatType()
 		isFloat = true
 	} else {
@@ -107,7 +112,7 @@ func (p *Parser) parseVarDecl() *ast.VarDecl {
 		return nil
 	}
 
-	return &ast.VarDecl{Name: name, IType: iType, FType: fType, Expr: expr, IsFloat: isFloat}
+	return &ast.VarDecl{Name: name, IType: iType, FType: fType, BType: bType, Expr: expr, IsFloat: isFloat, IsBool: isBool}
 }
 
 func (p *Parser) parseFloatType() ast.FloatType {
@@ -168,6 +173,55 @@ func (p *Parser) parseFloatType() ast.FloatType {
 	}
 
 	return fType
+}
+
+func (p *Parser) parseBoolType() ast.BoolType {
+	bType := ast.BoolType{Nullable: true}
+
+	p.nextToken()
+	if p.curToken.Type == lexer.TOK_LBRACE {
+		for {
+			p.nextToken()
+			if p.curToken.Type == lexer.TOK_RBRACE {
+				p.nextToken()
+				break
+			}
+			if p.curToken.Type != lexer.TOK_NULLABLE {
+				p.addError("expected 'nullable', got %s", p.curToken.Type)
+				break
+			}
+			key := p.curToken.Literal
+
+			p.nextToken()
+			if p.curToken.Type != lexer.TOK_COLON {
+				p.addError("expected ':', got %s", p.curToken.Type)
+				break
+			}
+
+			p.nextToken()
+			switch key {
+			case "nullable":
+				if p.curToken.Type != lexer.TOK_TRUE && p.curToken.Type != lexer.TOK_FALSE {
+					p.addError("expected 'true' or 'false', got %s", p.curToken.Type)
+					break
+				}
+				bType.Nullable = p.curToken.Type == lexer.TOK_TRUE
+			}
+
+			p.nextToken()
+			if p.curToken.Type == lexer.TOK_COMMA {
+				continue
+			}
+			if p.curToken.Type == lexer.TOK_RBRACE {
+				p.nextToken()
+				break
+			}
+			p.addError("expected ',' or '}', got %s", p.curToken.Type)
+			break
+		}
+	}
+
+	return bType
 }
 
 func (p *Parser) parseIntegerType() ast.IntegerType {
@@ -383,6 +437,12 @@ func (p *Parser) parsePrimary() ast.Expr {
 		}
 		p.nextToken()
 		return expr
+	case lexer.TOK_TRUE:
+		p.nextToken()
+		return &ast.BoolLit{Value: true, Untyped: true}
+	case lexer.TOK_FALSE:
+		p.nextToken()
+		return &ast.BoolLit{Value: false, Untyped: true}
 	case lexer.TOK_NULL:
 		p.nextToken()
 		return &ast.NullLit{}

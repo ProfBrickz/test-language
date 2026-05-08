@@ -17,6 +17,10 @@ type IntegerType struct {
 	Nullable bool
 }
 
+type BoolType struct {
+	Nullable bool
+}
+
 type FloatType struct {
 	Size     int
 	Nullable bool
@@ -31,6 +35,12 @@ type IntegerLit struct {
 type FloatLit struct {
 	Value   float64
 	FType   FloatType
+	Untyped bool
+}
+
+type BoolLit struct {
+	Value   bool
+	BType   BoolType
 	Untyped bool
 }
 
@@ -51,8 +61,10 @@ type VarDecl struct {
 	Name    string
 	IType   IntegerType
 	FType   FloatType
+	BType   BoolType
 	Expr    Expr
 	IsFloat bool
+	IsBool  bool
 }
 
 type Assignment struct {

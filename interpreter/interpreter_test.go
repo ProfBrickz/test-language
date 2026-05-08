@@ -279,7 +279,7 @@ func TestTypeDesc(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := typeDesc(tt.itype, tt.ftype, tt.isFloat)
+		result := typeDescFromVar(tt.itype, tt.ftype, ast.BoolType{}, tt.isFloat, false)
 		if result != tt.expected {
 			t.Errorf("typeDesc(%v, %v, %v) = %q, expected %q", tt.itype, tt.ftype, tt.isFloat, result, tt.expected)
 		}
@@ -3062,7 +3062,7 @@ func TestConvertFloatAllSizes(t *testing.T) {
 }
 
 func TestTypeDescUntypedInteger(t *testing.T) {
-	result := typeDesc(ast.IntegerType{Size: 0}, ast.FloatType{}, false)
+	result := typeDescFromVar(ast.IntegerType{Size: 0}, ast.FloatType{}, ast.BoolType{}, false, false)
 	if result != "untyped integer literal" {
 		t.Errorf("expected 'untyped integer literal', got %q", result)
 	}

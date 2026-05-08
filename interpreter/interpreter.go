@@ -12,10 +12,13 @@ import (
 type Value struct {
 	IType   ast.IntegerType
 	FType   ast.FloatType
+	BType   ast.BoolType
 	Data    int64
 	FData   float64
+	BData   bool
 	Untyped bool
 	IsFloat bool
+	IsBool  bool
 	Null    bool
 }
 
@@ -23,28 +26,45 @@ func (v Value) String() string {
 	if v.Null {
 		return "null"
 	}
+	if v.IsBool {
+		if v.Untyped {
+			return fmt.Sprintf("%t", v.BData)
+		}
+		return fmt.Sprintf("%s(%t)", typeDesc(v.BType, true), v.BData)
+	}
 	if v.IsFloat {
 		if v.Untyped {
 			return fmt.Sprintf("%g", v.FData)
 		}
-		return fmt.Sprintf("%s(%g)", typeDesc(ast.IntegerType{}, v.FType, true), v.FData)
+		return fmt.Sprintf("%s(%g)", typeDesc(v.FType, false), v.FData)
 	}
 	if v.Untyped {
 		return fmt.Sprintf("%d", v.Data)
 	}
-	return fmt.Sprintf("%s(%d)", typeDesc(v.IType, ast.FloatType{}, false), v.Data)
+	return fmt.Sprintf("%s(%d)", typeDesc(v.IType, false), v.Data)
 }
 
-func typeDesc(it ast.IntegerType, ft ast.FloatType, isFloat bool) string {
-	if isFloat {
-		if ft.Size == 0 {
-			return "untyped float literal"
+func typeDescFromVar(it ast.IntegerType, ft ast.FloatType, bt ast.BoolType, isFloat, isBool bool) string {
+	if isBool {
+		nullable := ""
+		if bt.Nullable {
+			nullable = "nullable "
 		}
+		return fmt.Sprintf("%sbool", nullable)
+	}
+	if isFloat {
 		nullable := ""
 		if ft.Nullable {
 			nullable = "nullable "
 		}
+		if ft.Size == 0 {
+			return "untyped float literal"
+		}
 		return fmt.Sprintf("%s%d-bit float", nullable, ft.Size)
+	}
+	nullable := ""
+	if it.Nullable {
+		nullable = "nullable "
 	}
 	if it.Size == 0 {
 		return "untyped integer literal"
@@ -53,11 +73,44 @@ func typeDesc(it ast.IntegerType, ft ast.FloatType, isFloat bool) string {
 	if !it.Signed {
 		sign = "unsigned"
 	}
-	nullable := ""
-	if it.Nullable {
-		nullable = "nullable "
-	}
 	return fmt.Sprintf("%s%d-bit %s integer", nullable, it.Size, sign)
+}
+
+func typeDescForVal(v Value) string {
+	return typeDescFromVar(v.IType, v.FType, v.BType, v.IsFloat, v.IsBool)
+}
+
+func typeDesc(t interface{}, isBool bool) string {
+	switch typ := t.(type) {
+	case ast.BoolType:
+		if typ.Nullable {
+			return "nullable bool"
+		}
+		return "bool"
+	case ast.FloatType:
+		if typ.Size == 0 {
+			return "untyped float literal"
+		}
+		nullable := ""
+		if typ.Nullable {
+			nullable = "nullable "
+		}
+		return fmt.Sprintf("%s%d-bit float", nullable, typ.Size)
+	case ast.IntegerType:
+		if typ.Size == 0 {
+			return "untyped integer literal"
+		}
+		sign := "signed"
+		if !typ.Signed {
+			sign = "unsigned"
+		}
+		nullable := ""
+		if typ.Nullable {
+			nullable = "nullable "
+		}
+		return fmt.Sprintf("%s%d-bit %s integer", nullable, typ.Size, sign)
+	}
+	return "unknown"
 }
 
 func canImplicitConvert(srcInt ast.IntegerType, srcFloat ast.FloatType, srcIsFloat bool,
@@ -200,41 +253,57 @@ func (i *Interpreter) ExecuteStmt(stmt ast.Stmt) error {
 func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 	switch s := stmt.(type) {
 	case *ast.VarDecl:
-		val := Value{IType: s.IType, FType: s.FType, IsFloat: s.IsFloat}
+		val := Value{IType: s.IType, FType: s.FType, BType: s.BType, IsFloat: s.IsFloat, IsBool: s.IsBool}
 		if s.Expr != nil {
 			rightVal, err := i.evalExpr(s.Expr)
 			if err != nil {
 				return err
 			}
 			if rightVal.Null {
-				if !s.IType.Nullable && !s.FType.Nullable {
-					return fmt.Errorf("cannot assign null to %s", typeDesc(s.IType, s.FType, s.IsFloat))
+				if !s.IsBool && !s.IType.Nullable && !s.FType.Nullable || (s.IsBool && !s.BType.Nullable) {
+					return fmt.Errorf("cannot assign null to %s", typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
 				}
 				val.Null = true
 			} else {
-				if rightVal.IsFloat {
+				if rightVal.IsBool {
+					if !s.IsBool {
+						return fmt.Errorf("cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
+					}
+					if rightVal.BType.Nullable && !s.BType.Nullable {
+						return fmt.Errorf("cannot assign nullable %s to non-nullable %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
+					}
+					val.BData = rightVal.BData
+				} else if rightVal.IsFloat {
 					if !s.IsFloat {
-						return fmt.Errorf("cannot assign %s to integer variable", typeDesc(rightVal.IType, rightVal.FType, true))
+						return fmt.Errorf("cannot assign %s to integer variable", typeDescForVal(rightVal))
 					}
 					if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, true, s.IType, s.FType, true) {
-						return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDesc(rightVal.IType, rightVal.FType, true), typeDesc(s.IType, s.FType, true))
+						return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, true, false))
 					}
 					val.FData = convertFloat(rightVal.FData, s.FType)
 				} else {
-					if s.IsFloat {
+					if s.IsBool {
+						val.BData = rightVal.Data != 0
+					} else if s.IsFloat {
 						// Integer to float conversion
 						if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, ast.FloatType{}, false, ast.IntegerType{}, s.FType, true) {
-							return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDesc(rightVal.IType, ast.FloatType{}, false), typeDesc(ast.IntegerType{}, s.FType, true))
+							return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(ast.IntegerType{}, s.FType, ast.BoolType{}, true, false))
 						}
 						val.FData = convertFloat(float64(rightVal.Data), s.FType)
 					} else {
 						// Integer to integer
 						if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, false, s.IType, s.FType, false) {
-							return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDesc(rightVal.IType, rightVal.FType, false), typeDesc(s.IType, s.FType, false))
+							return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, ast.BoolType{}, false, false))
 						}
 						val.Data = convertInt(rightVal.Data, s.IType)
 					}
 				}
+			}
+		} else if s.IsBool {
+			if s.BType.Nullable {
+				val.Null = true
+			} else {
+				val.BData = false
 			}
 		} else if (s.IsFloat && s.FType.Nullable) || (!s.IsFloat && s.IType.Nullable) {
 			val.Null = true
@@ -249,6 +318,8 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 		}
 		if val.Null {
 			fmt.Println("null")
+		} else if val.IsBool {
+			fmt.Println(val.BData)
 		} else if val.IsFloat {
 			fmt.Println(strconv.FormatFloat(val.FData, 'g', 20, 64))
 		} else {
@@ -272,12 +343,13 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 	}
 
 	if rightVal.Null {
-		if !val.IType.Nullable && !val.FType.Nullable {
-			return fmt.Errorf("cannot assign null to %s", typeDesc(val.IType, val.FType, val.IsFloat))
+		if !val.IsBool && !val.IType.Nullable && !val.FType.Nullable || (val.IsBool && !val.BType.Nullable) {
+			return fmt.Errorf("cannot assign null to %s", typeDescForVal(val))
 		}
 		val.Null = true
 		val.Data = 0
 		val.FData = 0
+		val.BData = false
 		i.env.Set(stmt.Name, val)
 		return nil
 	}
@@ -289,10 +361,23 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 	var result int64
 	var fresult float64
 
-	if val.IsFloat && !rightVal.IsFloat {
+	if val.IsBool {
+		if !rightVal.IsBool {
+			return fmt.Errorf("cannot assign %s to %s", typeDescForVal(rightVal), typeDescForVal(val))
+		}
+		if rightVal.BType.Nullable && !val.BType.Nullable {
+			return fmt.Errorf("cannot assign nullable %s to non-nullable %s", typeDescForVal(rightVal), typeDescForVal(val))
+		}
+		switch stmt.Op {
+		case "=":
+			val.BData = rightVal.BData
+		default:
+			return fmt.Errorf("unknown operator: %s", stmt.Op)
+		}
+	} else if val.IsFloat && !rightVal.IsFloat {
 		// Integer to float assignment
 		if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, false, val.IType, val.FType, true) {
-			return fmt.Errorf("type mismatch: cannot assign %s to %s", typeDesc(rightVal.IType, rightVal.FType, false), typeDesc(val.IType, val.FType, true))
+			return fmt.Errorf("type mismatch: cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(val.IType, val.FType, ast.BoolType{}, true, false))
 		}
 		switch stmt.Op {
 		case "=":
@@ -311,7 +396,7 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 		val.FData = convertFloat(fresult, val.FType)
 	} else if !val.IsFloat && rightVal.IsFloat {
 		// Float to integer - not allowed implicitly
-		return fmt.Errorf("cannot assign %s to integer variable", typeDesc(rightVal.IType, rightVal.FType, true))
+		return fmt.Errorf("cannot assign %s to integer variable", typeDescForVal(rightVal))
 	} else if val.IsFloat {
 		// Float to float
 		fresult = val.FData
@@ -369,6 +454,11 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 			return Value{Untyped: true, FData: e.Value, IsFloat: true}, nil
 		}
 		return Value{FType: e.FType, FData: e.Value, IsFloat: true}, nil
+	case *ast.BoolLit:
+		if e.Untyped {
+			return Value{Untyped: true, BData: e.Value, IsBool: true}, nil
+		}
+		return Value{BType: e.BType, BData: e.Value, IsBool: true}, nil
 	case *ast.VarRef:
 		val, ok := i.env.Get(e.Name)
 		if !ok {
@@ -424,7 +514,7 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 		} else {
 			resultType = left.IType
 			if !canImplicitConvert(right.IType, right.FType, false, left.IType, left.FType, false) && !canImplicitConvert(left.IType, left.FType, false, right.IType, right.FType, false) {
-				return Value{}, fmt.Errorf("type mismatch: cannot compute %s %s %s", typeDesc(left.IType, left.FType, false), expr.Op, typeDesc(right.IType, right.FType, false))
+				return Value{}, fmt.Errorf("type mismatch: cannot compute %s %s %s", typeDescForVal(left), expr.Op, typeDescForVal(right))
 			}
 			if canImplicitConvert(right.IType, right.FType, false, left.IType, left.FType, false) && left.IType.Size >= right.IType.Size {
 				right.Data = convertInt(right.Data, left.IType)
