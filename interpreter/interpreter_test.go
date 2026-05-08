@@ -2839,3 +2839,315 @@ print(x);
 		t.Errorf("expected output to contain '255', got %q", output)
 	}
 }
+
+func TestUnsignedInt8Wrapping(t *testing.T) {
+	input := `
+var x: integer{size: 8, signed: false} = 256;
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "0") {
+		t.Errorf("expected output to contain '0', got %q", output)
+	}
+}
+
+func TestUnsignedInt16Wrapping(t *testing.T) {
+	input := `
+var x: integer{size: 16, signed: false} = 65536;
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "0") {
+		t.Errorf("expected output to contain '0', got %q", output)
+	}
+}
+
+func TestUnsignedInt32Wrapping(t *testing.T) {
+	input := `
+var x: integer{size: 32, signed: false} = 4294967296;
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "0") {
+		t.Errorf("expected output to contain '0', got %q", output)
+	}
+}
+
+func TestUnsignedIntWrappingSub(t *testing.T) {
+	input := `
+var x: integer{size: 8, signed: false} = 0;
+x = x - 1;
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "255") {
+		t.Errorf("expected output to contain '255', got %q", output)
+	}
+}
+
+func TestPrefixedHexFloatEval(t *testing.T) {
+	input := `
+var a: float{size: 64} = 0xf.f;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "15.9375") {
+		t.Errorf("expected output to contain '15.9375', got %q", output)
+	}
+}
+
+func TestPrefixedBinFloatEval(t *testing.T) {
+	input := `
+var a: float{size: 64} = 0b1.01;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "1.25") {
+		t.Errorf("expected output to contain '1.25', got %q", output)
+	}
+}
+
+func TestPrefixedOctFloatEval(t *testing.T) {
+	input := `
+var a: float{size: 64} = 0o7.7;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "7.875") {
+		t.Errorf("expected output to contain '7.875', got %q", output)
+	}
+}
+
+func TestPrefixedHexFloatNoIntPartEval(t *testing.T) {
+	input := `
+var a: float{size: 64} = 0x.1;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "0.0625") {
+		t.Errorf("expected output to contain '0.0625', got %q", output)
+	}
+}
+
+func TestConvertFloatInvalidSize(t *testing.T) {
+	// convertFloat with invalid size should return the value unchanged (default case)
+	result := convertFloat(3.14, ast.FloatType{Size: 123})
+	if result != 3.14 {
+		t.Errorf("expected 3.14, got %g", result)
+	}
+}
+
+func TestConvertFloatAllSizes(t *testing.T) {
+	// float16
+	result := convertFloat(1.0, ast.FloatType{Size: 16})
+	if result != 1.0 {
+		t.Errorf("float16: expected 1.0, got %g", result)
+	}
+
+	// float32
+	result = convertFloat(3.14, ast.FloatType{Size: 32})
+	if result != float64(float32(3.14)) {
+		t.Errorf("float32: expected %g, got %g", float64(float32(3.14)), result)
+	}
+
+	// float64
+	result = convertFloat(3.14, ast.FloatType{Size: 64})
+	if result != 3.14 {
+		t.Errorf("float64: expected 3.14, got %g", result)
+	}
+}
+
+func TestTypeDescUntypedInteger(t *testing.T) {
+	result := typeDesc(ast.IntegerType{Size: 0}, ast.FloatType{}, false)
+	if result != "untyped integer literal" {
+		t.Errorf("expected 'untyped integer literal', got %q", result)
+	}
+}
+
+func TestExecuteStmtTypedFloatMismatch(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:    "x",
+		FType:   ast.FloatType{Size: 32},
+		IsFloat: true,
+		Expr:    &ast.FloatLit{Value: 1.5, FType: ast.FloatType{Size: 64}, Untyped: false},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected type mismatch error")
+	}
+}
+
+func TestExecuteAssignmentUnknownOpIntToFloat(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.0, IsFloat: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "%=",
+		Expr: &ast.IntegerLit{Value: 5, Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected unknown operator error")
+	}
+}
+
+func TestConvertIntAllSizes(t *testing.T) {
+	// signed int8
+	result := convertInt(42, ast.IntegerType{Size: 8, Signed: true})
+	if result != 42 {
+		t.Errorf("int8: expected 42, got %d", result)
+	}
+
+	// unsigned uint8
+	result = convertInt(255, ast.IntegerType{Size: 8, Signed: false})
+	if result != 255 {
+		t.Errorf("uint8: expected 255, got %d", result)
+	}
+
+	// signed int16
+	result = convertInt(42, ast.IntegerType{Size: 16, Signed: true})
+	if result != 42 {
+		t.Errorf("int16: expected 42, got %d", result)
+	}
+
+	// unsigned uint16
+	result = convertInt(42, ast.IntegerType{Size: 16, Signed: false})
+	if result != 42 {
+		t.Errorf("uint16: expected 42, got %d", result)
+	}
+
+	// signed int32
+	result = convertInt(42, ast.IntegerType{Size: 32, Signed: true})
+	if result != 42 {
+		t.Errorf("int32: expected 42, got %d", result)
+	}
+
+	// unsigned uint32
+	result = convertInt(42, ast.IntegerType{Size: 32, Signed: false})
+	if result != 42 {
+		t.Errorf("uint32: expected 42, got %d", result)
+	}
+
+	// signed int64
+	result = convertInt(42, ast.IntegerType{Size: 64, Signed: true})
+	if result != 42 {
+		t.Errorf("int64: expected 42, got %d", result)
+	}
+
+	// unsigned uint64
+	result = convertInt(42, ast.IntegerType{Size: 64, Signed: false})
+	if result != 42 {
+		t.Errorf("uint64: expected 42, got %d", result)
+	}
+
+	// invalid size (default case)
+	result = convertInt(42, ast.IntegerType{Size: 123, Signed: true})
+	if result != 42 {
+		t.Errorf("default: expected 42, got %d", result)
+	}
+}

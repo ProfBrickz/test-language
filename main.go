@@ -11,10 +11,12 @@ import (
 	"lang-interpreter/parser"
 )
 
+var osExit = os.Exit
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+		osExit(1)
 	}
 }
 
@@ -82,10 +84,8 @@ func repl() {
 			fmt.Fprintf(os.Stderr, "Warning: %s\n", warn)
 		}
 		if stmt == nil {
-			if len(errs) > 0 {
-				for _, err := range errs {
-					fmt.Fprintf(os.Stderr, "Error: %s\n", err)
-				}
+			for _, err := range errs {
+				fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 			}
 			continue
 		}

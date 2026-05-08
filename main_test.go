@@ -305,3 +305,154 @@ func TestMainBinarySmokeTest(t *testing.T) {
 		t.Errorf("expected welcome message, got: %s", out.String())
 	}
 }
+
+func TestMainErrorExit(t *testing.T) {
+	tmpDir := t.TempDir()
+	binPath := filepath.Join(tmpDir, "test-lang")
+	cmd := exec.Command("go", "build", "-o", binPath, ".")
+	cmd.Dir = "/home/Ryan/GitHub/test-language"
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to build binary: %v", err)
+	}
+
+	cmd = exec.Command(binPath, "nonexistent.file")
+	var out, errOut bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errOut
+	err := cmd.Run()
+
+	if err == nil {
+		t.Errorf("expected exit error for non-existent file")
+	}
+	if !strings.Contains(errOut.String(), "Error reading file") {
+		t.Errorf("expected 'Error reading file', got: %s", errOut.String())
+	}
+}
+
+func TestRunFileWithWarning(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: integer{size: 32} = 010;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	err := runFile(testFile)
+
+	w.Close()
+	os.Stderr = oldStderr
+	errOut, _ := io.ReadAll(r)
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !strings.Contains(string(errOut), "Warning:") {
+		t.Errorf("expected warning output, got: %s", string(errOut))
+	}
+}
+
+func TestReplWithWarning(t *testing.T) {
+	oldStdin := os.Stdin
+	oldStdout := os.Stdout
+	oldStderr := os.Stderr
+	defer func() {
+		os.Stdin = oldStdin
+		os.Stdout = oldStdout
+		os.Stderr = oldStderr
+	}()
+
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	e, ew, _ := os.Pipe()
+	os.Stderr = ew
+
+	in, inW, _ := os.Pipe()
+	os.Stdin = in
+	go func() {
+		inW.WriteString("print(010);\nexit\n")
+		inW.Close()
+	}()
+
+	repl()
+
+	w.Close()
+	ew.Close()
+	out, _ := io.ReadAll(r)
+	errOut, _ := io.ReadAll(e)
+
+	combined := string(out) + string(errOut)
+	if !strings.Contains(combined, "Warning:") {
+		t.Errorf("expected warning output, got: stdout=%s, stderr=%s", string(out), string(errOut))
+	}
+}
+
+func TestMainErrorPath(t *testing.T) {
+	exited := false
+	exitCode := 0
+	osExit = func(code int) {
+		exited = true
+		exitCode = code
+		panic("os.Exit called")
+	}
+	defer func() { osExit = os.Exit }()
+
+	oldArgs := os.Args
+	os.Args = []string{"lang", "nonexistent.file"}
+	defer func() { os.Args = oldArgs }()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// expected panic from osExit
+			}
+		}()
+		main()
+	}()
+
+	w.Close()
+	os.Stderr = oldStderr
+	errOut, _ := io.ReadAll(r)
+
+	if !exited {
+		t.Errorf("expected os.Exit to be called")
+	}
+	if exitCode != 1 {
+		t.Errorf("expected exit code 1, got %d", exitCode)
+	}
+	if !strings.Contains(string(errOut), "Error reading file") {
+		t.Errorf("expected 'Error reading file', got: %s", string(errOut))
+	}
+}
+
+func TestReplScannerEOF(t *testing.T) {
+	oldStdin := os.Stdin
+	oldStdout := os.Stdout
+	defer func() {
+		os.Stdin = oldStdin
+		os.Stdout = oldStdout
+	}()
+
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	in, inW, _ := os.Pipe()
+	os.Stdin = in
+	inW.Close()
+
+	repl()
+
+	w.Close()
+	out, _ := io.ReadAll(r)
+
+	if !strings.Contains(string(out), "Welcome to the language interpreter") {
+		t.Errorf("expected welcome message, got: %s", string(out))
+	}
+}

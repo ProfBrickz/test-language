@@ -431,3 +431,103 @@ func TestNumberSequenceWithEOF(t *testing.T) {
 		t.Errorf("expected EOF, got %s", tok2.Type)
 	}
 }
+
+func TestHexFloatLexer(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedType TokenType
+		expectedLit  string
+	}{
+		{"0xf.f", TOK_FLOAT_LIT, "0xf.f"},
+		{"0x.1", TOK_FLOAT_LIT, "0x.1"},
+		{"0xabc.def", TOK_FLOAT_LIT, "0xabc.def"},
+		{"0xf.f+", TOK_FLOAT_LIT, "0xf.f"},
+	}
+
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("input %q: expected %s, got %s", tt.input, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLit {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.expectedLit, tok.Literal)
+		}
+	}
+}
+
+func TestBinFloatLexer(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedType TokenType
+		expectedLit  string
+	}{
+		{"0b1.01", TOK_FLOAT_LIT, "0b1.01"},
+		{"0b0.1", TOK_FLOAT_LIT, "0b0.1"},
+		{"0b1.01+", TOK_FLOAT_LIT, "0b1.01"},
+	}
+
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("input %q: expected %s, got %s", tt.input, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLit {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.expectedLit, tok.Literal)
+		}
+	}
+}
+
+func TestOctFloatLexer(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedType TokenType
+		expectedLit  string
+	}{
+		{"0o7.7", TOK_FLOAT_LIT, "0o7.7"},
+		{"0o0.4", TOK_FLOAT_LIT, "0o0.4"},
+		{"0o7.7+", TOK_FLOAT_LIT, "0o7.7"},
+	}
+
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("input %q: expected %s, got %s", tt.input, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLit {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.expectedLit, tok.Literal)
+		}
+	}
+}
+
+func TestExponentResetOnNoDigits(t *testing.T) {
+	l := New("1e")
+	tok := l.NextToken()
+	if tok.Type != TOK_INT_LIT {
+		t.Errorf("expected INT_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "1" {
+		t.Errorf("expected '1', got %q", tok.Literal)
+	}
+
+	tok2 := l.NextToken()
+	if tok2.Type != TOK_IDENT {
+		t.Errorf("expected IDENT, got %s", tok2.Type)
+	}
+	if tok2.Literal != "e" {
+		t.Errorf("expected 'e', got %q", tok2.Literal)
+	}
+}
+
+func TestExponentLoopBreakOnNonDigit(t *testing.T) {
+	l := New("1e;")
+	tok := l.NextToken()
+	if tok.Type != TOK_INT_LIT {
+		t.Errorf("expected INT_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "1" {
+		t.Errorf("expected '1', got %q", tok.Literal)
+	}
+}

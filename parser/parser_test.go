@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"strings"
 	"testing"
 
 	"lang-interpreter/ast"
@@ -1211,5 +1212,261 @@ func TestParseHexLiteral(t *testing.T) {
 		if lit.Value != tt.expectVal {
 			t.Errorf("input %q: expected %d, got %d", tt.input, tt.expectVal, lit.Value)
 		}
+	}
+}
+
+func TestParseHexFloatLiteral(t *testing.T) {
+	tests := []struct {
+		input     string
+		expectVal float64
+	}{
+		{"print(0xf.f);", 15.9375},
+		{"print(0x.1);", 0.0625},
+		{"print(0xf.0);", 15.0},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Errorf("input %q: unexpected errors: %v", tt.input, p.Errors())
+			continue
+		}
+		stmt := program.Stmts[0].(*ast.PrintStmt)
+		lit, ok := stmt.Expr.(*ast.FloatLit)
+		if !ok {
+			t.Errorf("input %q: expected *ast.FloatLit, got %T", tt.input, stmt.Expr)
+			continue
+		}
+		if lit.Value != tt.expectVal {
+			t.Errorf("input %q: expected %g, got %g", tt.input, tt.expectVal, lit.Value)
+		}
+	}
+}
+
+func TestParseBinFloatLiteral(t *testing.T) {
+	tests := []struct {
+		input     string
+		expectVal float64
+	}{
+		{"print(0b1.01);", 1.25},
+		{"print(0b0.1);", 0.5},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Errorf("input %q: unexpected errors: %v", tt.input, p.Errors())
+			continue
+		}
+		stmt := program.Stmts[0].(*ast.PrintStmt)
+		lit, ok := stmt.Expr.(*ast.FloatLit)
+		if !ok {
+			t.Errorf("input %q: expected *ast.FloatLit, got %T", tt.input, stmt.Expr)
+			continue
+		}
+		if lit.Value != tt.expectVal {
+			t.Errorf("input %q: expected %g, got %g", tt.input, tt.expectVal, lit.Value)
+		}
+	}
+}
+
+func TestParseOctFloatLiteral(t *testing.T) {
+	tests := []struct {
+		input     string
+		expectVal float64
+	}{
+		{"print(0o7.7);", 7.875},
+		{"print(0o0.4);", 0.5},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Errorf("input %q: unexpected errors: %v", tt.input, p.Errors())
+			continue
+		}
+		stmt := program.Stmts[0].(*ast.PrintStmt)
+		lit, ok := stmt.Expr.(*ast.FloatLit)
+		if !ok {
+			t.Errorf("input %q: expected *ast.FloatLit, got %T", tt.input, stmt.Expr)
+			continue
+		}
+		if lit.Value != tt.expectVal {
+			t.Errorf("input %q: expected %g, got %g", tt.input, tt.expectVal, lit.Value)
+		}
+	}
+}
+
+func TestParsePrefixedFloatError(t *testing.T) {
+	tests := []string{
+		"print(0xg.1);",
+		"print(0xf.g);",
+		"print(0b2.0);",
+		"print(0o8.0);",
+	}
+
+	for _, input := range tests {
+		l := lexer.New(input)
+		p := New(l)
+		p.ParseProgram()
+		if len(p.Errors()) == 0 {
+			t.Errorf("expected errors for input %q, got none", input)
+		}
+	}
+}
+
+func TestParseLeadingZeroWarning(t *testing.T) {
+	input := "print(010);"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Warnings()) == 0 {
+		t.Errorf("expected warning for leading zero, got none")
+	}
+}
+
+func TestParseSingleStmtWithWarning(t *testing.T) {
+	input := "print(010);"
+	l := lexer.New(input)
+	p := New(l)
+
+	stmt, errs, warns := p.ParseSingleStmt()
+	if stmt == nil {
+		t.Fatalf("expected statement, got nil")
+	}
+	if len(errs) > 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	if len(warns) == 0 {
+		t.Errorf("expected warnings for leading zero, got none")
+	}
+}
+
+func TestParsePrefixedFloatNoFrac(t *testing.T) {
+	input := "print(0xf.);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	lit, ok := stmt.Expr.(*ast.FloatLit)
+	if !ok {
+		t.Fatalf("expected *ast.FloatLit, got %T", stmt.Expr)
+	}
+	if lit.Value != 15.0 {
+		t.Errorf("expected 15, got %g", lit.Value)
+	}
+}
+
+func TestParseInvalidPrefixIntegerLiterals(t *testing.T) {
+	tests := []struct {
+		input  string
+		errMsg string
+	}{
+		{"print(0b2);", "invalid binary literal"},
+		{"print(0o8);", "invalid octal literal"},
+		{"print(0xGG);", "invalid hexadecimal literal"},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		p.ParseProgram()
+		found := false
+		for _, err := range p.Errors() {
+			if strings.Contains(err, tt.errMsg) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("input %q: expected error containing %q, got %v", tt.input, tt.errMsg, p.Errors())
+		}
+	}
+}
+
+func TestParseInvalidIntegerLiteralTooLarge(t *testing.T) {
+	input := "print(99999999999999999999);"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	found := false
+	for _, err := range p.Errors() {
+		if strings.Contains(err, "invalid integer literal") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected 'invalid integer literal' error, got %v", p.Errors())
+	}
+}
+
+func TestParseFloatTypeMissingComma(t *testing.T) {
+	input := "var x: float{size: 32 nullable: true};"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	found := false
+	for _, err := range p.Errors() {
+		if strings.Contains(err, "expected ',' or '}'") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected error about missing comma, got %v", p.Errors())
+	}
+}
+
+func TestParsePrimaryStrayRParen(t *testing.T) {
+	input := "print((42);"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	// This tests a missing RPAREN in the outer print call
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ')'")
+	}
+}
+
+func TestParsePrimaryMissingInnerRParen(t *testing.T) {
+	input := "print((42;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing inner ')'")
+	}
+}
+
+func TestParseFloatParseError(t *testing.T) {
+	input := "print(1.0e_);"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	found := false
+	for _, err := range p.Errors() {
+		if strings.Contains(err, "invalid float literal") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected 'invalid float literal' error, got %v", p.Errors())
 	}
 }
