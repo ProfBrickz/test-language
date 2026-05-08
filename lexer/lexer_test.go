@@ -96,8 +96,17 @@ func TestIdentifiers(t *testing.T) {
 	}
 }
 
+func TestBoolKeyword(t *testing.T) {
+	input := "bool"
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_BOOL {
+		t.Errorf("expected BOOL, got %s", tok.Type)
+	}
+}
+
 func TestKeywords(t *testing.T) {
-	input := "var integer print size signed nullable null true false"
+	input := "var integer print size signed nullable null true false bool"
 	l := New(input)
 
 	tests := []struct {
@@ -112,6 +121,7 @@ func TestKeywords(t *testing.T) {
 		{TOK_NULL},
 		{TOK_TRUE},
 		{TOK_FALSE},
+		{TOK_BOOL},
 	}
 
 	for i, tt := range tests {

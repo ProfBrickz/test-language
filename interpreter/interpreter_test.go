@@ -3151,3 +3151,413 @@ func TestConvertIntAllSizes(t *testing.T) {
 		t.Errorf("default: expected 42, got %d", result)
 	}
 }
+
+func TestBoolVarDeclTrue(t *testing.T) {
+	input := `var x: bool = true;
+print(x);`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "true") {
+		t.Errorf("expected output 'true', got %q", output)
+	}
+}
+
+func TestBoolVarDeclFalse(t *testing.T) {
+	input := `var x: bool = false;
+print(x);`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "false") {
+		t.Errorf("expected output 'false', got %q", output)
+	}
+}
+
+func TestBoolVarDeclDefaultFalse(t *testing.T) {
+	input := `var x: bool{nullable: false};
+print(x);`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "false") {
+		t.Errorf("expected output 'false', got %q", output)
+	}
+}
+
+func TestBoolVarDeclNullableDefaultNull(t *testing.T) {
+	input := `var x: bool;
+print(x);`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "null") {
+		t.Errorf("expected output 'null', got %q", output)
+	}
+}
+
+func TestBoolVarDeclAssignNull(t *testing.T) {
+	input := `var x: bool{nullable: true} = null;
+print(x);`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "null") {
+		t.Errorf("expected output 'null', got %q", output)
+	}
+}
+
+func TestBoolAssignNullToNonNullableError(t *testing.T) {
+	input := `var x: bool{nullable: false} = null;`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error assigning null to non-nullable bool")
+	}
+}
+
+func TestBoolAssignNullableVarToNonNullableError(t *testing.T) {
+	input := `var a: bool{nullable: true} = true;
+var b: bool{nullable: false} = a;`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error assigning nullable bool to non-nullable bool")
+	}
+}
+
+func TestBoolAssignNullableToNonNullableViaAssignmentError(t *testing.T) {
+	input := `var a: bool{nullable: true} = true;
+var b: bool{nullable: false} = false;
+b = a;`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error assigning nullable bool to non-nullable bool")
+	}
+}
+
+func TestBoolAssignment(t *testing.T) {
+	input := `var x: bool{nullable: false} = true;
+x = false;
+print(x);`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "false") {
+		t.Errorf("expected output 'false', got %q", output)
+	}
+}
+
+func TestBoolRejectCompoundAssignment(t *testing.T) {
+	input := `var x: bool{nullable: false} = true;
+x += false;`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for compound assignment on bool")
+	}
+}
+
+func TestBoolAssignIntToBoolConversion(t *testing.T) {
+	input := `var x: bool{nullable: false} = 42;
+print(x);`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "true") {
+		t.Errorf("expected output 'true', got %q", output)
+	}
+}
+
+func TestPrintBoolLiteral(t *testing.T) {
+	input := `print(true);
+print(false);`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	lines := strings.Split(output, "\n")
+	if len(lines) != 2 || lines[0] != "true" || lines[1] != "false" {
+		t.Errorf("expected 'true\\nfalse', got %q", output)
+	}
+}
+
+func TestBoolValueString(t *testing.T) {
+	tests := []struct {
+		val      Value
+		expected string
+	}{
+		{Value{BType: ast.BoolType{}, BData: true, IsBool: true}, "bool(true)"},
+		{Value{BType: ast.BoolType{Nullable: true}, BData: false, IsBool: true}, "nullable bool(false)"},
+		{Value{Untyped: true, BData: true, IsBool: true}, "true"},
+		{Value{Untyped: true, BData: false, IsBool: true}, "false"},
+	}
+
+	for _, tt := range tests {
+		result := tt.val.String()
+		if result != tt.expected {
+			t.Errorf("Value.String() = %q, expected %q", result, tt.expected)
+		}
+	}
+}
+
+func TestBoolNullableAssignTrue(t *testing.T) {
+	input := `var x: bool{nullable: true} = true;
+print(x);`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "true") {
+		t.Errorf("expected output 'true', got %q", output)
+	}
+}
+
+func TestBoolVarRefAssign(t *testing.T) {
+	input := `var a: bool{nullable: false} = true;
+var b: bool{nullable: false} = a;
+print(b);`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "true") {
+		t.Errorf("expected output 'true', got %q", output)
+	}
+}
+
+func TestBoolLitEval(t *testing.T) {
+	i := New()
+	expr := &ast.BoolLit{Value: true, Untyped: true}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsBool {
+		t.Errorf("expected IsBool to be true")
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %t", val.BData)
+	}
+	if !val.Untyped {
+		t.Errorf("expected untyped")
+	}
+}
+
+func TestBoolLitTypedEval(t *testing.T) {
+	i := New()
+	expr := &ast.BoolLit{Value: false, BType: ast.BoolType{Nullable: false}, Untyped: false}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsBool {
+		t.Errorf("expected IsBool to be true")
+	}
+	if val.BData != false {
+		t.Errorf("expected false, got %t", val.BData)
+	}
+	if val.Untyped {
+		t.Errorf("expected typed")
+	}
+	if val.BType.Nullable {
+		t.Errorf("expected nullable false")
+	}
+}
+
+func TestBoolDeclWithExprError(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:   "x",
+		BType:  ast.BoolType{Nullable: false},
+		IsBool: true,
+		Expr:   &ast.PrintStmt{},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error from invalid expression")
+	}
+}
+
+func TestBoolAssignToNonNullableFromNonNullable(t *testing.T) {
+	input := `var a: bool{nullable: false} = true;
+var b: bool{nullable: false} = a;
+print(b);`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "true") {
+		t.Errorf("expected output 'true', got %q", output)
+	}
+}
+
+func TestTypeDescFromVarNullableFloat(t *testing.T) {
+	result := typeDescFromVar(ast.IntegerType{}, ast.FloatType{Size: 32, Nullable: true}, ast.BoolType{}, true, false)
+	if !strings.Contains(result, "nullable") {
+		t.Errorf("expected 'nullable' in %q", result)
+	}
+}
+
+func TestTypeDescUntypedFloat(t *testing.T) {
+	result := typeDesc(ast.FloatType{Size: 0}, false)
+	if result != "untyped float literal" {
+		t.Errorf("expected 'untyped float literal', got %q", result)
+	}
+}
+
+func TestTypeDescUntypedIntegerNew(t *testing.T) {
+	result := typeDesc(ast.IntegerType{Size: 0}, false)
+	if result != "untyped integer literal" {
+		t.Errorf("expected 'untyped integer literal', got %q", result)
+	}
+}
+
+func TestTypeDescUnknown(t *testing.T) {
+	result := typeDesc("unknown", false)
+	if result != "unknown" {
+		t.Errorf("expected 'unknown', got %q", result)
+	}
+}
+
+func TestExecuteStmtBoolToIntegerError(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		IType: ast.IntegerType{Size: 32, Signed: true},
+		Expr:  &ast.BoolLit{Value: true, Untyped: true},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error assigning bool to integer")
+	}
+}
+
+func TestExecuteAssignmentBoolDefaultOp(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{BType: ast.BoolType{Nullable: false}, BData: true, IsBool: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "%=",
+		Expr: &ast.BoolLit{Value: false, Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected error for unknown operator on bool")
+	}
+}
+
+func TestExecuteAssignmentBoolTypeMismatch(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{BType: ast.BoolType{Nullable: false}, BData: true, IsBool: true})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "=",
+		Expr: &ast.IntegerLit{Value: 42, Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected error assigning integer to bool variable")
+	}
+}

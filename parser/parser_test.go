@@ -1004,6 +1004,239 @@ func TestParseFloatTypeInvalidSizeNumber(t *testing.T) {
 	}
 }
 
+func TestParseBoolDeclDefault(t *testing.T) {
+	input := "var x: bool = true;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt, ok := program.Stmts[0].(*ast.VarDecl)
+	if !ok {
+		t.Fatalf("expected *ast.VarDecl, got %T", program.Stmts[0])
+	}
+
+	if !stmt.IsBool {
+		t.Errorf("expected IsBool to be true")
+	}
+	if !stmt.BType.Nullable {
+		t.Errorf("expected default nullable true")
+	}
+
+	lit, ok := stmt.Expr.(*ast.BoolLit)
+	if !ok {
+		t.Fatalf("expected *ast.BoolLit, got %T", stmt.Expr)
+	}
+	if lit.Value != true {
+		t.Errorf("expected true, got %t", lit.Value)
+	}
+	if !lit.Untyped {
+		t.Errorf("expected untyped true")
+	}
+}
+
+func TestParseBoolDeclNullableFalse(t *testing.T) {
+	input := "var x: bool{nullable: false} = false;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt, ok := program.Stmts[0].(*ast.VarDecl)
+	if !ok {
+		t.Fatalf("expected *ast.VarDecl, got %T", program.Stmts[0])
+	}
+
+	if !stmt.IsBool {
+		t.Errorf("expected IsBool to be true")
+	}
+	if stmt.BType.Nullable {
+		t.Errorf("expected nullable false")
+	}
+
+	lit, ok := stmt.Expr.(*ast.BoolLit)
+	if !ok {
+		t.Fatalf("expected *ast.BoolLit, got %T", stmt.Expr)
+	}
+	if lit.Value != false {
+		t.Errorf("expected false, got %t", lit.Value)
+	}
+}
+
+func TestParseBoolDeclNullableTrue(t *testing.T) {
+	input := "var x: bool{nullable: true} = null;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt, ok := program.Stmts[0].(*ast.VarDecl)
+	if !ok {
+		t.Fatalf("expected *ast.VarDecl, got %T", program.Stmts[0])
+	}
+
+	if !stmt.IsBool {
+		t.Errorf("expected IsBool to be true")
+	}
+	if !stmt.BType.Nullable {
+		t.Errorf("expected nullable true")
+	}
+
+	if _, ok := stmt.Expr.(*ast.NullLit); !ok {
+		t.Fatalf("expected *ast.NullLit, got %T", stmt.Expr)
+	}
+}
+
+func TestParseBoolPrintTrue(t *testing.T) {
+	input := "print(true);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt, ok := program.Stmts[0].(*ast.PrintStmt)
+	if !ok {
+		t.Fatalf("expected *ast.PrintStmt, got %T", program.Stmts[0])
+	}
+
+	lit, ok := stmt.Expr.(*ast.BoolLit)
+	if !ok {
+		t.Fatalf("expected *ast.BoolLit, got %T", stmt.Expr)
+	}
+	if lit.Value != true {
+		t.Errorf("expected true, got %t", lit.Value)
+	}
+}
+
+func TestParseBoolPrintFalse(t *testing.T) {
+	input := "print(false);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt, ok := program.Stmts[0].(*ast.PrintStmt)
+	if !ok {
+		t.Fatalf("expected *ast.PrintStmt, got %T", program.Stmts[0])
+	}
+
+	lit, ok := stmt.Expr.(*ast.BoolLit)
+	if !ok {
+		t.Fatalf("expected *ast.BoolLit, got %T", stmt.Expr)
+	}
+	if lit.Value != false {
+		t.Errorf("expected false, got %t", lit.Value)
+	}
+}
+
+func TestParseBoolTypeErrors(t *testing.T) {
+	tests := []string{
+		"var x: bool{nullable: maybe} = true;",
+		"var x: bool{invalid: true} = true;",
+	}
+
+	for _, input := range tests {
+		l := lexer.New(input)
+		p := New(l)
+		p.ParseProgram()
+
+		if len(p.Errors()) == 0 {
+			t.Errorf("expected errors for input %q, got none", input)
+		}
+	}
+}
+
+func TestParseBoolTypeMissingColon(t *testing.T) {
+	input := "var x: bool{nullable true} = true;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing colon, got none")
+	}
+}
+
+func TestParseBoolTypeOnlyBraces(t *testing.T) {
+	input := "var x: bool{} = true;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+}
+
+func TestParseBoolDeclWithoutInit(t *testing.T) {
+	input := "var x: bool;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt, ok := program.Stmts[0].(*ast.VarDecl)
+	if !ok {
+		t.Fatalf("expected *ast.VarDecl, got %T", program.Stmts[0])
+	}
+	if !stmt.IsBool {
+		t.Errorf("expected IsBool to be true")
+	}
+	if stmt.Expr != nil {
+		t.Errorf("expected nil expression")
+	}
+}
+
+func TestParseBoolTypeTrailingComma(t *testing.T) {
+	input := "var x: bool{nullable: true,} = true;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	if !stmt.BType.Nullable {
+		t.Errorf("expected nullable true")
+	}
+}
+
+func TestParseBoolTypeMissingComma(t *testing.T) {
+	input := "var x: bool{nullable: true nullable: false} = true;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing comma, got none")
+	}
+}
+
 func TestParseFloatTypeTrailingComma(t *testing.T) {
 	input := "var x: float{size: 32,} = 1.0;"
 	l := lexer.New(input)
