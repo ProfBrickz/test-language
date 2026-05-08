@@ -9,7 +9,7 @@ type TokenType string
 
 const (
 	TOK_BOOL      TokenType = "BOOL"
-	TOK_INTEGER   TokenType = "INTEGER"
+	TOK_INT       TokenType = "INT"
 	TOK_FLOAT     TokenType = "FLOAT"
 	TOK_VAR       TokenType = "VAR"
 	TOK_PRINT     TokenType = "PRINT"
@@ -303,8 +303,8 @@ func (l *Lexer) readIdentifier() Token {
 		return Token{TOK_VAR, word, l.line}
 	case "bool":
 		return Token{TOK_BOOL, word, l.line}
-	case "integer":
-		return Token{TOK_INTEGER, word, l.line}
+	case "int":
+		return Token{TOK_INT, word, l.line}
 	case "float":
 		return Token{TOK_FLOAT, word, l.line}
 	case "print":

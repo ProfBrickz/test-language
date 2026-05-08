@@ -227,8 +227,8 @@ func (p *Parser) parseBoolType() ast.BoolType {
 func (p *Parser) parseIntegerType() ast.IntegerType {
 	iType := ast.IntegerType{Size: 64, Signed: true, Nullable: true}
 
-	if p.curToken.Type != lexer.TOK_INTEGER {
-		p.addError("expected 'integer', got %s", p.curToken.Type)
+	if p.curToken.Type != lexer.TOK_INT {
+		p.addError("expected 'int', got %s", p.curToken.Type)
 		return iType
 	}
 
@@ -398,7 +398,7 @@ func (p *Parser) parsePrimary() ast.Expr {
 			} else if strings.HasPrefix(lit, "0x") || strings.HasPrefix(lit, "0X") {
 				p.addError("%s is an invalid hexadecimal literal", lit)
 			} else {
-				p.addError("%s is an invalid integer literal", lit)
+				p.addError("%s is an invalid int literal", lit)
 			}
 			return nil
 		}

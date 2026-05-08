@@ -28,7 +28,7 @@ func captureOutput(f func()) string {
 
 func TestVarDeclAndPrint(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: false} = 42;
+var x: int{size: 32, signed: true, nullable: false} = 42;
 print(x);
 `
 	l := lexer.New(input)
@@ -50,7 +50,7 @@ print(x);
 
 func TestAssignment(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: false} = 10;
+var x: int{size: 32, signed: true, nullable: false} = 10;
 x = 20;
 print(x);
 `
@@ -73,7 +73,7 @@ print(x);
 
 func TestCompoundAssignment(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: false} = 10;
+var x: int{size: 32, signed: true, nullable: false} = 10;
 x += 5;
 print(x);
 `
@@ -96,8 +96,8 @@ print(x);
 
 func TestBinaryExpr(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: false} = 10;
-var y: integer{size: 32, signed: true, nullable: false} = 20;
+var x: int{size: 32, signed: true, nullable: false} = 10;
+var y: int{size: 32, signed: true, nullable: false} = 20;
 print(x + y);
 `
 	l := lexer.New(input)
@@ -119,7 +119,7 @@ print(x + y);
 
 func TestNullAssign(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: true} = null;
+var x: int{size: 32, signed: true, nullable: true} = null;
 print(x);
 `
 	l := lexer.New(input)
@@ -141,7 +141,7 @@ print(x);
 
 func TestTypeMismatch(t *testing.T) {
 	input := `
-var x: integer{size: 8, signed: true, nullable: false} = 1000;
+var x: int{size: 8, signed: true, nullable: false} = 1000;
 print(x);
 `
 	l := lexer.New(input)
@@ -162,7 +162,7 @@ print(x);
 
 func TestDivisionByZero(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: false} = 10;
+var x: int{size: 32, signed: true, nullable: false} = 10;
 x /= 0;
 `
 	l := lexer.New(input)
@@ -250,8 +250,8 @@ func TestValueString(t *testing.T) {
 	}{
 		{Value{Null: true}, "null"},
 		{Value{Untyped: true, Data: 42}, "42"},
-		{Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 10, IsFloat: false}, "32-bit signed integer(10)"},
-		{Value{IType: ast.IntegerType{Size: 16, Signed: false}, Data: 5, IsFloat: false}, "16-bit unsigned integer(5)"},
+		{Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 10, IsFloat: false}, "32-bit signed int(10)"},
+		{Value{IType: ast.IntegerType{Size: 16, Signed: false}, Data: 5, IsFloat: false}, "16-bit unsigned int(5)"},
 		{Value{FType: ast.FloatType{Size: 32}, FData: 3.14, IsFloat: true}, "32-bit float(3.14)"},
 		{Value{Untyped: true, FData: 2.5, IsFloat: true}, "2.5"},
 	}
@@ -271,9 +271,9 @@ func TestTypeDesc(t *testing.T) {
 		isFloat  bool
 		expected string
 	}{
-		{ast.IntegerType{Size: 32, Signed: true, Nullable: false}, ast.FloatType{}, false, "32-bit signed integer"},
-		{ast.IntegerType{Size: 16, Signed: false, Nullable: true}, ast.FloatType{}, false, "nullable 16-bit unsigned integer"},
-		{ast.IntegerType{Size: 64, Signed: true, Nullable: true}, ast.FloatType{}, false, "nullable 64-bit signed integer"},
+		{ast.IntegerType{Size: 32, Signed: true, Nullable: false}, ast.FloatType{}, false, "32-bit signed int"},
+		{ast.IntegerType{Size: 16, Signed: false, Nullable: true}, ast.FloatType{}, false, "nullable 16-bit unsigned int"},
+		{ast.IntegerType{Size: 64, Signed: true, Nullable: true}, ast.FloatType{}, false, "nullable 64-bit signed int"},
 		{ast.IntegerType{}, ast.FloatType{Size: 32}, true, "32-bit float"},
 		{ast.IntegerType{}, ast.FloatType{Size: 64}, true, "64-bit float"},
 	}
@@ -288,7 +288,7 @@ func TestTypeDesc(t *testing.T) {
 
 func TestExecuteStmt(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: false} = 10;
+var x: int{size: 32, signed: true, nullable: false} = 10;
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -391,7 +391,7 @@ func TestEvalBinaryTypeMismatch(t *testing.T) {
 
 func TestExecuteAssignmentNullToNonNullable(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: false} = 10;
+var x: int{size: 32, signed: true, nullable: false} = 10;
 x = null;
 `
 	l := lexer.New(input)
@@ -407,7 +407,7 @@ x = null;
 
 func TestExecuteAssignmentFromNullVar(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: true} = null;
+var x: int{size: 32, signed: true, nullable: true} = null;
 x += 5;
 `
 	l := lexer.New(input)
@@ -470,8 +470,8 @@ func TestCanImplicitConvertMore(t *testing.T) {
 
 func TestAssignmentWithVarRef(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: false} = 10;
-var y: integer{size: 32, signed: true, nullable: false} = x;
+var x: int{size: 32, signed: true, nullable: false} = 10;
+var y: int{size: 32, signed: true, nullable: false} = x;
 print(y);
 `
 	l := lexer.New(input)
@@ -493,8 +493,8 @@ print(y);
 
 func TestTypeConversionOnAssign(t *testing.T) {
 	input := `
-var x: integer{size: 8, signed: true, nullable: false} = 10;
-var y: integer{size: 32, signed: true, nullable: false} = x;
+var x: int{size: 8, signed: true, nullable: false} = 10;
+var y: int{size: 32, signed: true, nullable: false} = x;
 print(y);
 `
 	l := lexer.New(input)
@@ -516,7 +516,7 @@ print(y);
 
 func TestExecuteAssignmentWithLiteralOverflow(t *testing.T) {
 	input := `
-var x: integer{size: 8, signed: true, nullable: false} = 10;
+var x: int{size: 8, signed: true, nullable: false} = 10;
 x = 200;
 print(x);
 `
@@ -538,8 +538,8 @@ print(x);
 
 func TestExecuteAssignmentWithVarRefAndConversion(t *testing.T) {
 	input := `
-var x: integer{size: 16, signed: true, nullable: false} = 1000;
-var y: integer{size: 32, signed: true, nullable: false} = 0;
+var x: int{size: 16, signed: true, nullable: false} = 1000;
+var y: int{size: 32, signed: true, nullable: false} = 0;
 y = x;
 print(y);
 `
@@ -613,7 +613,7 @@ func TestEvalBinaryResultOverflow(t *testing.T) {
 
 func TestExecuteAssignmentNullAssign(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: true} = 10;
+var x: int{size: 32, signed: true, nullable: true} = 10;
 x = null;
 print(x);
 `
@@ -696,7 +696,7 @@ func TestEvalBinaryResultUntyped(t *testing.T) {
 
 func TestExecuteAssignmentWithLiteral(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: false} = 10;
+var x: int{size: 32, signed: true, nullable: false} = 10;
 x = 20;
 print(x);
 `
@@ -719,7 +719,7 @@ print(x);
 
 func TestExecuteAssignmentWithUntypedExpr(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: false} = 10;
+var x: int{size: 32, signed: true, nullable: false} = 10;
 x = x + 5;
 print(x);
 `
@@ -830,8 +830,8 @@ func TestEvalBinaryWithMultiplicationOverflow(t *testing.T) {
 
 func TestExecuteAssignmentWithTypeMismatch(t *testing.T) {
 	input := `
-var x: integer{size: 8, signed: true, nullable: false} = 10;
-var y: integer{size: 32, signed: true, nullable: false} = 1000;
+var x: int{size: 8, signed: true, nullable: false} = 10;
+var y: int{size: 32, signed: true, nullable: false} = 1000;
 x = y;
 print(x);
 `
@@ -934,7 +934,7 @@ func TestExecutePrintStmtWithError(t *testing.T) {
 
 func TestExecuteAssignmentSubtraction(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: false} = 10;
+var x: int{size: 32, signed: true, nullable: false} = 10;
 x -= 5;
 print(x);
 `
@@ -957,7 +957,7 @@ print(x);
 
 func TestExecuteAssignmentMultiplication(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: false} = 10;
+var x: int{size: 32, signed: true, nullable: false} = 10;
 x *= 5;
 print(x);
 `
@@ -980,7 +980,7 @@ print(x);
 
 func TestExecuteAssignmentDivision(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: false} = 10;
+var x: int{size: 32, signed: true, nullable: false} = 10;
 x /= 2;
 print(x);
 `
@@ -1063,7 +1063,7 @@ func TestEvalBinaryRightError(t *testing.T) {
 
 func TestExecuteAssignmentWithNullLiteral(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: true} = 10;
+var x: int{size: 32, signed: true, nullable: true} = 10;
 x = null;
 print(x);
 `
@@ -1179,7 +1179,7 @@ print(a);
 
 func TestIntToFloatConversion(t *testing.T) {
 	input := `
-var a: integer{size: 32} = 42;
+var a: int{size: 32} = 42;
 var b: float{size: 64} = a;
 print(b);
 `
@@ -1562,7 +1562,7 @@ func TestFloatBinaryExprDivByZero(t *testing.T) {
 
 func TestMixedIntFloatExpr(t *testing.T) {
 	input := `
-var a: integer{size: 32} = 10;
+var a: int{size: 32} = 10;
 var b: float{size: 32} = 2.5;
 print(a + b);
 `
@@ -1586,7 +1586,7 @@ print(a + b);
 func TestMixedFloatIntExpr(t *testing.T) {
 	input := `
 var a: float{size: 32} = 2.5;
-var b: integer{size: 32} = 10;
+var b: int{size: 32} = 10;
 print(a + b);
 `
 	l := lexer.New(input)
@@ -1819,8 +1819,8 @@ func TestEnvironmentUndefinedVar(t *testing.T) {
 
 func TestRunMultipleStatements(t *testing.T) {
 	input := `
-var x: integer{size: 32} = 10;
-var y: integer{size: 32} = 20;
+var x: int{size: 32} = 10;
+var y: int{size: 32} = 20;
 print(x + y);
 `
 	l := lexer.New(input)
@@ -2746,7 +2746,7 @@ print(a);
 
 func TestUnderscoreIntegerLiteral(t *testing.T) {
 	input := `
-var x: integer{size: 64} = 100_000;
+var x: int{size: 64} = 100_000;
 print(x);
 `
 	l := lexer.New(input)
@@ -2770,7 +2770,7 @@ print(x);
 
 func TestBinaryLiteralInInterp(t *testing.T) {
 	input := `
-var x: integer{size: 64} = 0b1010;
+var x: int{size: 64} = 0b1010;
 print(x);
 `
 	l := lexer.New(input)
@@ -2794,7 +2794,7 @@ print(x);
 
 func TestOctalLiteralInInterp(t *testing.T) {
 	input := `
-var x: integer{size: 64} = 0o777;
+var x: int{size: 64} = 0o777;
 print(x);
 `
 	l := lexer.New(input)
@@ -2818,7 +2818,7 @@ print(x);
 
 func TestHexLiteralInInterp(t *testing.T) {
 	input := `
-var x: integer{size: 64} = 0xFF;
+var x: int{size: 64} = 0xFF;
 print(x);
 `
 	l := lexer.New(input)
@@ -2842,7 +2842,7 @@ print(x);
 
 func TestUnsignedInt8Wrapping(t *testing.T) {
 	input := `
-var x: integer{size: 8, signed: false} = 256;
+var x: int{size: 8, signed: false} = 256;
 print(x);
 `
 	l := lexer.New(input)
@@ -2866,7 +2866,7 @@ print(x);
 
 func TestUnsignedInt16Wrapping(t *testing.T) {
 	input := `
-var x: integer{size: 16, signed: false} = 65536;
+var x: int{size: 16, signed: false} = 65536;
 print(x);
 `
 	l := lexer.New(input)
@@ -2890,7 +2890,7 @@ print(x);
 
 func TestUnsignedInt32Wrapping(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: false} = 4294967296;
+var x: int{size: 32, signed: false} = 4294967296;
 print(x);
 `
 	l := lexer.New(input)
@@ -2914,7 +2914,7 @@ print(x);
 
 func TestUnsignedIntWrappingSub(t *testing.T) {
 	input := `
-var x: integer{size: 8, signed: false} = 0;
+var x: int{size: 8, signed: false} = 0;
 x = x - 1;
 print(x);
 `
@@ -3063,7 +3063,7 @@ func TestConvertFloatAllSizes(t *testing.T) {
 
 func TestTypeDescUntypedInteger(t *testing.T) {
 	result := typeDescFromVar(ast.IntegerType{Size: 0}, ast.FloatType{}, ast.BoolType{}, false, false)
-	if result != "untyped integer literal" {
+	if result != "untyped int literal" {
 		t.Errorf("expected 'untyped integer literal', got %q", result)
 	}
 }
@@ -3509,7 +3509,7 @@ func TestTypeDescUntypedFloat(t *testing.T) {
 
 func TestTypeDescUntypedIntegerNew(t *testing.T) {
 	result := typeDesc(ast.IntegerType{Size: 0}, false)
-	if result != "untyped integer literal" {
+	if result != "untyped int literal" {
 		t.Errorf("expected 'untyped integer literal', got %q", result)
 	}
 }
@@ -3530,7 +3530,7 @@ func TestExecuteStmtBoolToIntegerError(t *testing.T) {
 	}
 	err := i.executeStmt(stmt)
 	if err == nil {
-		t.Errorf("expected error assigning bool to integer")
+		t.Errorf("expected error assigning bool to int")
 	}
 }
 
@@ -3558,6 +3558,6 @@ func TestExecuteAssignmentBoolTypeMismatch(t *testing.T) {
 	}
 	err := i.executeAssignment(stmt)
 	if err == nil {
-		t.Errorf("expected error assigning integer to bool variable")
+		t.Errorf("expected error assigning int to bool variable")
 	}
 }

@@ -112,7 +112,7 @@ func TestReplValidStatement(t *testing.T) {
 	in, inW, _ := os.Pipe()
 	os.Stdin = in
 	go func() {
-		inW.WriteString("var x: integer{size: 32} = 42;\nexit\n")
+		inW.WriteString("var x: int{size: 32} = 42;\nexit\n")
 		inW.Close()
 	}()
 
@@ -201,7 +201,7 @@ func TestReplExecutionError(t *testing.T) {
 func TestRunMainWithFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.lang")
-	content := "var x: integer{size: 32} = 42;"
+	content := "var x: int{size: 32} = 42;"
 	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
@@ -236,7 +236,7 @@ func TestRunFileParseErrors(t *testing.T) {
 func TestRunFileRuntimeError(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.lang")
-	content := "var x: integer{size: 32} = 42/0;"
+	content := "var x: int{size: 32} = 42/0;"
 	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
@@ -332,7 +332,7 @@ func TestMainErrorExit(t *testing.T) {
 func TestRunFileWithWarning(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.lang")
-	content := "var x: integer{size: 32} = 010;"
+	content := "var x: int{size: 32} = 010;"
 	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}

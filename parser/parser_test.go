@@ -9,7 +9,7 @@ import (
 )
 
 func TestVarDecl(t *testing.T) {
-	input := "var x: integer{size: 32, signed: true, nullable: false} = 42;"
+	input := "var x: int{size: 32, signed: true, nullable: false} = 42;"
 	l := lexer.New(input)
 	p := New(l)
 	program := p.ParseProgram()
@@ -54,7 +54,7 @@ func TestVarDecl(t *testing.T) {
 }
 
 func TestVarDeclWithoutInit(t *testing.T) {
-	input := "var x: integer{size: 64, signed: true, nullable: true};"
+	input := "var x: int{size: 64, signed: true, nullable: true};"
 	l := lexer.New(input)
 	p := New(l)
 	program := p.ParseProgram()
@@ -199,7 +199,7 @@ func TestBinaryExpr(t *testing.T) {
 }
 
 func TestNullLit(t *testing.T) {
-	input := "var x: integer{size: 32, nullable: true} = null;"
+	input := "var x: int{size: 32, nullable: true} = null;"
 	l := lexer.New(input)
 	p := New(l)
 	program := p.ParseProgram()
@@ -223,8 +223,8 @@ func TestParserErrors(t *testing.T) {
 		input       string
 		expectError bool
 	}{
-		{"var: integer;", true},
-		{"var x integer;", true},
+		{"var: int;", true},
+		{"var x int;", true},
 		{"print;", true},
 	}
 
@@ -240,7 +240,7 @@ func TestParserErrors(t *testing.T) {
 }
 
 func TestParseSingleStmt(t *testing.T) {
-	input := "var x: integer{size: 32} = 42;"
+	input := "var x: int{size: 32} = 42;"
 	l := lexer.New(input)
 	p := New(l)
 
@@ -274,7 +274,7 @@ func TestParseSingleStmtEOF(t *testing.T) {
 }
 
 func TestParseIntegerTypeFull(t *testing.T) {
-	input := "var x: integer{size: 16, signed: false, nullable: true} = 42;"
+	input := "var x: int{size: 16, signed: false, nullable: true} = 42;"
 	l := lexer.New(input)
 	p := New(l)
 	program := p.ParseProgram()
@@ -300,7 +300,7 @@ func TestParseIntegerTypeFull(t *testing.T) {
 }
 
 func TestParseIntegerTypeDefault(t *testing.T) {
-	input := "var x: integer = 42;"
+	input := "var x: int = 42;"
 	l := lexer.New(input)
 	p := New(l)
 	program := p.ParseProgram()
@@ -411,11 +411,11 @@ func TestParsePrimaryErrors(t *testing.T) {
 
 func TestParseIntegerTypeErrors(t *testing.T) {
 	tests := []string{
-		"var x: notinteger{size: 32};",
-		"var x: integer{size: 12};",
-		"var x: integer{size: 32, signed: yes};",
-		"var x: integer{size: 32, invalid: true};",
-		"var x: integer{size: 32 signed: true};", // missing colon
+		"var x: notint{size: 32};",
+		"var x: int{size: 12};",
+		"var x: int{size: 32, signed: yes};",
+		"var x: int{size: 32, invalid: true};",
+		"var x: int{size: 32 signed: true};", // missing colon
 	}
 
 	for _, input := range tests {
@@ -430,7 +430,7 @@ func TestParseIntegerTypeErrors(t *testing.T) {
 }
 
 func TestParseIntegerTypeWithComma(t *testing.T) {
-	input := "var x: integer{size: 32, signed: true} = 42;"
+	input := "var x: int{size: 32, signed: true} = 42;"
 	l := lexer.New(input)
 	p := New(l)
 	program := p.ParseProgram()
@@ -445,7 +445,7 @@ func TestParseIntegerTypeWithComma(t *testing.T) {
 }
 
 func TestParseIntegerTypeWithAllFields(t *testing.T) {
-	input := "var x: integer{size: 16, signed: false, nullable: true} = 42;"
+	input := "var x: int{size: 16, signed: false, nullable: true} = 42;"
 	l := lexer.New(input)
 	p := New(l)
 	program := p.ParseProgram()
@@ -471,7 +471,7 @@ func TestParseIntegerTypeWithAllFields(t *testing.T) {
 }
 
 func TestParseIntegerTypeWithOnlyBrace(t *testing.T) {
-	input := "var x: integer{} = 42;"
+	input := "var x: int{} = 42;"
 	l := lexer.New(input)
 	p := New(l)
 	program := p.ParseProgram()
@@ -494,7 +494,7 @@ func TestParseAssignmentWithAllOperators(t *testing.T) {
 	}
 
 	for _, input := range tests {
-		l := lexer.New("var x: integer{size: 32} = 10;" + input)
+		l := lexer.New("var x: int{size: 32} = 10;" + input)
 		p := New(l)
 		p.ParseProgram()
 
@@ -512,7 +512,7 @@ func TestParseAssignmentErrors(t *testing.T) {
 	}
 
 	for _, input := range tests {
-		l := lexer.New("var x: integer{size: 32} = 10;" + input)
+		l := lexer.New("var x: int{size: 32} = 10;" + input)
 		p := New(l)
 		p.ParseProgram()
 
@@ -523,7 +523,7 @@ func TestParseAssignmentErrors(t *testing.T) {
 }
 
 func TestParseAssignmentNoSemicolon(t *testing.T) {
-	input := "var x: integer{size: 32} = 10; x = 5"
+	input := "var x: int{size: 32} = 10; x = 5"
 	l := lexer.New(input)
 	p := New(l)
 	p.ParseProgram()
@@ -534,7 +534,7 @@ func TestParseAssignmentNoSemicolon(t *testing.T) {
 }
 
 func TestParseAssignmentInvalidOp(t *testing.T) {
-	input := "var x: integer{size: 32} = 10; x + 5;"
+	input := "var x: int{size: 32} = 10; x + 5;"
 	l := lexer.New(input)
 	p := New(l)
 	p.ParseProgram()
@@ -687,7 +687,7 @@ func TestParsePrimaryNull(t *testing.T) {
 }
 
 func TestParseIntegerTypeMissingColon(t *testing.T) {
-	input := "var x: integer{size 32};"
+	input := "var x: int{size 32};"
 	l := lexer.New(input)
 	p := New(l)
 	p.ParseProgram()
@@ -697,17 +697,17 @@ func TestParseIntegerTypeMissingColon(t *testing.T) {
 }
 
 func TestParseIntegerTypeInvalidSizeString(t *testing.T) {
-	input := "var x: integer{size: abc};"
+	input := "var x: int{size: abc};"
 	l := lexer.New(input)
 	p := New(l)
 	p.ParseProgram()
 	if len(p.Errors()) == 0 {
-		t.Errorf("expected error for non-integer size")
+		t.Errorf("expected error for non-int size")
 	}
 }
 
 func TestParseIntegerTypeInvalidSizeNumber(t *testing.T) {
-	input := "var x: integer{size: 7};"
+	input := "var x: int{size: 7};"
 	l := lexer.New(input)
 	p := New(l)
 	p.ParseProgram()
@@ -717,7 +717,7 @@ func TestParseIntegerTypeInvalidSizeNumber(t *testing.T) {
 }
 
 func TestParseIntegerTypeInvalidSigned(t *testing.T) {
-	input := "var x: integer{signed: maybe};"
+	input := "var x: int{signed: maybe};"
 	l := lexer.New(input)
 	p := New(l)
 	p.ParseProgram()
@@ -727,7 +727,7 @@ func TestParseIntegerTypeInvalidSigned(t *testing.T) {
 }
 
 func TestParseIntegerTypeInvalidNullable(t *testing.T) {
-	input := "var x: integer{nullable: maybe};"
+	input := "var x: int{nullable: maybe};"
 	l := lexer.New(input)
 	p := New(l)
 	p.ParseProgram()
@@ -738,7 +738,7 @@ func TestParseIntegerTypeInvalidNullable(t *testing.T) {
 
 func TestParseAssignmentWithVarRef(t *testing.T) {
 	input := `
-var x: integer{size: 32, signed: true, nullable: false} = 10;
+var x: int{size: 32, signed: true, nullable: false} = 10;
 x = y;
 `
 	l := lexer.New(input)
@@ -989,7 +989,7 @@ func TestParseFloatTypeInvalidSizeValue(t *testing.T) {
 	p.ParseProgram()
 
 	if len(p.Errors()) == 0 {
-		t.Errorf("expected error for non-integer size")
+		t.Errorf("expected error for non-int size")
 	}
 }
 
@@ -1290,7 +1290,7 @@ func TestParseFloatTypeSizeLine(t *testing.T) {
 	p.ParseProgram()
 
 	if len(p.Errors()) == 0 {
-		t.Errorf("expected error for non-integer size value")
+		t.Errorf("expected error for non-int size value")
 	}
 }
 
@@ -1635,13 +1635,13 @@ func TestParseInvalidIntegerLiteralTooLarge(t *testing.T) {
 
 	found := false
 	for _, err := range p.Errors() {
-		if strings.Contains(err, "invalid integer literal") {
+		if strings.Contains(err, "invalid int literal") {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("expected 'invalid integer literal' error, got %v", p.Errors())
+		t.Errorf("expected 'invalid int literal' error, got %v", p.Errors())
 	}
 }
 

@@ -67,13 +67,13 @@ func typeDescFromVar(it ast.IntegerType, ft ast.FloatType, bt ast.BoolType, isFl
 		nullable = "nullable "
 	}
 	if it.Size == 0 {
-		return "untyped integer literal"
+		return "untyped int literal"
 	}
 	sign := "signed"
 	if !it.Signed {
 		sign = "unsigned"
 	}
-	return fmt.Sprintf("%s%d-bit %s integer", nullable, it.Size, sign)
+	return fmt.Sprintf("%s%d-bit %s int", nullable, it.Size, sign)
 }
 
 func typeDescForVal(v Value) string {
@@ -98,7 +98,7 @@ func typeDesc(t interface{}, isBool bool) string {
 		return fmt.Sprintf("%s%d-bit float", nullable, typ.Size)
 	case ast.IntegerType:
 		if typ.Size == 0 {
-			return "untyped integer literal"
+			return "untyped int literal"
 		}
 		sign := "signed"
 		if !typ.Signed {
@@ -108,7 +108,7 @@ func typeDesc(t interface{}, isBool bool) string {
 		if typ.Nullable {
 			nullable = "nullable "
 		}
-		return fmt.Sprintf("%s%d-bit %s integer", nullable, typ.Size, sign)
+		return fmt.Sprintf("%s%d-bit %s int", nullable, typ.Size, sign)
 	}
 	return "unknown"
 }
@@ -275,7 +275,7 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 					val.BData = rightVal.BData
 				} else if rightVal.IsFloat {
 					if !s.IsFloat {
-						return fmt.Errorf("cannot assign %s to integer variable", typeDescForVal(rightVal))
+						return fmt.Errorf("cannot assign %s to int variable", typeDescForVal(rightVal))
 					}
 					if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, true, s.IType, s.FType, true) {
 						return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, true, false))
@@ -396,7 +396,7 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 		val.FData = convertFloat(fresult, val.FType)
 	} else if !val.IsFloat && rightVal.IsFloat {
 		// Float to integer - not allowed implicitly
-		return fmt.Errorf("cannot assign %s to integer variable", typeDescForVal(rightVal))
+		return fmt.Errorf("cannot assign %s to int variable", typeDescForVal(rightVal))
 	} else if val.IsFloat {
 		// Float to float
 		fresult = val.FData

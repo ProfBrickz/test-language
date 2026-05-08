@@ -3,7 +3,7 @@ package lexer
 import "testing"
 
 func TestNextToken(t *testing.T) {
-	input := `var x: integer{size: 32, signed: true, nullable: false};
+	input := `var x: int{size: 32, signed: true, nullable: false};
 print(x);
 x += 5;
 null;`
@@ -15,7 +15,7 @@ null;`
 		{TOK_VAR, "var"},
 		{TOK_IDENT, "x"},
 		{TOK_COLON, ":"},
-		{TOK_INTEGER, "integer"},
+		{TOK_INT, "int"},
 		{TOK_LBRACE, "{"},
 		{TOK_SIZE, "size"},
 		{TOK_COLON, ":"},
@@ -106,14 +106,14 @@ func TestBoolKeyword(t *testing.T) {
 }
 
 func TestKeywords(t *testing.T) {
-	input := "var integer print size signed nullable null true false bool"
+	input := "var int print size signed nullable null true false bool"
 	l := New(input)
 
 	tests := []struct {
 		expectedType TokenType
 	}{
 		{TOK_VAR},
-		{TOK_INTEGER},
+		{TOK_INT},
 		{TOK_PRINT},
 		{TOK_SIZE},
 		{TOK_SIGNED},
