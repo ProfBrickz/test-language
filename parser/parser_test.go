@@ -1686,6 +1686,73 @@ func TestParsePrimaryMissingInnerRParen(t *testing.T) {
 	}
 }
 
+func TestParseUnaryMinusInteger(t *testing.T) {
+	input := "print(-42);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	lit, ok := stmt.Expr.(*ast.IntegerLit)
+	if !ok {
+		t.Fatalf("expected *ast.IntegerLit, got %T", stmt.Expr)
+	}
+	if lit.Value != -42 {
+		t.Errorf("expected -42, got %d", lit.Value)
+	}
+}
+
+func TestParseUnaryMinusFloat(t *testing.T) {
+	input := "print(-3.14);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	lit, ok := stmt.Expr.(*ast.FloatLit)
+	if !ok {
+		t.Fatalf("expected *ast.FloatLit, got %T", stmt.Expr)
+	}
+	if lit.Value != -3.14 {
+		t.Errorf("expected -3.14, got %g", lit.Value)
+	}
+}
+
+func TestParseUnaryMinusExpr(t *testing.T) {
+	input := "print(-(1+2));"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	binExpr, ok := stmt.Expr.(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected *ast.BinaryExpr for negated expr, got %T", stmt.Expr)
+	}
+	if binExpr.Op != "-" {
+		t.Errorf("expected op '-', got %q", binExpr.Op)
+	}
+	intLit, ok := binExpr.Left.(*ast.IntegerLit)
+	if !ok {
+		t.Fatalf("expected *ast.IntegerLit as left operand, got %T", binExpr.Left)
+	}
+	if intLit.Value != 0 {
+		t.Errorf("expected left value 0, got %d", intLit.Value)
+	}
+}
+
 func TestParseFloatParseError(t *testing.T) {
 	input := "print(1.0e_);"
 	l := lexer.New(input)

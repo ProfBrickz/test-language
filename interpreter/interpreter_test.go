@@ -3526,3 +3526,61 @@ func TestExecuteAssignmentBoolTypeMismatch(t *testing.T) {
 		t.Errorf("expected error assigning int to bool variable")
 	}
 }
+
+func TestCheckIntFitsSigned16Overflow(t *testing.T) {
+	err := checkIntFits(99999, ast.IntegerType{Size: 16, Signed: true})
+	if err == nil {
+		t.Errorf("expected overflow error for signed 16-bit")
+	}
+}
+
+func TestCheckIntFitsSigned32Overflow(t *testing.T) {
+	err := checkIntFits(9999999999, ast.IntegerType{Size: 32, Signed: true})
+	if err == nil {
+		t.Errorf("expected overflow error for signed 32-bit")
+	}
+}
+
+func TestCheckIntFitsUnsigned64Overflow(t *testing.T) {
+	err := checkIntFits(-1, ast.IntegerType{Size: 64, Signed: false})
+	if err == nil {
+		t.Errorf("expected overflow error for unsigned 64-bit")
+	}
+}
+
+func TestCheckFloatFitsInf(t *testing.T) {
+	err := checkFloatFits(math.Inf(1), ast.FloatType{Size: 16})
+	if err != nil {
+		t.Errorf("expected no error for Inf, got %v", err)
+	}
+}
+
+func TestCheckFloatFitsNaN(t *testing.T) {
+	err := checkFloatFits(math.NaN(), ast.FloatType{Size: 16})
+	if err != nil {
+		t.Errorf("expected no error for NaN, got %v", err)
+	}
+}
+
+func TestCheckFloatFits32Overflow(t *testing.T) {
+	err := checkFloatFits(3.5e40, ast.FloatType{Size: 32})
+	if err == nil {
+		t.Errorf("expected overflow error for 32-bit float")
+	}
+}
+
+func TestExecuteAssignmentFloatOverflow(t *testing.T) {
+	input := `
+var a: float{size: 16} = 1.0;
+a = 70000.0;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected float overflow error on assignment")
+	}
+}

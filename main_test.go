@@ -163,6 +163,76 @@ func TestReplParseError(t *testing.T) {
 	}
 }
 
+func TestReplSemicolonOnly(t *testing.T) {
+	oldStdin := os.Stdin
+	oldStdout := os.Stdout
+	oldStderr := os.Stderr
+	defer func() {
+		os.Stdin = oldStdin
+		os.Stdout = oldStdout
+		os.Stderr = oldStderr
+	}()
+
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	e, ew, _ := os.Pipe()
+	os.Stderr = ew
+
+	in, inW, _ := os.Pipe()
+	os.Stdin = in
+	go func() {
+		inW.WriteString(";\nexit\n")
+		inW.Close()
+	}()
+
+	repl()
+
+	w.Close()
+	ew.Close()
+	out, _ := io.ReadAll(r)
+	errOut, _ := io.ReadAll(e)
+
+	combined := string(out) + string(errOut)
+	if !strings.Contains(combined, "Error") {
+		t.Errorf("expected error for semicolon-only input")
+	}
+}
+
+func TestReplStmtWithErrors(t *testing.T) {
+	oldStdin := os.Stdin
+	oldStdout := os.Stdout
+	oldStderr := os.Stderr
+	defer func() {
+		os.Stdin = oldStdin
+		os.Stdout = oldStdout
+		os.Stderr = oldStderr
+	}()
+
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	e, ew, _ := os.Pipe()
+	os.Stderr = ew
+
+	in, inW, _ := os.Pipe()
+	os.Stdin = in
+	go func() {
+		inW.WriteString("var x: int{size: 7} = 42;\nexit\n")
+		inW.Close()
+	}()
+
+	repl()
+
+	w.Close()
+	ew.Close()
+	out, _ := io.ReadAll(r)
+	errOut, _ := io.ReadAll(e)
+
+	combined := string(out) + string(errOut)
+	if !strings.Contains(combined, "invalid size") {
+		t.Errorf("expected 'invalid size' error, got: stdout=%s, stderr=%s", string(out), string(errOut))
+	}
+}
+
 func TestReplExecutionError(t *testing.T) {
 	oldStdin := os.Stdin
 	oldStdout := os.Stdout
