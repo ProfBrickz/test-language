@@ -373,6 +373,24 @@ func (p *Parser) parseMulDiv() ast.Expr {
 }
 
 func (p *Parser) parsePrimary() ast.Expr {
+	if p.curToken.Type == lexer.TOK_MINUS {
+		p.nextToken()
+		expr := p.parsePrimary()
+		if lit, ok := expr.(*ast.IntegerLit); ok {
+			lit.Value = -lit.Value
+			return lit
+		}
+		if lit, ok := expr.(*ast.FloatLit); ok {
+			lit.Value = -lit.Value
+			return lit
+		}
+		return &ast.BinaryExpr{
+			Left:  &ast.IntegerLit{Value: 0, Untyped: true},
+			Op:    "-",
+			Right: expr,
+		}
+	}
+
 	switch p.curToken.Type {
 	case lexer.TOK_INT_LIT:
 		lit := p.curToken.Literal

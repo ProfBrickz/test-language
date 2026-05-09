@@ -149,14 +149,9 @@ print(x);
 	program := p.ParseProgram()
 
 	i := New()
-	output := captureOutput(func() {
-		err := i.Run(program)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-	if !strings.Contains(output, "-24") {
-		t.Errorf("expected output to contain '-24', got %q", output)
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected overflow error")
 	}
 }
 
@@ -525,14 +520,9 @@ print(x);
 	program := p.ParseProgram()
 
 	i := New()
-	output := captureOutput(func() {
-		err := i.Run(program)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-	if !strings.Contains(output, "-56") {
-		t.Errorf("expected output to contain '-56', got %q", output)
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected overflow error")
 	}
 }
 
@@ -912,12 +902,8 @@ func TestExecuteVarDeclWithLiteralOverflow(t *testing.T) {
 		Expr:  &ast.IntegerLit{Value: 200, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	val, _ := i.env.Get("x")
-	if val.Data != -56 {
-		t.Errorf("expected -56, got %d", val.Data)
+	if err == nil {
+		t.Errorf("expected overflow error")
 	}
 }
 
@@ -1661,14 +1647,9 @@ print(a);
 	program := p.ParseProgram()
 
 	i := New()
-	output := captureOutput(func() {
-		err := i.Run(program)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-	if !strings.Contains(output, "Inf") {
-		t.Errorf("expected output to contain 'Inf', got %q", output)
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected overflow error")
 	}
 }
 
@@ -2264,12 +2245,8 @@ func TestVarDeclFloatOverflow(t *testing.T) {
 		Expr:    &ast.FloatLit{Value: 70000.0, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	val, _ := i.env.Get("x")
-	if !math.IsInf(val.FData, 1) {
-		t.Errorf("expected +Inf, got %g", val.FData)
+	if err == nil {
+		t.Errorf("expected overflow error")
 	}
 }
 
@@ -2523,8 +2500,8 @@ func TestVarDeclFloatOverflowInConversion(t *testing.T) {
 		Expr:    &ast.FloatLit{Value: 70000.0, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Errorf("expected overflow error")
 	}
 }
 
@@ -2538,8 +2515,8 @@ func TestVarDeclFloatToFloatOverflow(t *testing.T) {
 		Expr:    &ast.FloatLit{Value: 70000.0, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Errorf("expected overflow error")
 	}
 }
 
@@ -2569,6 +2546,10 @@ func TestExecuteAssignmentFloatToFloatOverflow(t *testing.T) {
 	err := i.executeAssignment(stmt)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if !math.IsInf(val.FData, 1) {
+		t.Errorf("expected +Inf, got %g", val.FData)
 	}
 }
 
@@ -2624,8 +2605,8 @@ func TestVarDeclFloatOverflowCheck(t *testing.T) {
 		Expr:    &ast.FloatLit{Value: 70000.0, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Errorf("expected overflow error")
 	}
 }
 
@@ -2646,7 +2627,7 @@ func TestExecuteAssignmentFloatEqOverflow(t *testing.T) {
 
 func TestVarDeclFloatOverflowInCheck(t *testing.T) {
 	i := New()
-	// rightVal is float32 with value 70000, target is float16
+	// rightVal is float with value 70000, target is float16
 	stmt := &ast.VarDecl{
 		Name:    "x",
 		FType:   ast.FloatType{Size: 16},
@@ -2654,15 +2635,15 @@ func TestVarDeclFloatOverflowInCheck(t *testing.T) {
 		Expr:    &ast.FloatLit{Value: 70000.0, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Errorf("expected overflow error")
 	}
 }
 
 // Test for executeStmt - VarDecl with float conversion that overflows
 func TestVarDeclFloatOverflowCoverage(t *testing.T) {
 	i := New()
-	// rightVal is float32 with value 70000, target is float16
+	// rightVal is float with value 70000, target is float16
 	stmt := &ast.VarDecl{
 		Name:    "x",
 		FType:   ast.FloatType{Size: 16},
@@ -2670,8 +2651,8 @@ func TestVarDeclFloatOverflowCoverage(t *testing.T) {
 		Expr:    &ast.FloatLit{Value: 70000.0, Untyped: true},
 	}
 	err := i.executeStmt(stmt)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Errorf("expected overflow error")
 	}
 }
 
@@ -2690,7 +2671,6 @@ func TestExecuteAssignmentDefaultOpCoverage(t *testing.T) {
 	}
 }
 
-// Test for executeAssignment - canFitInFloat check (line 332-334)
 func TestExecuteAssignmentFloatEqOverflowCoverage(t *testing.T) {
 	i := New()
 	i.env.Set("x", Value{FType: ast.FloatType{Size: 16}, FData: 1.0, IsFloat: true})
@@ -2840,7 +2820,7 @@ print(x);
 	}
 }
 
-func TestUnsignedInt8Wrapping(t *testing.T) {
+func TestUnsignedInt8Overflow(t *testing.T) {
 	input := `
 var x: int{size: 8, signed: false} = 256;
 print(x);
@@ -2853,18 +2833,13 @@ print(x);
 	}
 
 	i := New()
-	output := captureOutput(func() {
-		err := i.Run(program)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-	if !strings.Contains(output, "0") {
-		t.Errorf("expected output to contain '0', got %q", output)
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected overflow error")
 	}
 }
 
-func TestUnsignedInt16Wrapping(t *testing.T) {
+func TestUnsignedInt16Overflow(t *testing.T) {
 	input := `
 var x: int{size: 16, signed: false} = 65536;
 print(x);
@@ -2877,18 +2852,13 @@ print(x);
 	}
 
 	i := New()
-	output := captureOutput(func() {
-		err := i.Run(program)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-	if !strings.Contains(output, "0") {
-		t.Errorf("expected output to contain '0', got %q", output)
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected overflow error")
 	}
 }
 
-func TestUnsignedInt32Wrapping(t *testing.T) {
+func TestUnsignedInt32Overflow(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: false} = 4294967296;
 print(x);
@@ -2901,18 +2871,13 @@ print(x);
 	}
 
 	i := New()
-	output := captureOutput(func() {
-		err := i.Run(program)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-	if !strings.Contains(output, "0") {
-		t.Errorf("expected output to contain '0', got %q", output)
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected overflow error")
 	}
 }
 
-func TestUnsignedIntWrappingSub(t *testing.T) {
+func TestUnsignedIntUnderflowSub(t *testing.T) {
 	input := `
 var x: int{size: 8, signed: false} = 0;
 x = x - 1;

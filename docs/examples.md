@@ -106,12 +106,11 @@ var us: float = 1_000.5e1_0;       // underscores
 
 ## Overflow
 
-```go
-var x: int{size: 8, signed: true} = 200;
-print(x);  // -56 (wraps around)
+Overflow is a runtime error:
 
-var y: int{size: 8, signed: false} = 256;
-print(y);  // 0 (wraps around)
+```go
+var x: int{size: 8, signed: true} = 200;   // error: value overflows type
+var y: int{size: 8, signed: false} = 256;  // error: value overflows type
 ```
 
 ## Complete Program

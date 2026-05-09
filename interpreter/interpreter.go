@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 
 	"github.com/x448/float16"
@@ -200,6 +201,62 @@ func convertInt(val int64, itype ast.IntegerType) int64 {
 	return val
 }
 
+func checkIntFits(val int64, itype ast.IntegerType) error {
+	if itype.Signed {
+		switch itype.Size {
+		case 8:
+			if val < math.MinInt8 || val > math.MaxInt8 {
+				return fmt.Errorf("value %d does not fit in 8-bit signed int", val)
+			}
+		case 16:
+			if val < math.MinInt16 || val > math.MaxInt16 {
+				return fmt.Errorf("value %d does not fit in 16-bit signed int", val)
+			}
+		case 32:
+			if val < math.MinInt32 || val > math.MaxInt32 {
+				return fmt.Errorf("value %d does not fit in 32-bit signed int", val)
+			}
+		}
+	} else {
+		switch itype.Size {
+		case 8:
+			if val < 0 || val > math.MaxUint8 {
+				return fmt.Errorf("value %d does not fit in 8-bit unsigned int", val)
+			}
+		case 16:
+			if val < 0 || val > math.MaxUint16 {
+				return fmt.Errorf("value %d does not fit in 16-bit unsigned int", val)
+			}
+		case 32:
+			if val < 0 || val > math.MaxUint32 {
+				return fmt.Errorf("value %d does not fit in 32-bit unsigned int", val)
+			}
+		case 64:
+			if val < 0 {
+				return fmt.Errorf("value %d does not fit in 64-bit unsigned int", val)
+			}
+		}
+	}
+	return nil
+}
+
+func checkFloatFits(val float64, ftype ast.FloatType) error {
+	if math.IsInf(val, 0) || math.IsNaN(val) {
+		return nil
+	}
+	switch ftype.Size {
+	case 16:
+		if val > 65504 || val < -65504 {
+			return fmt.Errorf("value %g does not fit in 16-bit float", val)
+		}
+	case 32:
+		if val > math.MaxFloat32 || val < -math.MaxFloat32 {
+			return fmt.Errorf("value %g does not fit in 32-bit float", val)
+		}
+	}
+	return nil
+}
+
 func convertFloat(val float64, ftype ast.FloatType) float64 {
 	switch ftype.Size {
 	case 16:
@@ -255,6 +312,16 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 	case *ast.VarDecl:
 		val := Value{IType: s.IType, FType: s.FType, BType: s.BType, IsFloat: s.IsFloat, IsBool: s.IsBool}
 		if s.Expr != nil {
+			if lit, ok := s.Expr.(*ast.IntegerLit); ok && lit.Untyped && !s.IsFloat && !s.IsBool {
+				if err := checkIntFits(lit.Value, s.IType); err != nil {
+					return err
+				}
+			}
+			if lit, ok := s.Expr.(*ast.FloatLit); ok && lit.Untyped && s.IsFloat {
+				if err := checkFloatFits(lit.Value, s.FType); err != nil {
+					return err
+				}
+			}
 			rightVal, err := i.evalExpr(s.Expr)
 			if err != nil {
 				return err
@@ -335,6 +402,19 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 	val, ok := i.env.Get(stmt.Name)
 	if !ok {
 		return fmt.Errorf("undefined variable: %s", stmt.Name)
+	}
+
+	if stmt.Op == "=" {
+		if lit, ok := stmt.Expr.(*ast.IntegerLit); ok && lit.Untyped && !val.IsFloat && !val.IsBool {
+			if err := checkIntFits(lit.Value, val.IType); err != nil {
+				return err
+			}
+		}
+		if lit, ok := stmt.Expr.(*ast.FloatLit); ok && lit.Untyped && val.IsFloat {
+			if err := checkFloatFits(lit.Value, val.FType); err != nil {
+				return err
+			}
+		}
 	}
 
 	rightVal, err := i.evalExpr(stmt.Expr)

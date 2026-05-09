@@ -61,12 +61,12 @@ Values are automatically converted in assignments and operator assignments follo
 
 ## Overflow
 
-When a value exceeds its target range, it wraps around:
+When a value exceeds its target range, a runtime error is raised:
 
 ```go
-var x: int{size: 8, signed: true} = 200;   // -56
-var y: int{size: 8, signed: false} = 256;  // 0
-var a: float{size: 16} = 70000.0;          // +Inf
+var x: int{size: 8, signed: true} = 200;   // error: overflows 8-bit signed int
+var y: int{size: 8, signed: false} = 256;  // error: overflows 8-bit unsigned int
+var a: float{size: 16} = 70000.0;          // error: overflows 16-bit float
 ```
 
 Division by zero is a runtime error for integers and produces infinity for floats.
