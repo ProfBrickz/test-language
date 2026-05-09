@@ -6,11 +6,11 @@ An expression-based, statically-typed programming language with integers, floats
 
 Source code goes through three phases:
 
-1. **Lexer** — splits text into tokens
-2. **Parser** — builds an abstract syntax tree
-3. **Interpreter** — walks the tree and runs it
+1. **Lexer** - splits text into tokens
+2. **Parser** - builds an abstract syntax tree
+3. **Interpreter** - walks the tree and runs it
 
-No bytecode, no VM, no compiler — the tree runs directly.
+No bytecode, no VM, no compiler - the tree runs directly.
 
 ## Usage
 
