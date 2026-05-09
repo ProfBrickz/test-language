@@ -1460,6 +1460,81 @@ print(a);
 	}
 }
 
+func TestNaNLiteral(t *testing.T) {
+	input := `
+var a: float{size: 64} = NaN;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "NaN" {
+		t.Errorf("expected 'NaN', got %q", output)
+	}
+}
+
+func TestInfinityLiteral(t *testing.T) {
+	input := `
+var a: float{size: 64} = infinity;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "infinity" {
+		t.Errorf("expected 'infinity', got %q", output)
+	}
+}
+
+func TestNegInfinityLiteral(t *testing.T) {
+	input := `
+var a: float{size: 64} = -infinity;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "-infinity" {
+		t.Errorf("expected '-infinity', got %q", output)
+	}
+}
+
 func TestFloatDivisionByZero(t *testing.T) {
 	input := `
 var a: float{size: 32} = 10.0;
@@ -1477,8 +1552,8 @@ print(a);
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
-	if !strings.Contains(output, "Inf") {
-		t.Errorf("expected output to contain 'Inf', got %q", output)
+	if !strings.Contains(output, "infinity") {
+		t.Errorf("expected output to contain 'infinity', got %q", output)
 	}
 }
 

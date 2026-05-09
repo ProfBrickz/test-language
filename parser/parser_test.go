@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"math"
 	"strings"
 	"testing"
 
@@ -1768,5 +1769,65 @@ func TestParseFloatParseError(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected 'invalid float literal' error, got %v", p.Errors())
+	}
+}
+
+func TestParseNaNFloatLiteral(t *testing.T) {
+	input := "print(NaN);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	flt, ok := stmt.Expr.(*ast.FloatLit)
+	if !ok {
+		t.Fatalf("expected *ast.FloatLit, got %T", stmt.Expr)
+	}
+	if !math.IsNaN(flt.Value) {
+		t.Errorf("expected NaN value, got %v", flt.Value)
+	}
+}
+
+func TestParseInfinityFloatLiteral(t *testing.T) {
+	input := "print(infinity);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	flt, ok := stmt.Expr.(*ast.FloatLit)
+	if !ok {
+		t.Fatalf("expected *ast.FloatLit, got %T", stmt.Expr)
+	}
+	if !math.IsInf(flt.Value, 1) {
+		t.Errorf("expected +Inf value, got %v", flt.Value)
+	}
+}
+
+func TestParseNegInfinityFloatLiteral(t *testing.T) {
+	input := "print(-infinity);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	flt, ok := stmt.Expr.(*ast.FloatLit)
+	if !ok {
+		t.Fatalf("expected *ast.FloatLit, got %T", stmt.Expr)
+	}
+	if !math.IsInf(flt.Value, -1) {
+		t.Errorf("expected -Inf value, got %v", flt.Value)
 	}
 }

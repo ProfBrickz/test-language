@@ -23,6 +23,19 @@ type Value struct {
 	Null    bool
 }
 
+func formatFloat(val float64) string {
+	if math.IsInf(val, 1) {
+		return "infinity"
+	}
+	if math.IsInf(val, -1) {
+		return "-infinity"
+	}
+	if math.IsNaN(val) {
+		return "NaN"
+	}
+	return strconv.FormatFloat(val, 'g', -1, 64)
+}
+
 func (v Value) String() string {
 	if v.Null {
 		return "null"
@@ -35,9 +48,9 @@ func (v Value) String() string {
 	}
 	if v.IsFloat {
 		if v.Untyped {
-			return fmt.Sprintf("%g", v.FData)
+			return formatFloat(v.FData)
 		}
-		return fmt.Sprintf("%s(%g)", typeDesc(v.FType, false), v.FData)
+		return fmt.Sprintf("%s(%s)", typeDesc(v.FType, false), formatFloat(v.FData))
 	}
 	if v.Untyped {
 		return fmt.Sprintf("%d", v.Data)
@@ -388,7 +401,7 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 		} else if val.IsBool {
 			fmt.Println(val.BData)
 		} else if val.IsFloat {
-			fmt.Println(strconv.FormatFloat(val.FData, 'g', 20, 64))
+			fmt.Println(formatFloat(val.FData))
 		} else {
 			fmt.Println(val.Data)
 		}

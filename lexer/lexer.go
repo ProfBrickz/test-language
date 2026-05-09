@@ -321,6 +321,10 @@ func (l *Lexer) readIdentifier() Token {
 		return Token{TOK_TRUE, word, l.line}
 	case "false":
 		return Token{TOK_FALSE, word, l.line}
+	case "NaN":
+		return Token{TOK_FLOAT_LIT, word, l.line}
+	case "infinity":
+		return Token{TOK_FLOAT_LIT, word, l.line}
 	default:
 		return Token{TOK_IDENT, word, l.line}
 	}

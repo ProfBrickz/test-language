@@ -541,3 +541,25 @@ func TestExponentLoopBreakOnNonDigit(t *testing.T) {
 		t.Errorf("expected '1', got %q", tok.Literal)
 	}
 }
+
+func TestNaNFloatLiteral(t *testing.T) {
+	l := New("NaN")
+	tok := l.NextToken()
+	if tok.Type != TOK_FLOAT_LIT {
+		t.Errorf("expected FLOAT_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "NaN" {
+		t.Errorf("expected literal %q, got %q", "NaN", tok.Literal)
+	}
+}
+
+func TestInfinityFloatLiteral(t *testing.T) {
+	l := New("infinity")
+	tok := l.NextToken()
+	if tok.Type != TOK_FLOAT_LIT {
+		t.Errorf("expected FLOAT_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "infinity" {
+		t.Errorf("expected literal %q, got %q", "infinity", tok.Literal)
+	}
+}

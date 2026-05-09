@@ -427,7 +427,11 @@ func (p *Parser) parsePrimary() ast.Expr {
 		clean := strings.ReplaceAll(lit, "_", "")
 		var val float64
 		var err error
-		if strings.HasPrefix(clean, "0x") || strings.HasPrefix(clean, "0X") {
+		if clean == "NaN" {
+			val = math.NaN()
+		} else if clean == "infinity" {
+			val = math.Inf(1)
+		} else if strings.HasPrefix(clean, "0x") || strings.HasPrefix(clean, "0X") {
 			val = p.parsePrefixedFloat(clean[2:], 16)
 		} else if strings.HasPrefix(clean, "0b") || strings.HasPrefix(clean, "0B") {
 			val = p.parsePrefixedFloat(clean[2:], 2)
