@@ -12,7 +12,7 @@ First, run these commands to understand the current state:
 
 Based on the changes, draft a commit message with:
 - A short summary line (imperative mood, no period, ~50 chars)
-- A blank line followed by a longer description explaining what changed and why
+- A blank line followed by a longer description explaining what changed and why, formatted as a bullet points list (with headers to split it up if it is long)
 
 The summary format should follow existing patterns in the repo (use `git log` output as style reference).
 
