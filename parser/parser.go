@@ -356,6 +356,12 @@ func (p *Parser) parseOr() ast.Expr {
 		op := p.curToken.Literal
 		p.nextToken()
 		right := p.parseAnd()
+		if _, ok := left.(*ast.NullLit); ok {
+			p.addWarning("using null literal with boolean || operator")
+		}
+		if _, ok := right.(*ast.NullLit); ok {
+			p.addWarning("using null literal with boolean || operator")
+		}
 		left = &ast.BinaryExpr{Left: left, Op: op, Right: right}
 	}
 	return left
@@ -367,6 +373,12 @@ func (p *Parser) parseAnd() ast.Expr {
 		op := p.curToken.Literal
 		p.nextToken()
 		right := p.parseEquality()
+		if _, ok := left.(*ast.NullLit); ok {
+			p.addWarning("using null literal with boolean && operator")
+		}
+		if _, ok := right.(*ast.NullLit); ok {
+			p.addWarning("using null literal with boolean && operator")
+		}
 		left = &ast.BinaryExpr{Left: left, Op: op, Right: right}
 	}
 	return left
@@ -390,6 +402,12 @@ func (p *Parser) parseComparison() ast.Expr {
 		op := p.curToken.Literal
 		p.nextToken()
 		right := p.parseAddSub()
+		if _, ok := left.(*ast.NullLit); ok {
+			p.addWarning("using null literal with comparison operator %s", op)
+		}
+		if _, ok := right.(*ast.NullLit); ok {
+			p.addWarning("using null literal with comparison operator %s", op)
+		}
 		left = &ast.BinaryExpr{Left: left, Op: op, Right: right}
 	}
 	return left
@@ -419,6 +437,10 @@ func (p *Parser) parseMulDiv() ast.Expr {
 
 func (p *Parser) parseUnary() ast.Expr {
 	if p.curToken.Type == lexer.TOK_MINUS {
+		if p.peekToken.Type == lexer.TOK_MINUS {
+			p.addError("unary minus cannot be applied to a minus expression")
+			return nil
+		}
 		p.nextToken()
 		expr := p.parseMember()
 		if lit, ok := expr.(*ast.IntegerLit); ok {
@@ -438,6 +460,9 @@ func (p *Parser) parseUnary() ast.Expr {
 	if p.curToken.Type == lexer.TOK_NOT {
 		p.nextToken()
 		expr := p.parseUnary()
+		if _, ok := expr.(*ast.NullLit); ok {
+			p.addWarning("using null literal with boolean ! operator")
+		}
 		return &ast.UnaryExpr{Op: "!", Right: expr}
 	}
 	return p.parseMember()

@@ -2240,3 +2240,184 @@ func TestParsePrecedenceComparisonVsAdd(t *testing.T) {
 		t.Errorf("expected left Op '+', got %q", left.Op)
 	}
 }
+
+func TestParsePrefixOnlyLiterals(t *testing.T) {
+	tests := []struct {
+		input  string
+		errMsg string
+	}{
+		{"print(0x);", "invalid hexadecimal literal"},
+		{"print(0X);", "invalid hexadecimal literal"},
+		{"print(0b);", "invalid binary literal"},
+		{"print(0B);", "invalid binary literal"},
+		{"print(0o);", "invalid octal literal"},
+		{"print(0O);", "invalid octal literal"},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		p.ParseProgram()
+		found := false
+		for _, err := range p.Errors() {
+			if strings.Contains(err, tt.errMsg) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("input %q: expected error containing %q, got %v", tt.input, tt.errMsg, p.Errors())
+		}
+	}
+}
+
+func TestParseDoubleUnaryNot(t *testing.T) {
+	input := "print(!!true);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	outer, ok := stmt.Expr.(*ast.UnaryExpr)
+	if !ok {
+		t.Fatalf("expected outer *ast.UnaryExpr, got %T", stmt.Expr)
+	}
+	if outer.Op != "!" {
+		t.Errorf("expected outer Op '!', got %q", outer.Op)
+	}
+	inner, ok := outer.Right.(*ast.UnaryExpr)
+	if !ok {
+		t.Fatalf("expected inner *ast.UnaryExpr, got %T", outer.Right)
+	}
+	if inner.Op != "!" {
+		t.Errorf("expected inner Op '!', got %q", inner.Op)
+	}
+}
+
+func TestParseDoubleUnaryMinus(t *testing.T) {
+	input := "print(--5);"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for double unary minus, got none")
+	}
+	found := false
+	for _, err := range p.Errors() {
+		if strings.Contains(err, "unary minus") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected error containing 'unary minus', got %v", p.Errors())
+	}
+}
+
+func TestParseEmptyTypeBraces(t *testing.T) {
+	tests := []string{
+		"var x: int{};",
+		"var x: float{};",
+		"var x: bool{};",
+	}
+
+	for _, input := range tests {
+		l := lexer.New(input)
+		p := New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Errorf("input %q: unexpected errors: %v", input, p.Errors())
+		}
+		if len(program.Stmts) != 1 {
+			t.Errorf("input %q: expected 1 statement, got %d", input, len(program.Stmts))
+		}
+	}
+}
+
+func TestParseEmptyProgram(t *testing.T) {
+	input := ""
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 0 {
+		t.Errorf("expected 0 statements, got %d", len(program.Stmts))
+	}
+}
+
+func TestParseNullLiteralWarnings(t *testing.T) {
+	tests := []struct {
+		input       string
+		warningPart string
+	}{
+		{"print(null || true);", "|| operator"},
+		{"print(true || null);", "|| operator"},
+		{"print(null && true);", "&& operator"},
+		{"print(true && null);", "&& operator"},
+		{"print(null < 1);", "comparison operator"},
+		{"print(1 < null);", "comparison operator"},
+		{"print(!null);", "! operator"},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		p.ParseProgram()
+		if len(p.Warnings()) == 0 {
+			t.Errorf("input %q: expected warning, got none", tt.input)
+		}
+		found := false
+		for _, w := range p.Warnings() {
+			if strings.Contains(w, tt.warningPart) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("input %q: expected warning containing %q, got %v", tt.input, tt.warningPart, p.Warnings())
+		}
+	}
+}
+
+func TestParseUnaryMinusOnFloat(t *testing.T) {
+	input := "print(-1.5);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	lit, ok := stmt.Expr.(*ast.FloatLit)
+	if !ok {
+		t.Fatalf("expected *ast.FloatLit, got %T", stmt.Expr)
+	}
+	if lit.Value != -1.5 {
+		t.Errorf("expected -1.5, got %g", lit.Value)
+	}
+}
+
+func TestParseUnaryMinusOnNonLiteral(t *testing.T) {
+	tests := []string{
+		"print(-(1 + 2));",
+		"print(-x);",
+	}
+
+	for _, input := range tests {
+		l := lexer.New(input)
+		p := New(l)
+		program := p.ParseProgram()
+		stmt := program.Stmts[0].(*ast.PrintStmt)
+		bin, ok := stmt.Expr.(*ast.BinaryExpr)
+		if !ok {
+			t.Fatalf("input %q: expected *ast.BinaryExpr, got %T", input, stmt.Expr)
+		}
+		if bin.Op != "-" {
+			t.Errorf("input %q: expected Op '-', got %q", input, bin.Op)
+		}
+	}
+}

@@ -696,3 +696,57 @@ func TestSinglePipeAsIntLit(t *testing.T) {
 		t.Errorf("expected INT_LIT, got %s", tok.Type)
 	}
 }
+
+func TestPrefixOnlyLiterals(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedType TokenType
+		expectedLit  string
+	}{
+		{"0x", TOK_INT_LIT, "0x"},
+		{"0X", TOK_INT_LIT, "0X"},
+		{"0b", TOK_INT_LIT, "0b"},
+		{"0B", TOK_INT_LIT, "0B"},
+		{"0o", TOK_INT_LIT, "0o"},
+		{"0O", TOK_INT_LIT, "0O"},
+	}
+
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("input %q: expected %s, got %s", tt.input, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLit {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.expectedLit, tok.Literal)
+		}
+	}
+}
+
+func TestCaseVariantFloatKeywords(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedType TokenType
+		expectedLit  string
+	}{
+		{"nan", TOK_IDENT, "nan"},
+		{"NAN", TOK_IDENT, "NAN"},
+		{"Nan", TOK_IDENT, "Nan"},
+		{"inf", TOK_IDENT, "inf"},
+		{"INF", TOK_IDENT, "INF"},
+		{"Inf", TOK_IDENT, "Inf"},
+		{"Infinity", TOK_IDENT, "Infinity"},
+		{"INFINITY", TOK_IDENT, "INFINITY"},
+	}
+
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("input %q: expected %s, got %s", tt.input, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLit {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.expectedLit, tok.Literal)
+		}
+	}
+}

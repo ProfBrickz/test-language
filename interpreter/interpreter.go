@@ -537,7 +537,7 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 					val.FData = convertFloat(rightVal.FData, s.FType)
 				} else {
 					if s.IsBool {
-						val.BData = rightVal.Data != 0
+						return fmt.Errorf("cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
 					} else if s.IsFloat {
 						// Integer to float conversion
 						if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, ast.FloatType{}, false, ast.IntegerType{}, s.FType, true) {
@@ -778,11 +778,11 @@ func (i *Interpreter) evalUnary(expr *ast.UnaryExpr) (Value, error) {
 	if err != nil {
 		return Value{}, err
 	}
-	if right.Null {
-		return Value{Null: true}, nil
-	}
 	switch expr.Op {
 	case "!":
+		if right.Null {
+			return Value{Untyped: true, BData: true, IsBool: true}, nil
+		}
 		if !right.IsBool {
 			return Value{}, fmt.Errorf("operator ! requires a bool, got %s", typeDescForVal(right))
 		}
@@ -793,6 +793,10 @@ func (i *Interpreter) evalUnary(expr *ast.UnaryExpr) (Value, error) {
 }
 
 func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
+	if expr.Op == "&&" || expr.Op == "||" {
+		return i.evalShortCircuit(expr)
+	}
+
 	left, err := i.evalExpr(expr.Left)
 	if err != nil {
 		return Value{}, err
@@ -802,11 +806,17 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 		return Value{}, err
 	}
 
+	switch expr.Op {
+	case "==", "!=":
+		return i.evalEquality(left, right, expr.Op)
+	case "<", ">", "<=", ">=":
+		return i.evalComparison(left, right, expr.Op)
+	}
+
 	if left.Null || right.Null {
 		return Value{Null: true}, nil
 	}
 
-	// Determine result type
 	isFloat := left.IsFloat || right.IsFloat
 	var resultType ast.IntegerType
 	var resultFType ast.FloatType
@@ -860,72 +870,6 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 	rightF := getFloat(right)
 
 	switch expr.Op {
-	case "==", "!=":
-		// Type compatibility check for mixed int/float comparisons
-		if left.IsBool != right.IsBool && (left.IsBool || right.IsBool) {
-			return Value{}, fmt.Errorf("type mismatch: cannot compare %s %s %s", typeDescForVal(left), expr.Op, typeDescForVal(right))
-		}
-		if left.IsFloat != right.IsFloat && !left.Untyped && !right.Untyped {
-			if !canImplicitConvert(right.IType, right.FType, false, ast.IntegerType{}, left.FType, true) &&
-				!canImplicitConvert(left.IType, left.FType, false, ast.IntegerType{}, right.FType, true) {
-				return Value{}, fmt.Errorf("type mismatch: cannot compare %s %s %s", typeDescForVal(left), expr.Op, typeDescForVal(right))
-			}
-		}
-		var eq bool
-		if left.IsBool && right.IsBool {
-			eq = left.BData == right.BData
-		} else if left.IsFloat || right.IsFloat {
-			eq = leftF == rightF
-		} else {
-			eq = left.Data == right.Data
-		}
-		if expr.Op == "!=" {
-			eq = !eq
-		}
-		return Value{Untyped: true, BData: eq, IsBool: true}, nil
-	case "<", ">", "<=", ">=":
-		// Type compatibility check for mixed int/float comparisons
-		if left.IsFloat != right.IsFloat && !left.Untyped && !right.Untyped {
-			if !canImplicitConvert(right.IType, right.FType, false, ast.IntegerType{}, left.FType, true) &&
-				!canImplicitConvert(left.IType, left.FType, false, ast.IntegerType{}, right.FType, true) {
-				return Value{}, fmt.Errorf("type mismatch: cannot compare %s %s %s", typeDescForVal(left), expr.Op, typeDescForVal(right))
-			}
-		}
-		var cmp bool
-		if left.IsFloat || right.IsFloat {
-			switch expr.Op {
-			case "<":
-				cmp = leftF < rightF
-			case ">":
-				cmp = leftF > rightF
-			case "<=":
-				cmp = leftF <= rightF
-			case ">=":
-				cmp = leftF >= rightF
-			}
-		} else {
-			switch expr.Op {
-			case "<":
-				cmp = left.Data < right.Data
-			case ">":
-				cmp = left.Data > right.Data
-			case "<=":
-				cmp = left.Data <= right.Data
-			case ">=":
-				cmp = left.Data >= right.Data
-			}
-		}
-		return Value{Untyped: true, BData: cmp, IsBool: true}, nil
-	case "&&":
-		if !left.IsBool || !right.IsBool {
-			return Value{}, fmt.Errorf("operator && requires bools, got %s and %s", typeDescForVal(left), typeDescForVal(right))
-		}
-		return Value{Untyped: true, BData: left.BData && right.BData, IsBool: true}, nil
-	case "||":
-		if !left.IsBool || !right.IsBool {
-			return Value{}, fmt.Errorf("operator || requires bools, got %s and %s", typeDescForVal(left), typeDescForVal(right))
-		}
-		return Value{Untyped: true, BData: left.BData || right.BData, IsBool: true}, nil
 	case "+":
 		if isFloat {
 			fresult = leftF + rightF
@@ -968,4 +912,145 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 		return Value{Untyped: true, Data: result}, nil
 	}
 	return Value{IType: resultType, Data: convertInt(result, resultType)}, nil
+}
+
+func (i *Interpreter) evalShortCircuit(expr *ast.BinaryExpr) (Value, error) {
+	left, err := i.evalExpr(expr.Left)
+	if err != nil {
+		return Value{}, err
+	}
+
+	if !left.Null && !left.IsBool {
+		return Value{}, fmt.Errorf("operator %s requires bools, got %s", expr.Op, typeDescForVal(left))
+	}
+
+	if expr.Op == "&&" {
+		if left.Null || (left.IsBool && !left.BData) {
+			return Value{Untyped: true, BData: false, IsBool: true}, nil
+		}
+	} else {
+		if left.IsBool && left.BData {
+			return Value{Untyped: true, BData: true, IsBool: true}, nil
+		}
+	}
+
+	right, err := i.evalExpr(expr.Right)
+	if err != nil {
+		return Value{}, err
+	}
+
+	if !right.Null && !right.IsBool {
+		return Value{}, fmt.Errorf("operator %s requires bools, got %s", expr.Op, typeDescForVal(right))
+	}
+
+	if expr.Op == "&&" {
+		if right.Null {
+			return Value{Untyped: true, BData: false, IsBool: true}, nil
+		}
+		return Value{Untyped: true, BData: right.BData, IsBool: true}, nil
+	} else {
+		if right.Null {
+			return Value{Untyped: true, BData: false, IsBool: true}, nil
+		}
+		return Value{Untyped: true, BData: right.BData, IsBool: true}, nil
+	}
+}
+
+func (i *Interpreter) evalEquality(left, right Value, op string) (Value, error) {
+	if left.Null && right.Null {
+		if op == "==" {
+			return Value{Untyped: true, BData: true, IsBool: true}, nil
+		}
+		return Value{Untyped: true, BData: false, IsBool: true}, nil
+	}
+
+	if left.Null || right.Null {
+		if op == "==" {
+			return Value{Untyped: true, BData: false, IsBool: true}, nil
+		}
+		return Value{Untyped: true, BData: true, IsBool: true}, nil
+	}
+
+	if left.IsBool != right.IsBool && (left.IsBool || right.IsBool) {
+		return Value{}, fmt.Errorf("type mismatch: cannot compare %s %s %s", typeDescForVal(left), op, typeDescForVal(right))
+	}
+	if left.IsFloat != right.IsFloat && !left.Untyped && !right.Untyped {
+		if !canImplicitConvert(right.IType, right.FType, false, ast.IntegerType{}, left.FType, true) &&
+			!canImplicitConvert(left.IType, left.FType, false, ast.IntegerType{}, right.FType, true) {
+			return Value{}, fmt.Errorf("type mismatch: cannot compare %s %s %s", typeDescForVal(left), op, typeDescForVal(right))
+		}
+	}
+
+	getFloat := func(v Value) float64 {
+		if v.IsFloat {
+			return v.FData
+		}
+		return float64(v.Data)
+	}
+
+	var eq bool
+	if left.IsBool && right.IsBool {
+		eq = left.BData == right.BData
+	} else if left.IsFloat || right.IsFloat {
+		eq = getFloat(left) == getFloat(right)
+	} else {
+		eq = left.Data == right.Data
+	}
+
+	if op == "!=" {
+		eq = !eq
+	}
+	return Value{Untyped: true, BData: eq, IsBool: true}, nil
+}
+
+func (i *Interpreter) evalComparison(left, right Value, op string) (Value, error) {
+	if left.Null || right.Null {
+		return Value{Untyped: true, BData: false, IsBool: true}, nil
+	}
+
+	if left.IsBool || right.IsBool {
+		return Value{}, fmt.Errorf("operator %s cannot be used with booleans", op)
+	}
+
+	if left.IsFloat != right.IsFloat && !left.Untyped && !right.Untyped {
+		if !canImplicitConvert(right.IType, right.FType, false, ast.IntegerType{}, left.FType, true) &&
+			!canImplicitConvert(left.IType, left.FType, false, ast.IntegerType{}, right.FType, true) {
+			return Value{}, fmt.Errorf("type mismatch: cannot compare %s %s %s", typeDescForVal(left), op, typeDescForVal(right))
+		}
+	}
+
+	getFloat := func(v Value) float64 {
+		if v.IsFloat {
+			return v.FData
+		}
+		return float64(v.Data)
+	}
+
+	var cmp bool
+	if left.IsFloat || right.IsFloat {
+		leftF := getFloat(left)
+		rightF := getFloat(right)
+		switch op {
+		case "<":
+			cmp = leftF < rightF
+		case ">":
+			cmp = leftF > rightF
+		case "<=":
+			cmp = leftF <= rightF
+		case ">=":
+			cmp = leftF >= rightF
+		}
+	} else {
+		switch op {
+		case "<":
+			cmp = left.Data < right.Data
+		case ">":
+			cmp = left.Data > right.Data
+		case "<=":
+			cmp = left.Data <= right.Data
+		case ">=":
+			cmp = left.Data >= right.Data
+		}
+	}
+	return Value{Untyped: true, BData: cmp, IsBool: true}, nil
 }

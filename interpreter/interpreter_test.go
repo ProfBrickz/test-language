@@ -3444,7 +3444,7 @@ x += false;`
 	}
 }
 
-func TestBoolAssignIntToBoolConversion(t *testing.T) {
+func TestBoolAssignNoIntToBoolConversion(t *testing.T) {
 	input := `var x: bool{nullable: false} = 42;
 print(x);`
 	l := lexer.New(input)
@@ -3452,14 +3452,9 @@ print(x);`
 	program := p.ParseProgram()
 
 	i := New()
-	output := captureOutput(func() {
-		err := i.Run(program)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-	if !strings.Contains(output, "true") {
-		t.Errorf("expected output 'true', got %q", output)
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for int to bool conversion, got none")
 	}
 }
 
@@ -5118,8 +5113,11 @@ func TestEqNull(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !val.Null {
-		t.Errorf("expected null result")
+	if val.Null {
+		t.Errorf("expected non-null result")
+	}
+	if val.BData != false {
+		t.Errorf("expected false, got %v", val.BData)
 	}
 }
 
@@ -5133,8 +5131,11 @@ func TestNullNot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !val.Null {
-		t.Errorf("expected null result")
+	if val.Null {
+		t.Errorf("expected non-null result")
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
 	}
 }
 
@@ -5539,5 +5540,330 @@ print(a == b);
 	err := i.Run(program)
 	if err == nil {
 		t.Errorf("expected error for int64 == float64 comparison")
+	}
+}
+
+func TestNullComparisons(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"print(null == null);", "true"},
+		{"print(null != null);", "false"},
+		{"print(null == 1);", "false"},
+		{"print(null != 1);", "true"},
+		{"print(1 == null);", "false"},
+		{"print(1 != null);", "true"},
+		{"print(null == 1.0);", "false"},
+		{"print(null != 1.0);", "true"},
+		{"print(null < 1);", "false"},
+		{"print(null > 1);", "false"},
+		{"print(null <= 1);", "false"},
+		{"print(null >= 1);", "false"},
+		{"print(1 < null);", "false"},
+		{"print(1 > null);", "false"},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := parser.New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Fatalf("input %q: unexpected parse errors: %v", tt.input, p.Errors())
+		}
+		i := New()
+		output := captureOutput(func() {
+			err := i.Run(program)
+			if err != nil {
+				t.Fatalf("input %q: unexpected runtime error: %v", tt.input, err)
+			}
+		})
+		if output != tt.expected {
+			t.Errorf("input %q: expected %q, got %q", tt.input, tt.expected, output)
+		}
+	}
+}
+
+func TestNullInBooleanOps(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"print(null && true);", "false"},
+		{"print(null && false);", "false"},
+		{"print(true && null);", "false"},
+		{"print(false && null);", "false"},
+		{"print(null || true);", "true"},
+		{"print(null || false);", "false"},
+		{"print(true || null);", "true"},
+		{"print(false || null);", "false"},
+		{"print(!null);", "true"},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := parser.New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Fatalf("input %q: unexpected parse errors: %v", tt.input, p.Errors())
+		}
+		i := New()
+		output := captureOutput(func() {
+			err := i.Run(program)
+			if err != nil {
+				t.Fatalf("input %q: unexpected runtime error: %v", tt.input, err)
+			}
+		})
+		if output != tt.expected {
+			t.Errorf("input %q: expected %q, got %q", tt.input, tt.expected, output)
+		}
+	}
+}
+
+func TestNaNComparisons(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"print(NaN == NaN);", "false"},
+		{"print(NaN != NaN);", "true"},
+		{"print(NaN < 0);", "false"},
+		{"print(NaN > 0);", "false"},
+		{"print(NaN <= 0);", "false"},
+		{"print(NaN >= 0);", "false"},
+		{"print(0 < NaN);", "false"},
+		{"print(0 > NaN);", "false"},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := parser.New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Fatalf("input %q: unexpected parse errors: %v", tt.input, p.Errors())
+		}
+		i := New()
+		output := captureOutput(func() {
+			err := i.Run(program)
+			if err != nil {
+				t.Fatalf("input %q: unexpected runtime error: %v", tt.input, err)
+			}
+		})
+		if output != tt.expected {
+			t.Errorf("input %q: expected %q, got %q", tt.input, tt.expected, output)
+		}
+	}
+}
+
+func TestInfinityComparisons(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"print(infinity == infinity);", "true"},
+		{"print(-infinity < 0);", "true"},
+		{"print(-infinity > 0);", "false"},
+		{"print(infinity > 1000);", "true"},
+		{"print(-infinity < -1000);", "true"},
+		{"print(infinity == 1.0);", "false"},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := parser.New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Fatalf("input %q: unexpected parse errors: %v", tt.input, p.Errors())
+		}
+		i := New()
+		output := captureOutput(func() {
+			err := i.Run(program)
+			if err != nil {
+				t.Fatalf("input %q: unexpected runtime error: %v", tt.input, err)
+			}
+		})
+		if output != tt.expected {
+			t.Errorf("input %q: expected %q, got %q", tt.input, tt.expected, output)
+		}
+	}
+}
+
+func TestFloatDivByZeroInline(t *testing.T) {
+	input := `
+print(1.0 / 0.0);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected parse errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected runtime error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "infinity") {
+		t.Errorf("expected output to contain 'infinity', got %q", output)
+	}
+}
+
+func TestDoubleNegation(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"print(!!true);", "true"},
+		{"print(!!false);", "false"},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := parser.New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Fatalf("input %q: unexpected parse errors: %v", tt.input, p.Errors())
+		}
+		i := New()
+		output := captureOutput(func() {
+			err := i.Run(program)
+			if err != nil {
+				t.Fatalf("input %q: unexpected runtime error: %v", tt.input, err)
+			}
+		})
+		if output != tt.expected {
+			t.Errorf("input %q: expected %q, got %q", tt.input, tt.expected, output)
+		}
+	}
+}
+
+func TestNoImplicitIntToBoolConversion(t *testing.T) {
+	tests := []string{
+		"var x: bool = 0;",
+		"var x: bool = 1;",
+		"var x: bool = -1;",
+		"var x: bool = 42;",
+	}
+
+	for _, input := range tests {
+		l := lexer.New(input)
+		p := parser.New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Fatalf("input %q: unexpected parse errors: %v", input, p.Errors())
+		}
+		i := New()
+		err := i.Run(program)
+		if err == nil {
+			t.Errorf("input %q: expected error for int to bool conversion, got none", input)
+		}
+	}
+}
+
+func TestBoolComparisonOperatorsError(t *testing.T) {
+	tests := []string{
+		"print(true < false);",
+		"print(true > false);",
+		"print(true <= false);",
+		"print(true >= false);",
+		"print(1 < true);",
+		"print(true < 1);",
+		"print(1.0 < true);",
+		"print(true < 1.0);",
+	}
+
+	for _, input := range tests {
+		l := lexer.New(input)
+		p := parser.New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Fatalf("input %q: unexpected parse errors: %v", input, p.Errors())
+		}
+		i := New()
+		err := i.Run(program)
+		if err == nil {
+			t.Errorf("input %q: expected error for boolean comparison operator, got none", input)
+		}
+	}
+}
+
+func TestShortCircuitRightOperandNonBool(t *testing.T) {
+	tests := []struct {
+		left  ast.Expr
+		op    string
+		right ast.Expr
+	}{
+		{&ast.BoolLit{Value: true, Untyped: true}, "&&", &ast.IntegerLit{Value: 1, Untyped: true}},
+		{&ast.BoolLit{Value: false, Untyped: true}, "||", &ast.IntegerLit{Value: 1, Untyped: true}},
+	}
+
+	for _, tt := range tests {
+		i := New()
+		expr := &ast.BinaryExpr{
+			Left:  tt.left,
+			Op:    tt.op,
+			Right: tt.right,
+		}
+		_, err := i.evalExpr(expr)
+		if err == nil {
+			t.Errorf("expected error for non-bool right operand with op %q, got none", tt.op)
+		}
+	}
+}
+
+func TestShortCircuitOperandEvalError(t *testing.T) {
+	tests := []struct {
+		left  ast.Expr
+		op    string
+		right ast.Expr
+	}{
+		{&ast.VarRef{Name: "undefined"}, "&&", &ast.BoolLit{Value: true, Untyped: true}},
+		{&ast.BoolLit{Value: true, Untyped: true}, "&&", &ast.VarRef{Name: "undefined"}},
+		{&ast.VarRef{Name: "undefined"}, "||", &ast.BoolLit{Value: false, Untyped: true}},
+		{&ast.BoolLit{Value: false, Untyped: true}, "||", &ast.VarRef{Name: "undefined"}},
+	}
+
+	for _, tt := range tests {
+		i := New()
+		expr := &ast.BinaryExpr{
+			Left:  tt.left,
+			Op:    tt.op,
+			Right: tt.right,
+		}
+		_, err := i.evalExpr(expr)
+		if err == nil {
+			t.Errorf("expected error for undefined variable with op %q, got none", tt.op)
+		}
+	}
+}
+
+func TestShortCircuitEvaluation(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"print(false && true);", "false"},
+		{"print(true || false);", "true"},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := parser.New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) > 0 {
+			t.Fatalf("input %q: unexpected parse errors: %v", tt.input, p.Errors())
+		}
+		i := New()
+		output := captureOutput(func() {
+			err := i.Run(program)
+			if err != nil {
+				t.Fatalf("input %q: unexpected runtime error: %v", tt.input, err)
+			}
+		})
+		if output != tt.expected {
+			t.Errorf("input %q: expected %q, got %q", tt.input, tt.expected, output)
+		}
 	}
 }
