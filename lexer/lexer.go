@@ -35,6 +35,7 @@ const (
 	TOK_MINUS     TokenType = "-"
 	TOK_STAR      TokenType = "*"
 	TOK_SLASH     TokenType = "/"
+	TOK_DOT       TokenType = "."
 
 	TOK_LBRACE TokenType = "{"
 	TOK_RBRACE TokenType = "}"
@@ -114,6 +115,11 @@ func (l *Lexer) NextToken() Token {
 		return l.makeToken(TOK_SLASH, 1)
 	case '=':
 		return l.makeToken(TOK_ASSIGN, 1)
+	case '.':
+		if l.pos+1 < len(l.input) && unicode.IsDigit(rune(l.input[l.pos+1])) {
+			return l.readFloatAfterDot()
+		}
+		return l.makeToken(TOK_DOT, 1)
 	default:
 		tok := Token{TOK_INT_LIT, string(ch), l.line}
 		l.pos++
@@ -215,6 +221,43 @@ func (l *Lexer) readNumber() Token {
 		return Token{TOK_FLOAT_LIT, lit, l.line}
 	}
 	return Token{TOK_INT_LIT, lit, l.line}
+}
+
+func (l *Lexer) readFloatAfterDot() Token {
+	start := l.pos
+	l.pos++
+
+	for l.pos < len(l.input) {
+		ch := l.input[l.pos]
+		if ch == '_' || unicode.IsDigit(rune(ch)) {
+			l.pos++
+		} else {
+			break
+		}
+	}
+
+	if l.pos < len(l.input) && (l.input[l.pos] == 'e' || l.input[l.pos] == 'E') {
+		expStart := l.pos
+		l.pos++
+		if l.pos < len(l.input) && (l.input[l.pos] == '+' || l.input[l.pos] == '-') {
+			l.pos++
+		}
+		digitCount := 0
+		for l.pos < len(l.input) {
+			ch := l.input[l.pos]
+			if ch == '_' || unicode.IsDigit(rune(ch)) {
+				digitCount++
+				l.pos++
+			} else {
+				break
+			}
+		}
+		if digitCount == 0 {
+			l.pos = expStart
+		}
+	}
+
+	return Token{TOK_FLOAT_LIT, l.input[start:l.pos], l.line}
 }
 
 func (l *Lexer) readHexNumber(start int) Token {

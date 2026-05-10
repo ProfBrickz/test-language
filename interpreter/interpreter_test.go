@@ -1,6 +1,7 @@
 package interpreter
 
 import (
+	"fmt"
 	"io"
 	"math"
 	"os"
@@ -1346,6 +1347,86 @@ func TestEvalFloatLit(t *testing.T) {
 	}
 	if val.FData != 3.14 {
 		t.Errorf("expected 3.14, got %g", val.FData)
+	}
+}
+
+func TestDotLeadingFloat(t *testing.T) {
+	input := "print(.1);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "0.1" {
+		t.Errorf("expected 0.1, got %q", output)
+	}
+}
+
+func TestDotLeadingFloatNeg(t *testing.T) {
+	input := "print(-.5);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "-0.5" {
+		t.Errorf("expected -0.5, got %q", output)
+	}
+}
+
+func TestDotLeadingFloatAdd(t *testing.T) {
+	input := "print(.15 + .1);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "0.25" {
+		t.Errorf("expected 0.25, got %q", output)
+	}
+}
+
+func TestDotLeadingFloatExp(t *testing.T) {
+	input := "print(.1e2);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "10" {
+		t.Errorf("expected 10, got %q", output)
 	}
 }
 
@@ -3657,5 +3738,987 @@ a = 70000.0;
 	err := i.Run(program)
 	if err == nil {
 		t.Errorf("expected float overflow error on assignment")
+	}
+}
+
+func TestPrintTypeRefInt(t *testing.T) {
+	input := "print(int);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "64-bit signed int" {
+		t.Errorf("expected '64-bit signed int', got %q", output)
+	}
+}
+
+func TestPrintTypeRefFloat(t *testing.T) {
+	input := "print(float);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "64-bit float" {
+		t.Errorf("expected '64-bit float', got %q", output)
+	}
+}
+
+func TestPrintTypeRefBool(t *testing.T) {
+	input := "print(bool);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "bool" {
+		t.Errorf("expected 'bool', got %q", output)
+	}
+}
+
+func TestIntMinMaxDefault(t *testing.T) {
+	input := `
+print(int.min);
+print(int.max);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	lines := strings.Split(output, "\n")
+	if len(lines) >= 1 && lines[0] != fmt.Sprintf("%d", math.MinInt64) {
+		t.Errorf("expected %d for int.min, got %q", math.MinInt64, lines[0])
+	}
+	if len(lines) >= 2 && lines[1] != fmt.Sprintf("%d", math.MaxInt64) {
+		t.Errorf("expected %d for int.max, got %q", math.MaxInt64, lines[1])
+	}
+}
+
+func TestInt8MinMax(t *testing.T) {
+	input := `
+print(int{size: 8}.min);
+print(int{size: 8}.max);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	lines := strings.Split(output, "\n")
+	if lines[0] != "-128" {
+		t.Errorf("expected -128 for int8.min, got %q", lines[0])
+	}
+	if lines[1] != "127" {
+		t.Errorf("expected 127 for int8.max, got %q", lines[1])
+	}
+}
+
+func TestUint8MinMax(t *testing.T) {
+	input := `
+print(int{size: 8, signed: false}.min);
+print(int{size: 8, signed: false}.max);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	lines := strings.Split(output, "\n")
+	if lines[0] != "0" {
+		t.Errorf("expected 0 for uint8.min, got %q", lines[0])
+	}
+	if lines[1] != "255" {
+		t.Errorf("expected 255 for uint8.max, got %q", lines[1])
+	}
+}
+
+func TestFloatMinMax(t *testing.T) {
+	input := `
+print(float.min);
+print(float.max);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	lines := strings.Split(output, "\n")
+	if lines[0] != formatFloat(-math.MaxFloat64) {
+		t.Errorf("expected %s for float.min, got %q", formatFloat(-math.MaxFloat64), lines[0])
+	}
+	if lines[1] != formatFloat(math.MaxFloat64) {
+		t.Errorf("expected %s for float.max, got %q", formatFloat(math.MaxFloat64), lines[1])
+	}
+}
+
+func TestFloatMinSubnormalMinNormal(t *testing.T) {
+	input := `
+print(float.min_subnormal);
+print(float.min_normal);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	lines := strings.Split(output, "\n")
+	if lines[0] != formatFloat(math.SmallestNonzeroFloat64) {
+		t.Errorf("expected %s for float.min_subnormal, got %q", formatFloat(math.SmallestNonzeroFloat64), lines[0])
+	}
+	if lines[1] != formatFloat(math.Exp2(-1022)) {
+		t.Errorf("expected %s for float.min_normal, got %q", formatFloat(math.Exp2(-1022)), lines[1])
+	}
+}
+
+func TestFloatPrecisionExponentSize(t *testing.T) {
+	input := `
+print(float.precision);
+print(float.min_exponent);
+print(float.max_exponent);
+print(float.size);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	lines := strings.Split(output, "\n")
+	if lines[0] != "15" {
+		t.Errorf("expected 15 for float.precision, got %q", lines[0])
+	}
+	if lines[1] != "-1022" {
+		t.Errorf("expected -1022 for float.min_exponent, got %q", lines[1])
+	}
+	if lines[2] != "1023" {
+		t.Errorf("expected 1023 for float.max_exponent, got %q", lines[2])
+	}
+	if lines[3] != "64" {
+		t.Errorf("expected 64 for float.size, got %q", lines[3])
+	}
+}
+
+func TestFloat32Properties(t *testing.T) {
+	input := `
+print(float{size: 32}.min);
+print(float{size: 32}.max);
+print(float{size: 32}.min_subnormal);
+print(float{size: 32}.min_normal);
+print(float{size: 32}.precision);
+print(float{size: 32}.min_exponent);
+print(float{size: 32}.max_exponent);
+print(float{size: 32}.size);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	lines := strings.Split(output, "\n")
+	if lines[0] != formatFloat(-math.MaxFloat32) {
+		t.Errorf("expected %s for float32.min, got %q", formatFloat(-math.MaxFloat32), lines[0])
+	}
+	if lines[1] != formatFloat(math.MaxFloat32) {
+		t.Errorf("expected %s for float32.max, got %q", formatFloat(math.MaxFloat32), lines[1])
+	}
+	if lines[2] != formatFloat(math.SmallestNonzeroFloat32) {
+		t.Errorf("expected %s for float32.min_subnormal, got %q", formatFloat(math.SmallestNonzeroFloat32), lines[2])
+	}
+	if lines[3] != formatFloat(math.Exp2(-126)) {
+		t.Errorf("expected %s for float32.min_normal, got %q", formatFloat(math.Exp2(-126)), lines[3])
+	}
+	if lines[4] != "7" {
+		t.Errorf("expected 7 for float32.precision, got %q", lines[4])
+	}
+	if lines[5] != "-126" {
+		t.Errorf("expected -126 for float32.min_exponent, got %q", lines[5])
+	}
+	if lines[6] != "127" {
+		t.Errorf("expected 127 for float32.max_exponent, got %q", lines[6])
+	}
+	if lines[7] != "32" {
+		t.Errorf("expected 32 for float32.size, got %q", lines[7])
+	}
+}
+
+func TestVarDotType(t *testing.T) {
+	input := `
+var a: int{size: 8} = 42;
+print(a.type);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "8-bit signed int" {
+		t.Errorf("expected '8-bit signed int', got %q", output)
+	}
+}
+
+func TestVarDotTypeDotMin(t *testing.T) {
+	input := `
+var a: int{size: 8} = 42;
+print(a.type.min);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "-128" {
+		t.Errorf("expected '-128', got %q", output)
+	}
+}
+
+func TestVarFloatDotType(t *testing.T) {
+	input := `
+var a: float{size: 32} = 3.14;
+print(a.type);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "32-bit float" {
+		t.Errorf("expected '32-bit float', got %q", output)
+	}
+}
+
+func TestVarFloatDotTypeDotMax(t *testing.T) {
+	input := `
+var a: float{size: 32} = 3.14;
+print(a.type.max);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != formatFloat(math.MaxFloat32) {
+		t.Errorf("expected %s, got %q", formatFloat(math.MaxFloat32), output)
+	}
+}
+
+func TestNegIntMin(t *testing.T) {
+	input := "print(-int{size: 8}.min);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "128" {
+		t.Errorf("expected '128', got %q", output)
+	}
+}
+
+func TestInt16MinMax(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 16, Signed: true}},
+		Member: "min",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != -32768 {
+		t.Errorf("expected -32768, got %d", val.Data)
+	}
+
+	expr2 := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 16, Signed: true}},
+		Member: "max",
+	}
+	val2, err2 := i.evalExpr(expr2)
+	if err2 != nil {
+		t.Fatalf("unexpected error: %v", err2)
+	}
+	if val2.Data != 32767 {
+		t.Errorf("expected 32767, got %d", val2.Data)
+	}
+}
+
+func TestInt32MinMax(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 32, Signed: true}},
+		Member: "min",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != -2147483648 {
+		t.Errorf("expected -2147483648, got %d", val.Data)
+	}
+
+	expr2 := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 32, Signed: true}},
+		Member: "max",
+	}
+	val2, err2 := i.evalExpr(expr2)
+	if err2 != nil {
+		t.Fatalf("unexpected error: %v", err2)
+	}
+	if val2.Data != 2147483647 {
+		t.Errorf("expected 2147483647, got %d", val2.Data)
+	}
+}
+
+func TestUint16MinMax(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 16, Signed: false}},
+		Member: "min",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != 0 {
+		t.Errorf("expected 0, got %d", val.Data)
+	}
+
+	expr2 := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 16, Signed: false}},
+		Member: "max",
+	}
+	val2, err2 := i.evalExpr(expr2)
+	if err2 != nil {
+		t.Fatalf("unexpected error: %v", err2)
+	}
+	if val2.Data != 65535 {
+		t.Errorf("expected 65535, got %d", val2.Data)
+	}
+}
+
+func TestUint32MinMax(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 32, Signed: false}},
+		Member: "max",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != 4294967295 {
+		t.Errorf("expected 4294967295, got %d", val.Data)
+	}
+}
+
+func TestUint64MinMax(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 64, Signed: false}},
+		Member: "min",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != 0 {
+		t.Errorf("expected 0, got %d", val.Data)
+	}
+}
+
+func TestFloat16Properties(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Member: "max",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.FData != 65504 {
+		t.Errorf("expected 65504, got %v", val.FData)
+	}
+
+	expr2 := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Member: "min_exponent",
+	}
+	val2, err2 := i.evalExpr(expr2)
+	if err2 != nil {
+		t.Fatalf("unexpected error: %v", err2)
+	}
+	if val2.Data != -14 {
+		t.Errorf("expected -14, got %d", val2.Data)
+	}
+
+	expr3 := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Member: "max_exponent",
+	}
+	val3, err3 := i.evalExpr(expr3)
+	if err3 != nil {
+		t.Fatalf("unexpected error: %v", err3)
+	}
+	if val3.Data != 15 {
+		t.Errorf("expected 15, got %d", val3.Data)
+	}
+
+	expr4 := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Member: "size",
+	}
+	val4, err4 := i.evalExpr(expr4)
+	if err4 != nil {
+		t.Fatalf("unexpected error: %v", err4)
+	}
+	if val4.Data != 16 {
+		t.Errorf("expected 16, got %d", val4.Data)
+	}
+
+	expr5 := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Member: "min_subnormal",
+	}
+	val5, err5 := i.evalExpr(expr5)
+	if err5 != nil {
+		t.Fatalf("unexpected error: %v", err5)
+	}
+	if val5.FData != math.Exp2(-24) {
+		t.Errorf("expected %v, got %v", math.Exp2(-24), val5.FData)
+	}
+
+	expr6 := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Member: "min_normal",
+	}
+	val6, err6 := i.evalExpr(expr6)
+	if err6 != nil {
+		t.Fatalf("unexpected error: %v", err6)
+	}
+	if val6.FData != math.Exp2(-14) {
+		t.Errorf("expected %v, got %v", math.Exp2(-14), val6.FData)
+	}
+
+	expr7 := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Member: "precision",
+	}
+	val7, err7 := i.evalExpr(expr7)
+	if err7 != nil {
+		t.Fatalf("unexpected error: %v", err7)
+	}
+	if val7.Data != 3 {
+		t.Errorf("expected 3, got %d", val7.Data)
+	}
+
+	expr8 := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Member: "min_exponent",
+	}
+	val8, err8 := i.evalExpr(expr8)
+	if err8 != nil {
+		t.Fatalf("unexpected error: %v", err8)
+	}
+	if val8.Data != -14 {
+		t.Errorf("expected -14, got %d", val8.Data)
+	}
+
+	expr9 := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Member: "max_exponent",
+	}
+	val9, err9 := i.evalExpr(expr9)
+	if err9 != nil {
+		t.Fatalf("unexpected error: %v", err9)
+	}
+	if val9.Data != 15 {
+		t.Errorf("expected 15, got %d", val9.Data)
+	}
+
+	expr10 := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Member: "size",
+	}
+	val10, err10 := i.evalExpr(expr10)
+	if err10 != nil {
+		t.Fatalf("unexpected error: %v", err10)
+	}
+	if val10.Data != 16 {
+		t.Errorf("expected 16, got %d", val10.Data)
+	}
+}
+
+func TestFloat32MinSubnormal(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 32}},
+		Member: "min_subnormal",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.FData != float64(math.SmallestNonzeroFloat32) {
+		t.Errorf("expected %v, got %v", math.SmallestNonzeroFloat32, val.FData)
+	}
+}
+
+func TestFloat32MinNormal(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 32}},
+		Member: "min_normal",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.FData != math.Exp2(-126) {
+		t.Errorf("expected %v, got %v", math.Exp2(-126), val.FData)
+	}
+}
+
+func TestIntSize(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 8, Signed: true}},
+		Member: "size",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != 8 {
+		t.Errorf("expected 8, got %d", val.Data)
+	}
+
+	expr2 := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 32, Signed: false}},
+		Member: "size",
+	}
+	val2, err2 := i.evalExpr(expr2)
+	if err2 != nil {
+		t.Fatalf("unexpected error: %v", err2)
+	}
+	if val2.Data != 32 {
+		t.Errorf("expected 32, got %d", val2.Data)
+	}
+}
+
+func TestBoolTypeRef(t *testing.T) {
+	i := New()
+	expr := &ast.TypeRef{Kind: "bool", BType: ast.BoolType{Nullable: false}}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsType || !val.IsBool {
+		t.Errorf("expected IsType and IsBool")
+	}
+}
+
+func TestBoolTypeMemberType(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "bool", BType: ast.BoolType{Nullable: false}},
+		Member: "type",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsType || !val.IsBool {
+		t.Errorf("expected IsType and IsBool")
+	}
+}
+
+func TestBoolTypePrint(t *testing.T) {
+	input := "print(bool);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "bool" {
+		t.Errorf("expected 'bool', got %q", output)
+	}
+}
+
+func TestValueDotTypeOnTypedVar(t *testing.T) {
+	input := `
+var a: int{size: 32} = 100;
+print(a.type.min);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "-2147483648" {
+		t.Errorf("expected '-2147483648', got %q", output)
+	}
+}
+
+func TestFloatPrecisionDirect(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 64}},
+		Member: "precision",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != 15 {
+		t.Errorf("expected 15, got %d", val.Data)
+	}
+}
+
+func TestFloatMinExponentDirect(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 64}},
+		Member: "min_exponent",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != -1022 {
+		t.Errorf("expected -1022, got %d", val.Data)
+	}
+}
+
+func TestFloatMaxExponentDirect(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 64}},
+		Member: "max_exponent",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != 1023 {
+		t.Errorf("expected 1023, got %d", val.Data)
+	}
+}
+
+func TestFloatSizeDirect(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 64}},
+		Member: "size",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != 64 {
+		t.Errorf("expected 64, got %d", val.Data)
+	}
+}
+
+func TestFloatMemberNotFound(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 64}},
+		Member: "bogus",
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for nonexistent float member")
+	}
+}
+
+func TestUint64Max(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 64, Signed: false}},
+		Member: "max",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if uint64(val.Data) != math.MaxUint64 {
+		t.Errorf("expected MaxUint64, got %d", uint64(val.Data))
+	}
+}
+
+func TestPrintUint64Max(t *testing.T) {
+	input := "print(int{size: 64, signed: false}.max);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "18446744073709551615" {
+		t.Errorf("expected '18446744073709551615', got %q", output)
+	}
+}
+
+func TestPrintUint64Min(t *testing.T) {
+	input := "print(int{size: 64, signed: false}.min);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "0" {
+		t.Errorf("expected '0', got %q", output)
+	}
+}
+
+func TestValueStringTypeDesc(t *testing.T) {
+	v := Value{IsType: true, IType: ast.IntegerType{Size: 32, Signed: true, Nullable: false}}
+	result := v.String()
+	if result != "32-bit signed int" {
+		t.Errorf("expected '32-bit signed int', got %q", result)
+	}
+
+	v2 := Value{IsType: true, IsFloat: true, FType: ast.FloatType{Size: 64, Nullable: false}}
+	result2 := v2.String()
+	if result2 != "64-bit float" {
+		t.Errorf("expected '64-bit float', got %q", result2)
+	}
+}
+
+func TestMemberAccessUndefinedVar(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.VarRef{Name: "nonexistent"},
+		Member: "foo",
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for member access on undefined var")
+	}
+}
+
+func TestBoolTypeMemberError(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "bool", BType: ast.BoolType{Nullable: false}},
+		Member: "nonexistent",
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for nonexistent bool member")
+	}
+}
+
+func TestTypeMemberError(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 64, Signed: true}},
+		Member: "nonexistent",
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for nonexistent type member")
+	}
+}
+
+func TestValueMemberError(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{Untyped: true, Data: 42})
+	expr := &ast.MemberAccess{
+		Object: &ast.VarRef{Name: "x"},
+		Member: "foo",
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for nonexistent value member")
 	}
 }

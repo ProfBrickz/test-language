@@ -271,8 +271,8 @@ func TestReadNumberDotWithoutDigit(t *testing.T) {
 
 	// Next token should be dot
 	tok2 := l.NextToken()
-	if tok2.Type != TOK_INT_LIT {
-		t.Errorf("expected INT_LIT for '.', got %s", tok2.Type)
+	if tok2.Type != TOK_DOT {
+		t.Errorf("expected DOT for '.', got %s", tok2.Type)
 	}
 }
 
@@ -561,5 +561,78 @@ func TestInfinityFloatLiteral(t *testing.T) {
 	}
 	if tok.Literal != "infinity" {
 		t.Errorf("expected literal %q, got %q", "infinity", tok.Literal)
+	}
+}
+
+func TestDotToken(t *testing.T) {
+	l := New(".")
+	tok := l.NextToken()
+	if tok.Type != TOK_DOT {
+		t.Errorf("expected DOT, got %s", tok.Type)
+	}
+	if tok.Literal != "." {
+		t.Errorf("expected literal '.', got %q", tok.Literal)
+	}
+}
+
+func TestDotLeadingFloatSemicolon(t *testing.T) {
+	// .1e5; should lex as float ".1e5" then semicolon (exponent digits followed by non-digit hits break)
+	l := New(".1e5;")
+	tok1 := l.NextToken()
+	if tok1.Type != TOK_FLOAT_LIT {
+		t.Errorf("expected FLOAT_LIT, got %s", tok1.Type)
+	}
+	if tok1.Literal != ".1e5" {
+		t.Errorf("expected literal %q, got %q", ".1e5", tok1.Literal)
+	}
+	tok2 := l.NextToken()
+	if tok2.Type != TOK_SEMICOLON {
+		t.Errorf("expected SEMICOLON, got %s", tok2.Type)
+	}
+}
+
+func TestDotLeadingFloatBacktrack(t *testing.T) {
+	// .1e should lex as float ".1" then ident "e" (exponent with no digits backtracks)
+	l := New(".1e")
+	tok1 := l.NextToken()
+	if tok1.Type != TOK_FLOAT_LIT {
+		t.Errorf("expected FLOAT_LIT, got %s", tok1.Type)
+	}
+	if tok1.Literal != ".1" {
+		t.Errorf("expected literal %q, got %q", ".1", tok1.Literal)
+	}
+	tok2 := l.NextToken()
+	if tok2.Type != TOK_IDENT {
+		t.Errorf("expected IDENT, got %s", tok2.Type)
+	}
+	if tok2.Literal != "e" {
+		t.Errorf("expected literal %q, got %q", "e", tok2.Literal)
+	}
+}
+
+func TestDotLeadingFloat(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedType TokenType
+		expectedLit  string
+	}{
+		{".1", TOK_FLOAT_LIT, ".1"},
+		{".123", TOK_FLOAT_LIT, ".123"},
+		{".1e5", TOK_FLOAT_LIT, ".1e5"},
+		{".1e-5", TOK_FLOAT_LIT, ".1e-5"},
+		{".5_000", TOK_FLOAT_LIT, ".5_000"},
+		{".5_000e1_0", TOK_FLOAT_LIT, ".5_000e1_0"},
+		{".1e+5", TOK_FLOAT_LIT, ".1e+5"},
+	}
+
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("input %q: expected %s, got %s", tt.input, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLit {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.expectedLit, tok.Literal)
+		}
 	}
 }

@@ -362,20 +362,20 @@ func (p *Parser) parseAddSub() ast.Expr {
 }
 
 func (p *Parser) parseMulDiv() ast.Expr {
-	left := p.parsePrimary()
+	left := p.parseUnary()
 	for p.curToken.Type == lexer.TOK_STAR || p.curToken.Type == lexer.TOK_SLASH {
 		op := p.curToken.Literal
 		p.nextToken()
-		right := p.parsePrimary()
+		right := p.parseUnary()
 		left = &ast.BinaryExpr{Left: left, Op: op, Right: right}
 	}
 	return left
 }
 
-func (p *Parser) parsePrimary() ast.Expr {
+func (p *Parser) parseUnary() ast.Expr {
 	if p.curToken.Type == lexer.TOK_MINUS {
 		p.nextToken()
-		expr := p.parsePrimary()
+		expr := p.parseMember()
 		if lit, ok := expr.(*ast.IntegerLit); ok {
 			lit.Value = -lit.Value
 			return lit
@@ -390,7 +390,30 @@ func (p *Parser) parsePrimary() ast.Expr {
 			Right: expr,
 		}
 	}
+	return p.parseMember()
+}
 
+func (p *Parser) parseMember() ast.Expr {
+	left := p.parsePrimary()
+	for p.curToken.Type == lexer.TOK_DOT {
+		p.nextToken()
+		if !isMemberToken(p.curToken.Type) {
+			p.addError("expected member name after '.'")
+			break
+		}
+		name := p.curToken.Literal
+		p.nextToken()
+		left = &ast.MemberAccess{Object: left, Member: name}
+	}
+	return left
+}
+
+func isMemberToken(typ lexer.TokenType) bool {
+	return typ == lexer.TOK_IDENT || typ == lexer.TOK_SIZE ||
+		typ == lexer.TOK_SIGNED || typ == lexer.TOK_NULLABLE
+}
+
+func (p *Parser) parsePrimary() ast.Expr {
 	switch p.curToken.Type {
 	case lexer.TOK_INT_LIT:
 		lit := p.curToken.Literal
@@ -468,6 +491,15 @@ func (p *Parser) parsePrimary() ast.Expr {
 	case lexer.TOK_NULL:
 		p.nextToken()
 		return &ast.NullLit{}
+	case lexer.TOK_INT:
+		iType := p.parseIntegerType()
+		return &ast.TypeRef{Kind: "int", IType: iType}
+	case lexer.TOK_FLOAT:
+		fType := p.parseFloatType()
+		return &ast.TypeRef{Kind: "float", FType: fType}
+	case lexer.TOK_BOOL:
+		bType := p.parseBoolType()
+		return &ast.TypeRef{Kind: "bool", BType: bType}
 	default:
 		p.addError("unexpected token in expression: %s", p.curToken.Literal)
 		return nil

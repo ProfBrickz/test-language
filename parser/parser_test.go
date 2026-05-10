@@ -801,6 +801,26 @@ func TestParseFloatLiteral(t *testing.T) {
 	}
 }
 
+func TestParseDotLeadingFloatLiteral(t *testing.T) {
+	input := "print(.1);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	fl, ok := stmt.Expr.(*ast.FloatLit)
+	if !ok {
+		t.Fatalf("expected *ast.FloatLit, got %T", stmt.Expr)
+	}
+	if fl.Value != 0.1 {
+		t.Errorf("expected 0.1, got %g", fl.Value)
+	}
+}
+
 func TestParseInvalidFloatLiteral(t *testing.T) {
 	// Invalid float literal - Go's ParseFloat might handle some edge cases
 	// Let's test with a float that has multiple decimal points
@@ -1829,5 +1849,189 @@ func TestParseNegInfinityFloatLiteral(t *testing.T) {
 	}
 	if !math.IsInf(flt.Value, -1) {
 		t.Errorf("expected -Inf value, got %v", flt.Value)
+	}
+}
+
+func TestParseTypeRefInt(t *testing.T) {
+	input := "print(int);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	tr, ok := stmt.Expr.(*ast.TypeRef)
+	if !ok {
+		t.Fatalf("expected *ast.TypeRef, got %T", stmt.Expr)
+	}
+	if tr.Kind != "int" {
+		t.Errorf("expected Kind 'int', got %q", tr.Kind)
+	}
+	if tr.IType.Size != 64 {
+		t.Errorf("expected Size 64, got %d", tr.IType.Size)
+	}
+}
+
+func TestParseTypeRefFloat(t *testing.T) {
+	input := "print(float);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	tr, ok := stmt.Expr.(*ast.TypeRef)
+	if !ok {
+		t.Fatalf("expected *ast.TypeRef, got %T", stmt.Expr)
+	}
+	if tr.Kind != "float" {
+		t.Errorf("expected Kind 'float', got %q", tr.Kind)
+	}
+	if tr.FType.Size != 64 {
+		t.Errorf("expected Size 64, got %d", tr.FType.Size)
+	}
+}
+
+func TestParseTypeRefBool(t *testing.T) {
+	input := "print(bool);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	tr, ok := stmt.Expr.(*ast.TypeRef)
+	if !ok {
+		t.Fatalf("expected *ast.TypeRef, got %T", stmt.Expr)
+	}
+	if tr.Kind != "bool" {
+		t.Errorf("expected Kind 'bool', got %q", tr.Kind)
+	}
+}
+
+func TestParseIntDotMin(t *testing.T) {
+	input := "print(int.min);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	ma, ok := stmt.Expr.(*ast.MemberAccess)
+	if !ok {
+		t.Fatalf("expected *ast.MemberAccess, got %T", stmt.Expr)
+	}
+	if ma.Member != "min" {
+		t.Errorf("expected Member 'min', got %q", ma.Member)
+	}
+	tr, ok := ma.Object.(*ast.TypeRef)
+	if !ok {
+		t.Fatalf("expected Object *ast.TypeRef, got %T", ma.Object)
+	}
+	if tr.Kind != "int" {
+		t.Errorf("expected Kind 'int', got %q", tr.Kind)
+	}
+}
+
+func TestParseTypeWithSizeDotMax(t *testing.T) {
+	input := "print(int{size: 8}.max);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	ma, ok := stmt.Expr.(*ast.MemberAccess)
+	if !ok {
+		t.Fatalf("expected *ast.MemberAccess, got %T", stmt.Expr)
+	}
+	if ma.Member != "max" {
+		t.Errorf("expected Member 'max', got %q", ma.Member)
+	}
+	tr, ok := ma.Object.(*ast.TypeRef)
+	if !ok {
+		t.Fatalf("expected Object *ast.TypeRef, got %T", ma.Object)
+	}
+	if tr.Kind != "int" {
+		t.Errorf("expected Kind 'int', got %q", tr.Kind)
+	}
+	if tr.IType.Size != 8 {
+		t.Errorf("expected Size 8, got %d", tr.IType.Size)
+	}
+}
+
+func TestParseVarDotType(t *testing.T) {
+	input := "print(a.type);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	ma, ok := stmt.Expr.(*ast.MemberAccess)
+	if !ok {
+		t.Fatalf("expected *ast.MemberAccess, got %T", stmt.Expr)
+	}
+	if ma.Member != "type" {
+		t.Errorf("expected Member 'type', got %q", ma.Member)
+	}
+	vr, ok := ma.Object.(*ast.VarRef)
+	if !ok {
+		t.Fatalf("expected Object *ast.VarRef, got %T", ma.Object)
+	}
+	if vr.Name != "a" {
+		t.Errorf("expected Name 'a', got %q", vr.Name)
+	}
+}
+
+func TestParseChainedMemberAccess(t *testing.T) {
+	input := "print(a.type.min);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	outer, ok := stmt.Expr.(*ast.MemberAccess)
+	if !ok {
+		t.Fatalf("expected *ast.MemberAccess, got %T", stmt.Expr)
+	}
+	if outer.Member != "min" {
+		t.Errorf("expected Member 'min', got %q", outer.Member)
+	}
+	inner, ok := outer.Object.(*ast.MemberAccess)
+	if !ok {
+		t.Fatalf("expected inner *ast.MemberAccess, got %T", outer.Object)
+	}
+	if inner.Member != "type" {
+		t.Errorf("expected Member 'type', got %q", inner.Member)
+	}
+	vr, ok := inner.Object.(*ast.VarRef)
+	if !ok {
+		t.Fatalf("expected Object *ast.VarRef, got %T", inner.Object)
+	}
+	if vr.Name != "a" {
+		t.Errorf("expected Name 'a', got %q", vr.Name)
 	}
 }

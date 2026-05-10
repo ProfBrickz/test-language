@@ -21,6 +21,14 @@ type Value struct {
 	IsFloat bool
 	IsBool  bool
 	Null    bool
+	IsType  bool
+}
+
+func intToStr(data int64, itype ast.IntegerType, untyped bool) string {
+	if !untyped && !itype.Signed && itype.Size == 64 {
+		return fmt.Sprintf("%d", uint64(data))
+	}
+	return fmt.Sprintf("%d", data)
 }
 
 func formatFloat(val float64) string {
@@ -36,7 +44,169 @@ func formatFloat(val float64) string {
 	return strconv.FormatFloat(val, 'g', -1, 64)
 }
 
+func intTypeMin(it ast.IntegerType) int64 {
+	if !it.Signed {
+		return 0
+	}
+	switch it.Size {
+	case 8:
+		return -128
+	case 16:
+		return -32768
+	case 32:
+		return -2147483648
+	default:
+		return math.MinInt64
+	}
+}
+
+func intTypeMax(it ast.IntegerType) int64 {
+	if !it.Signed {
+		switch it.Size {
+		case 8:
+			return 255
+		case 16:
+			return 65535
+		case 32:
+			return 4294967295
+		default:
+			return -1 // int64(-1) has same bit pattern as math.MaxUint64
+		}
+	}
+	switch it.Size {
+	case 8:
+		return 127
+	case 16:
+		return 32767
+	case 32:
+		return 2147483647
+	default:
+		return math.MaxInt64
+	}
+}
+
+func floatTypeMax(size int) float64 {
+	switch size {
+	case 16:
+		return 65504
+	case 32:
+		return math.MaxFloat32
+	default:
+		return math.MaxFloat64
+	}
+}
+
+func floatTypeMinSubnormal(size int) float64 {
+	switch size {
+	case 16:
+		return math.Exp2(-24)
+	case 32:
+		return math.SmallestNonzeroFloat32
+	default:
+		return math.SmallestNonzeroFloat64
+	}
+}
+
+func floatTypeMinNormal(size int) float64 {
+	switch size {
+	case 16:
+		return math.Exp2(-14)
+	case 32:
+		return math.Exp2(-126)
+	default:
+		return math.Exp2(-1022)
+	}
+}
+
+func floatTypePrecision(size int) int {
+	switch size {
+	case 16:
+		return 3
+	case 32:
+		return 7
+	default:
+		return 15
+	}
+}
+
+func floatTypeMinExponent(size int) int {
+	switch size {
+	case 16:
+		return -14
+	case 32:
+		return -126
+	default:
+		return -1022
+	}
+}
+
+func floatTypeMaxExponent(size int) int {
+	switch size {
+	case 16:
+		return 15
+	case 32:
+		return 127
+	default:
+		return 1023
+	}
+}
+
+func valueToTypeDesc(val Value) Value {
+	td := Value{IsType: true}
+	if val.IsFloat {
+		td.IsFloat = true
+		td.FType = val.FType
+		td.FType.Nullable = false
+	} else if val.IsBool {
+		td.IsBool = true
+		td.BType = val.BType
+		td.BType.Nullable = false
+	} else {
+		td.IType = val.IType
+		td.IType.Nullable = false
+	}
+	return td
+}
+
+func (i *Interpreter) evalTypeMember(td Value, member string) (Value, error) {
+	if td.IsFloat {
+		size := td.FType.Size
+		switch member {
+		case "min":
+			return Value{FType: td.FType, FData: -floatTypeMax(size), IsFloat: true}, nil
+		case "max":
+			return Value{FType: td.FType, FData: floatTypeMax(size), IsFloat: true}, nil
+		case "min_subnormal":
+			return Value{FType: td.FType, FData: floatTypeMinSubnormal(size), IsFloat: true}, nil
+		case "min_normal":
+			return Value{FType: td.FType, FData: floatTypeMinNormal(size), IsFloat: true}, nil
+		case "precision":
+			return Value{IType: td.IType, Data: int64(floatTypePrecision(size))}, nil
+		case "min_exponent":
+			return Value{IType: td.IType, Data: int64(floatTypeMinExponent(size))}, nil
+		case "max_exponent":
+			return Value{IType: td.IType, Data: int64(floatTypeMaxExponent(size))}, nil
+		case "size":
+			return Value{IType: td.IType, Data: int64(size)}, nil
+		}
+	} else if td.IsBool {
+	} else {
+		switch member {
+		case "min":
+			return Value{IType: td.IType, Data: intTypeMin(td.IType)}, nil
+		case "max":
+			return Value{IType: td.IType, Data: intTypeMax(td.IType)}, nil
+		case "size":
+			return Value{IType: td.IType, Data: int64(td.IType.Size)}, nil
+		}
+	}
+	return Value{}, fmt.Errorf("type %s has no member %q", typeDescForVal(td), member)
+}
+
 func (v Value) String() string {
+	if v.IsType {
+		return typeDescForVal(v)
+	}
 	if v.Null {
 		return "null"
 	}
@@ -53,9 +223,9 @@ func (v Value) String() string {
 		return fmt.Sprintf("%s(%s)", typeDesc(v.FType, false), formatFloat(v.FData))
 	}
 	if v.Untyped {
-		return fmt.Sprintf("%d", v.Data)
+		return intToStr(v.Data, v.IType, true)
 	}
-	return fmt.Sprintf("%s(%d)", typeDesc(v.IType, false), v.Data)
+	return fmt.Sprintf("%s(%s)", typeDesc(v.IType, false), intToStr(v.Data, v.IType, false))
 }
 
 func typeDescFromVar(it ast.IntegerType, ft ast.FloatType, bt ast.BoolType, isFloat, isBool bool) string {
@@ -396,14 +566,16 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 		if err != nil {
 			return err
 		}
-		if val.Null {
+		if val.IsType {
+			fmt.Println(typeDescForVal(val))
+		} else if val.Null {
 			fmt.Println("null")
 		} else if val.IsBool {
 			fmt.Println(val.BData)
 		} else if val.IsFloat {
 			fmt.Println(formatFloat(val.FData))
 		} else {
-			fmt.Println(val.Data)
+			fmt.Println(intToStr(val.Data, val.IType, val.Untyped))
 		}
 	default:
 		return fmt.Errorf("unknown statement type")
@@ -562,6 +734,34 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 		return i.evalBinary(e)
 	case *ast.NullLit:
 		return Value{Null: true}, nil
+	case *ast.TypeRef:
+		val := Value{IsType: true}
+		switch e.Kind {
+		case "float":
+			val.IsFloat = true
+			val.FType = e.FType
+			val.FType.Nullable = false
+		case "bool":
+			val.IsBool = true
+			val.BType = e.BType
+			val.BType.Nullable = false
+		default:
+			val.IType = e.IType
+			val.IType.Nullable = false
+		}
+		return val, nil
+	case *ast.MemberAccess:
+		obj, err := i.evalExpr(e.Object)
+		if err != nil {
+			return Value{}, err
+		}
+		if e.Member == "type" {
+			return valueToTypeDesc(obj), nil
+		}
+		if obj.IsType {
+			return i.evalTypeMember(obj, e.Member)
+		}
+		return Value{}, fmt.Errorf("value of type %s has no member %q", typeDescForVal(obj), e.Member)
 	default:
 		return Value{}, fmt.Errorf("unknown expression type")
 	}

@@ -57,6 +57,19 @@ type BinaryExpr struct {
 	Right Expr
 }
 
+type MemberAccess struct {
+	Object Expr
+	Member string
+}
+
+type TypeRef struct {
+	Kind   string // "int", "float", "bool"
+	IType  IntegerType
+	FType  FloatType
+	BType  BoolType
+	IsType bool
+}
+
 type VarDecl struct {
 	Name    string
 	IType   IntegerType
