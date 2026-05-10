@@ -107,6 +107,73 @@ print(true || false && false);  // true (&& binds tighter)
 print((true || false) && false);  // false (with parentheses)
 ```
 
+## If / Else
+
+```go
+var x: int{size: 32} = 42;
+var flag: bool{nullable: false} = true;
+
+// If only
+if (flag) {
+    print(x);  // 42
+}
+
+// If with else
+if (x == 0) {
+    print("zero");
+} else {
+    print("non-zero");  // runs
+}
+
+// If / else if / else
+if (x < 10) {
+    print("small");
+} else if (x < 100) {
+    print("medium");  // runs
+} else {
+    print("large");
+}
+
+// Else if chain
+if (x == 0) {
+    print(0);
+} else if (x == 10) {
+    print(10);
+} else if (x == 42) {
+    print(42);  // runs
+} else {
+    print("unknown");
+}
+```
+
+## Scoping
+
+Variables declared inside an if/else block are scoped to that block:
+
+```go
+var a: int{size: 32} = 1;
+
+if (true) {
+    var b: int{size: 32} = 2;  // only visible here
+    print(b);                   // 2
+}
+
+print(a);  // 1
+print(b);  // error: b is not defined
+```
+
+Outer variables can be modified from within:
+
+```go
+var x: int{size: 32} = 0;
+
+if (true) {
+    x = 5;  // modifies outer x
+}
+
+print(x);  // 5
+```
+
 ## Assignments
 
 ```go

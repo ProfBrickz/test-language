@@ -51,6 +51,9 @@ const (
 	TOK_LPAREN TokenType = "("
 	TOK_RPAREN TokenType = ")"
 
+	TOK_IF   TokenType = "IF"
+	TOK_ELSE TokenType = "ELSE"
+
 	TOK_EOF TokenType = "EOF"
 )
 
@@ -379,6 +382,10 @@ func (l *Lexer) readIdentifier() Token {
 	}
 	word := l.input[start:l.pos]
 	switch word {
+	case "if":
+		return Token{TOK_IF, word, l.line}
+	case "else":
+		return Token{TOK_ELSE, word, l.line}
 	case "var":
 		return Token{TOK_VAR, word, l.line}
 	case "bool":

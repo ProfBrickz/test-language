@@ -1279,6 +1279,126 @@ func TestParsePrimaryInvalidInt(t *testing.T) {
 	// Just ensure no panic
 }
 
+func TestParseIfStmt(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 1;
+if (x) {
+	print(x);
+}
+`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(program.Stmts))
+	}
+
+	ifStmt, ok := program.Stmts[1].(*ast.IfStmt)
+	if !ok {
+		t.Fatalf("expected *ast.IfStmt, got %T", program.Stmts[1])
+	}
+
+	if ifStmt.Condition == nil {
+		t.Fatal("expected condition, got nil")
+	}
+
+	if ifStmt.Then == nil {
+		t.Fatal("expected then block, got nil")
+	}
+
+	if len(ifStmt.Then.Stmts) != 1 {
+		t.Fatalf("expected 1 statement in then block, got %d", len(ifStmt.Then.Stmts))
+	}
+
+	if ifStmt.Else != nil {
+		t.Errorf("expected nil else, got %T", ifStmt.Else)
+	}
+}
+
+func TestParseIfElseStmt(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 1;
+if (x) {
+	print(1);
+} else {
+	print(2);
+}
+`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(program.Stmts))
+	}
+
+	ifStmt, ok := program.Stmts[1].(*ast.IfStmt)
+	if !ok {
+		t.Fatalf("expected *ast.IfStmt, got %T", program.Stmts[1])
+	}
+
+	elseBlock, ok := ifStmt.Else.(*ast.BlockStmt)
+	if !ok {
+		t.Fatalf("expected *ast.BlockStmt for else, got %T", ifStmt.Else)
+	}
+
+	if len(elseBlock.Stmts) != 1 {
+		t.Fatalf("expected 1 statement in else block, got %d", len(elseBlock.Stmts))
+	}
+}
+
+func TestParseIfElseIfElseStmt(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 1;
+if (x) {
+	print(1);
+} else if (x) {
+	print(2);
+} else {
+	print(3);
+}
+`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(program.Stmts))
+	}
+
+	ifStmt, ok := program.Stmts[1].(*ast.IfStmt)
+	if !ok {
+		t.Fatalf("expected *ast.IfStmt, got %T", program.Stmts[1])
+	}
+
+	elseIfStmt, ok := ifStmt.Else.(*ast.IfStmt)
+	if !ok {
+		t.Fatalf("expected *ast.IfStmt for else if, got %T", ifStmt.Else)
+	}
+
+	elseBlock, ok := elseIfStmt.Else.(*ast.BlockStmt)
+	if !ok {
+		t.Fatalf("expected *ast.BlockStmt for final else, got %T", elseIfStmt.Else)
+	}
+
+	if len(elseBlock.Stmts) != 1 {
+		t.Fatalf("expected 1 statement in final else block, got %d", len(elseBlock.Stmts))
+	}
+}
+
 func TestParseStmtUnexpectedToken(t *testing.T) {
 	input := "@"
 	l := lexer.New(input)
@@ -2419,5 +2539,55 @@ func TestParseUnaryMinusOnNonLiteral(t *testing.T) {
 		if bin.Op != "-" {
 			t.Errorf("input %q: expected Op '-', got %q", input, bin.Op)
 		}
+	}
+}
+
+func TestParseIfMissingLParen(t *testing.T) {
+	input := "if true) { print(1); }"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '('")
+	}
+}
+
+func TestParseIfMissingRParen(t *testing.T) {
+	input := "if (true { print(1); }"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ')'")
+	}
+}
+
+func TestParseIfMissingOpenBrace(t *testing.T) {
+	input := "if (true) print(1);"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '{'")
+	}
+}
+
+func TestParseIfMissingCloseBrace(t *testing.T) {
+	input := "if (true) { print(1);"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '}'")
+	}
+}
+
+func TestParseIfElseMissingBraceOrIf(t *testing.T) {
+	input := "if (true) { print(1); } else print(2);"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '{' or 'if' after else")
 	}
 }

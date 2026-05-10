@@ -106,7 +106,7 @@ func TestBoolKeyword(t *testing.T) {
 }
 
 func TestKeywords(t *testing.T) {
-	input := "var int print size signed nullable null true false bool"
+	input := "var int print size signed nullable null true false bool if else"
 	l := New(input)
 
 	tests := []struct {
@@ -122,6 +122,8 @@ func TestKeywords(t *testing.T) {
 		{TOK_TRUE},
 		{TOK_FALSE},
 		{TOK_BOOL},
+		{TOK_IF},
+		{TOK_ELSE},
 	}
 
 	for i, tt := range tests {

@@ -8,6 +8,38 @@ var name: type = expression;
 
 The initializer is optional. Leave it off and nullable types default to `null`, integers to `0`, floats to `0.0`, and booleans to `false`.
 
+## If / Else
+
+```go
+if (condition) {
+    statements;
+} else if (condition) {
+    statements;
+} else {
+    statements;
+}
+```
+
+Condition must be a `bool`. The `else` and `else if` clauses are optional. Blocks (`{ }`) are required.
+
+Each `if`, `else if`, and `else` body creates a new scope:
+
+- Variables declared inside are not visible outside
+- Outer variables are accessible from within
+- Assignments to outer variables modify the outer variable (not a shadow)
+
+```go
+var x: int{size: 32} = 1;
+
+if (true) {
+    var y: int{size: 32} = 2;  // scoped to this block
+    x = 3;                      // modifies outer x
+}
+
+print(x);  // 3
+print(y);  // error: y is not defined
+```
+
 ## Print
 
 ```go

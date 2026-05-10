@@ -95,6 +95,16 @@ type PrintStmt struct {
 	Expr Expr
 }
 
+type BlockStmt struct {
+	Stmts []Stmt
+}
+
+type IfStmt struct {
+	Condition Expr
+	Then      *BlockStmt
+	Else      Stmt // *BlockStmt (else) or *IfStmt (else if)
+}
+
 type Program struct {
 	Stmts []Stmt
 }

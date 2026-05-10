@@ -5867,3 +5867,884 @@ func TestShortCircuitEvaluation(t *testing.T) {
 		}
 	}
 }
+
+func TestIfTrue(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 0;
+if (true) {
+	x = 1;
+}
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestIfFalse(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 0;
+if (false) {
+	x = 1;
+}
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "0" {
+		t.Errorf("expected '0', got %q", output)
+	}
+}
+
+func TestIfElseTrue(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 0;
+if (true) {
+	x = 1;
+} else {
+	x = 2;
+}
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestIfElseFalse(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 0;
+if (false) {
+	x = 1;
+} else {
+	x = 2;
+}
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "2" {
+		t.Errorf("expected '2', got %q", output)
+	}
+}
+
+func TestIfElseIfElse(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 1;
+if (x == 0) {
+	print(0);
+} else if (x == 1) {
+	print(1);
+} else {
+	print(2);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestIfConditionNotBool(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 1;
+if (x) {
+	print(1);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for non-bool condition")
+	}
+}
+
+func TestNestedIf(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 1;
+var y: int{size: 32, signed: true, nullable: false} = 2;
+if (true) {
+	if (true) {
+		x = 3;
+	}
+}
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "3" {
+		t.Errorf("expected '3', got %q", output)
+	}
+}
+
+func TestIfVariableScopedToBlock(t *testing.T) {
+	input := `
+var a: int{size: 32, signed: true, nullable: true} = null;
+if (a == null) {
+	var b: int{size: 32, signed: true, nullable: false} = 1;
+}
+print(b);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error: b is not defined outside if block")
+	}
+}
+
+func TestIfVariableVisibleInInnerScope(t *testing.T) {
+	input := `
+var a: int{size: 32, signed: true, nullable: false} = 1;
+if (true) {
+	print(a);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestIfModifiesOuterVar(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 0;
+if (true) {
+	x = 1;
+}
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestElseVariableScoped(t *testing.T) {
+	input := `
+var a: int{size: 32, signed: true, nullable: false} = 1;
+if (a == 0) {
+	var b: int{size: 32, signed: true, nullable: false} = 2;
+} else {
+	var c: int{size: 32, signed: true, nullable: false} = 3;
+}
+print(b);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error: b is not defined outside if/else block")
+	}
+}
+
+func TestElseIfVariableScoped(t *testing.T) {
+	input := `
+var a: int{size: 32, signed: true, nullable: false} = 2;
+if (a == 0) {
+	var b: int{size: 32, signed: true, nullable: false} = 1;
+} else if (a == 2) {
+	var c: int{size: 32, signed: true, nullable: false} = 3;
+}
+print(c);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error: c is not defined outside else if block")
+	}
+}
+
+func TestIfNullConditionWithElse(t *testing.T) {
+	input := `
+var a: int{size: 32, signed: true, nullable: true} = null;
+if (a == null) {
+	print(1);
+} else {
+	print(2);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestIfNullLiteralConditionWithElse(t *testing.T) {
+	input := `
+if (null) {
+	print(1);
+} else {
+	print(2);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "2" {
+		t.Errorf("expected '2', got %q", output)
+	}
+}
+
+func TestIfNullLiteralConditionNoElse(t *testing.T) {
+	input := `
+if (null) {
+	print(1);
+}
+print(2);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "2" {
+		t.Errorf("expected '2', got %q", output)
+	}
+}
+
+func TestIfConditionExprError(t *testing.T) {
+	input := `
+if (undefined) {
+	print(1);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for undefined variable in condition")
+	}
+}
+
+func TestBlockStmtErrorPropagation(t *testing.T) {
+	input := `
+if (true) {
+	print(undefinedVar);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for undefined variable inside block")
+	}
+}
+
+func TestExecElseUnexpectedType(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 1})
+	stmt := &ast.IfStmt{
+		Condition: &ast.BoolLit{Value: false, Untyped: true},
+		Then:      &ast.BlockStmt{},
+		Else:      &ast.PrintStmt{Expr: &ast.IntegerLit{Value: 1, Untyped: true}},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error for unexpected else type")
+	}
+}
+
+func TestVariableShadowingInIfBlock(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 1;
+if (true) {
+	var x: int{size: 32, signed: true, nullable: false} = 2;
+	print(x);
+}
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "2\n1" {
+		t.Errorf("expected '2\\n1', got %q", output)
+	}
+}
+
+func TestEmptyThenBlock(t *testing.T) {
+	input := `
+if (true) { }
+print(1);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestEmptyThenBlockWithElse(t *testing.T) {
+	input := `
+if (false) { } else {
+	print(1);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestEmptyElseBlock(t *testing.T) {
+	input := `
+if (true) {
+	print(1);
+} else { }
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestMultipleElseIfChain(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 2;
+if (x == 0) {
+	print(0);
+} else if (x == 1) {
+	print(1);
+} else if (x == 2) {
+	print(2);
+} else if (x == 3) {
+	print(3);
+} else {
+	print(4);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "2" {
+		t.Errorf("expected '2', got %q", output)
+	}
+}
+
+func TestAllElseIfConditionsFalseNoElse(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 10;
+if (x == 0) {
+	print(0);
+} else if (x == 1) {
+	print(1);
+} else if (x == 2) {
+	print(2);
+}
+print(3);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "3" {
+		t.Errorf("expected '3', got %q", output)
+	}
+}
+
+func TestRedeclareVarAfterIfBlock(t *testing.T) {
+	input := `
+var a: int{size: 32, signed: true, nullable: false} = 1;
+if (true) {
+	var b: int{size: 32, signed: true, nullable: false} = 2;
+}
+var b: int{size: 32, signed: true, nullable: false} = 3;
+print(b);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "3" {
+		t.Errorf("expected '3', got %q", output)
+	}
+}
+
+func TestNullLiteralConditionWithElseIf(t *testing.T) {
+	input := `
+if (null) {
+	print(1);
+} else if (true) {
+	print(2);
+} else {
+	print(3);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "2" {
+		t.Errorf("expected '2', got %q", output)
+	}
+}
+
+func TestComplexExpressionCondition(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 1;
+var y: bool{nullable: false} = true;
+if (x + 1 == 2 && y) {
+	print(1);
+} else {
+	print(2);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestMultipleStatementsInThenBlock(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 0;
+if (true) {
+	x = 1;
+	x = x + 1;
+	x = x * 3;
+}
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "6" {
+		t.Errorf("expected '6', got %q", output)
+	}
+}
+
+func TestElseIfConditionCanAccessOuterVarModifiedBeforehand(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 0;
+x = 5;
+if (x == 0) {
+	print(0);
+} else if (x == 5) {
+	print(5);
+} else {
+	print(99);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "5" {
+		t.Errorf("expected '5', got %q", output)
+	}
+}
+
+func TestIfElseIfFirstConditionTrueSkipsRest(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 0;
+if (x == 0) {
+	print(0);
+} else if (x == 0) {
+	print(99);
+} else if (x == 0) {
+	print(99);
+} else {
+	print(99);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "0" {
+		t.Errorf("expected '0', got %q", output)
+	}
+}
+
+func TestIfWithBoolVarCondition(t *testing.T) {
+	input := `
+var x: bool{nullable: false} = true;
+if (x) {
+	print(1);
+} else {
+	print(2);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestElseIfModifiesOuterVarBeforeNextCondition(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 1;
+if (x == 0) {
+	print(0);
+} else if (x == 1) {
+	x = 2;
+} else if (x == 2) {
+	print(2);
+} else {
+	print(3);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "" {
+		t.Errorf("expected empty output, got %q", output)
+	}
+}

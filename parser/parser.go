@@ -63,6 +63,8 @@ func (p *Parser) parseStmt() ast.Stmt {
 		return p.parsePrint()
 	case lexer.TOK_IDENT:
 		return p.parseAssignment()
+	case lexer.TOK_IF:
+		return p.parseIf()
 	default:
 		p.addError("unexpected token: %s", p.curToken.Literal)
 		return nil
@@ -344,6 +346,71 @@ func (p *Parser) parsePrint() *ast.PrintStmt {
 	}
 
 	return &ast.PrintStmt{Expr: expr}
+}
+
+func (p *Parser) parseBlock() *ast.BlockStmt {
+	block := &ast.BlockStmt{}
+
+	if p.curToken.Type != lexer.TOK_LBRACE {
+		p.addError("expected '{', got %s", p.curToken.Type)
+		return nil
+	}
+	p.nextToken()
+
+	for p.curToken.Type != lexer.TOK_RBRACE && p.curToken.Type != lexer.TOK_EOF {
+		stmt := p.parseStmt()
+		if stmt != nil {
+			block.Stmts = append(block.Stmts, stmt)
+		}
+		p.nextToken()
+	}
+
+	if p.curToken.Type == lexer.TOK_EOF {
+		p.addError("expected '}'")
+		return nil
+	}
+
+	return block
+}
+
+func (p *Parser) parseIf() *ast.IfStmt {
+	p.nextToken()
+
+	if p.curToken.Type != lexer.TOK_LPAREN {
+		p.addError("expected '(', got %s", p.curToken.Type)
+		return nil
+	}
+	p.nextToken()
+
+	condition := p.parseExpr()
+
+	if p.curToken.Type != lexer.TOK_RPAREN {
+		p.addError("expected ')', got %s", p.curToken.Type)
+		return nil
+	}
+	p.nextToken()
+
+	thenBlock := p.parseBlock()
+	if thenBlock == nil {
+		return nil
+	}
+
+	var elseStmt ast.Stmt
+	if p.peekToken.Type == lexer.TOK_ELSE {
+		p.nextToken()
+		p.nextToken()
+
+		if p.curToken.Type == lexer.TOK_IF {
+			elseStmt = p.parseIf()
+		} else if p.curToken.Type == lexer.TOK_LBRACE {
+			elseStmt = p.parseBlock()
+		} else {
+			p.addError("expected '{' or 'if' after else, got %s", p.curToken.Type)
+			return nil
+		}
+	}
+
+	return &ast.IfStmt{Condition: condition, Then: thenBlock, Else: elseStmt}
 }
 
 func (p *Parser) parseExpr() ast.Expr {

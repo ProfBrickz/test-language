@@ -458,10 +458,15 @@ func convertFloat(val float64, ftype ast.FloatType) float64 {
 
 type Environment struct {
 	variables map[string]Value
+	outer     *Environment
 }
 
 func NewEnv() *Environment {
 	return &Environment{variables: make(map[string]Value)}
+}
+
+func NewEnclosedEnv(outer *Environment) *Environment {
+	return &Environment{variables: make(map[string]Value), outer: outer}
 }
 
 func (e *Environment) Set(name string, val Value) {
@@ -470,7 +475,24 @@ func (e *Environment) Set(name string, val Value) {
 
 func (e *Environment) Get(name string) (Value, bool) {
 	val, ok := e.variables[name]
-	return val, ok
+	if ok {
+		return val, true
+	}
+	if e.outer != nil {
+		return e.outer.Get(name)
+	}
+	return Value{}, false
+}
+
+func (e *Environment) LookupEnv(name string) *Environment {
+	_, ok := e.variables[name]
+	if ok {
+		return e
+	}
+	if e.outer != nil {
+		return e.outer.LookupEnv(name)
+	}
+	return nil
 }
 
 type Interpreter struct {
@@ -479,6 +501,16 @@ type Interpreter struct {
 
 func New() *Interpreter {
 	return &Interpreter{env: NewEnv()}
+}
+
+func (i *Interpreter) pushScope() {
+	i.env = NewEnclosedEnv(i.env)
+}
+
+func (i *Interpreter) popScope() {
+	if i.env.outer != nil {
+		i.env = i.env.outer
+	}
 }
 
 func (i *Interpreter) Run(program *ast.Program) error {
@@ -565,6 +597,14 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 		i.env.Set(s.Name, val)
 	case *ast.Assignment:
 		return i.executeAssignment(s)
+	case *ast.BlockStmt:
+		for _, inner := range s.Stmts {
+			if err := i.executeStmt(inner); err != nil {
+				return err
+			}
+		}
+	case *ast.IfStmt:
+		return i.execIf(s)
 	case *ast.PrintStmt:
 		val, err := i.evalExpr(s.Expr)
 		if err != nil {
@@ -587,11 +627,52 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 	return nil
 }
 
+func (i *Interpreter) execIf(s *ast.IfStmt) error {
+	condVal, err := i.evalExpr(s.Condition)
+	if err != nil {
+		return err
+	}
+	if condVal.Null {
+		if s.Else != nil {
+			return i.execElse(s.Else)
+		}
+		return nil
+	}
+	if !condVal.IsBool {
+		return fmt.Errorf("if condition must be a bool, got %s", typeDescForVal(condVal))
+	}
+	if condVal.BData {
+		i.pushScope()
+		err = i.executeStmt(s.Then)
+		i.popScope()
+		return err
+	}
+	if s.Else != nil {
+		return i.execElse(s.Else)
+	}
+	return nil
+}
+
+func (i *Interpreter) execElse(stmt ast.Stmt) error {
+	switch s := stmt.(type) {
+	case *ast.BlockStmt:
+		i.pushScope()
+		err := i.executeStmt(s)
+		i.popScope()
+		return err
+	case *ast.IfStmt:
+		return i.execIf(s)
+	default:
+		return fmt.Errorf("unexpected else type: %T", stmt)
+	}
+}
+
 func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
-	val, ok := i.env.Get(stmt.Name)
-	if !ok {
+	env := i.env.LookupEnv(stmt.Name)
+	if env == nil {
 		return fmt.Errorf("undefined variable: %s", stmt.Name)
 	}
+	val, _ := env.Get(stmt.Name)
 
 	if stmt.Op == "=" {
 		if lit, ok := stmt.Expr.(*ast.IntegerLit); ok && lit.Untyped && !val.IsFloat && !val.IsBool {
@@ -619,7 +700,7 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 		val.Data = 0
 		val.FData = 0
 		val.BData = false
-		i.env.Set(stmt.Name, val)
+		env.Set(stmt.Name, val)
 		return nil
 	}
 
@@ -707,7 +788,7 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 		val.Data = convertInt(result, val.IType)
 	}
 	val.Null = false
-	i.env.Set(stmt.Name, val)
+	env.Set(stmt.Name, val)
 	return nil
 }
 
