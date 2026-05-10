@@ -2759,6 +2759,15 @@ func TestParseWhileMissingRParen(t *testing.T) {
 	}
 }
 
+func TestParseWhileUnclosedBlock(t *testing.T) {
+	input := "while (i < 10) {"
+	p := New(lexer.New(input))
+	_ = p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for unclosed block")
+	}
+}
+
 func TestParseBreakStmt(t *testing.T) {
 	input := "break;"
 	l := lexer.New(input)
@@ -2964,11 +2973,19 @@ func TestParseForUpdateDec(t *testing.T) {
 
 func TestParseForUpdateDefaultError(t *testing.T) {
 	input := "for (i = 0; i < 10; i + 1) { }"
-	l := lexer.New(input)
-	p := New(l)
+	p := New(lexer.New(input))
 	_ = p.ParseProgram()
 	if len(p.Errors()) == 0 {
 		t.Errorf("expected error for invalid update")
+	}
+}
+
+func TestParseForUnclosedBlock(t *testing.T) {
+	input := "for (i = 0; i < 10; i = i + 1) {"
+	p := New(lexer.New(input))
+	_ = p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for unclosed block")
 	}
 }
 
