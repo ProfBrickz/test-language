@@ -30,13 +30,34 @@ Operator assignments (`+=`, `-=`, `*=`, `/=`) read the current value, apply the 
 
 ## Operators
 
-Arithmetic: `+`, `-`, `*`, `/`. Multiplication and division bind tighter than addition and subtraction. Use parentheses `( )` to override.
+**Arithmetic:** `+`, `-`, `*`, `/`. Multiplication and division bind tighter than addition and subtraction. Use parentheses `( )` to override.
+
+**Comparison:** `==`, `!=`, `<`, `>`, `<=`, `>=`.
+
+- `==` and `!=` work on integers, floats, booleans, and null
+- `<`, `>`, `<=`, `>=` work on integers and floats only (not booleans)
+
+**Logical:** `&&`, `||`, `!`.
+
+- `&&` (AND), `||` (OR), `!` (NOT) work on booleans only
+- `&&` and `||` short-circuit: `false && x` returns false without evaluating `x`; `true || x` returns true without evaluating `x`
+
+**Precedence** (highest to lowest):
+1. `!` (unary)
+2. `*`, `/`
+3. `+`, `-`
+4. `<`, `>`, `<=`, `>=`
+5. `==`, `!=`
+6. `&&`
+7. `||`
 
 ## Literals
 
 **Integers:** plain decimal (`42`), hex (`0xFF`), binary (`0b1010`), octal (`0o777`), and underscore separators (`100_000`).
 
 **Floats:** decimal (`3.14`, `.1`), scientific (`1.5e3`, `.1e2`), hex float (`0xf.f`), binary float (`0b1.01`), octal float (`0o7.7`), and underscores (`1_000.5`, `.5_000`).
+
+Special float literals: `NaN`, `infinity`, `-infinity`.
 
 **Booleans:** `true` and `false`.
 

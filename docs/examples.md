@@ -46,6 +46,54 @@ var b: float = 3.0;
 print(a / b);  // 3.3333333333333335
 ```
 
+## Comparison Operators
+
+```go
+// Integer comparisons
+print(5 == 5);   // true
+print(5 != 3);   // true
+print(3 < 5);    // true
+print(5 > 3);    // true
+print(3 <= 3);   // true
+print(5 >= 3);   // true
+
+// Float comparisons
+print(3.14 > 2.0);  // true
+print(1.5 < 2.5);   // true
+
+// Boolean equality
+print(true == true);    // true
+print(true != false);   // true
+
+// Null comparisons
+print(null == null);   // true
+print(null != null);   // false
+print(null == 5);      // false
+print(null != 5);      // true
+print(null < 10);      // false (warning: null literal used with <)
+```
+
+## Logical Operators
+
+```go
+print(true && true);    // true
+print(true && false);   // false
+print(false && true);   // false (short-circuit: false && anything is false)
+
+print(true || true);    // true
+print(true || false);   // true (short-circuit: true || anything is true)
+print(false || true);   // true
+
+print(!true);    // false
+print(!false);   // true
+
+// Null with logical operators (null is falsy)
+print(!null);              // true (warning: null literal used with !)
+print(null && true);       // false (warning: null literal used with &&)
+print(false || null);      // false (warning: null literal used with ||)
+print(true || null);       // true (short-circuits, right not evaluated)
+```
+
 ## Operator Precedence
 
 ```go
@@ -53,6 +101,10 @@ print(1 + 2 * 3);      // 7
 print((1 + 2) * 3);    // 9
 print(10 - 4 / 2);     // 8
 print((10 - 4) / 2);   // 3
+
+// Logical precedence: && before ||
+print(true || false && false);  // true (&& binds tighter)
+print((true || false) && false);  // false (with parentheses)
 ```
 
 ## Assignments
@@ -104,6 +156,11 @@ var hf: float = 0xf.f;             // hex float: 15.9375
 var bf: float = 0b1.01;            // binary float: 1.25
 var of: float = 0o7.7;             // octal float: 7.875
 var us: float = 1_000.5e1_0;       // underscores
+
+// Special float literals
+var nan: float = NaN;               // Not a Number
+var inf: float = infinity;           // Positive infinity
+var ninf: float = -infinity;         // Negative infinity
 ```
 
 ## Overflow
@@ -153,6 +210,12 @@ print(flag);   // true
 // Nullable
 var maybe: int{nullable: true};
 print(maybe);  // null
+
+// Comparisons
+print(5 == 5);        // true
+print(true && false); // false
+print(!null);         // true
+```
 
 ## Type Members
 
