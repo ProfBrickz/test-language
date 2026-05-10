@@ -98,6 +98,8 @@ var oct: int = 0o777;       // octal: 511
 
 // Float literals
 var sci: float = 1.5e3;            // scientific: 1500.0
+var dl: float = .1;                // dot-leading: 0.1
+var dl2: float = .1e2;             // dot-leading with exponent: 10.0
 var hf: float = 0xf.f;             // hex float: 15.9375
 var bf: float = 0b1.01;            // binary float: 1.25
 var of: float = 0o7.7;             // octal float: 7.875
@@ -151,4 +153,26 @@ print(flag);   // true
 // Nullable
 var maybe: int{nullable: true};
 print(maybe);  // null
+
+## Type Members
+
+```go
+// Integer type properties
+print(int.min);                 // -9223372036854775808
+print(int{size: 8}.max);        // 127
+print(int{size: 8}.size);       // 8
+
+// Float type properties
+print(float.precision);         // 15
+print(float{size: 32}.min);     // -3.4028235e+38
+print(float{size: 16}.max);     // 65504
+
+// Bool type properties
+print(bool.size);               // 8
+
+// .type on values
+var a: int{size: 8} = 100;
+print(a.type);                  // 8-bit signed int
+print(a.type.min);              // -128
+print(a.type.max);              // 127
 ```

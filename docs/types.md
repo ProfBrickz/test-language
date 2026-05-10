@@ -70,3 +70,49 @@ var a: float{size: 16} = 70000.0;          // error: overflows 16-bit float
 ```
 
 Division by zero is a runtime error for integers and produces infinity for floats.
+
+## Type Members
+
+Types expose properties via dot access. The default parameters are used when no braces are specified.
+
+### int members
+
+| Member   | Description            | Example                          | Result                     |
+|----------|------------------------|----------------------------------|----------------------------|
+| `.min`   | Minimum representable  | `int{size: 8, signed: true}.min` | `-128`                     |
+| `.max`   | Maximum representable  | `int{size: 8, signed: false}.max`| `255`                      |
+| `.size`  | Bit width              | `int{size: 32}.size`             | `32`                       |
+
+Default `int` is `int{size: 64, signed: true}`.
+
+### float members
+
+| Member            | Description                    | Example                              | Result          |
+|-------------------|--------------------------------|--------------------------------------|-----------------|
+| `.min`            | Minimum (most negative)        | `float.min`                          | `-1.7976931348623157e+308` |
+| `.max`            | Maximum (largest positive)     | `float.max`                          | `1.7976931348623157e+308` |
+| `.min_subnormal`  | Smallest positive subnormal   | `float.min_subnormal`                | `5e-324`         |
+| `.min_normal`     | Smallest positive normal       | `float{size: 32}.min_normal`         | `1.1754944e-38`  |
+| `.precision`      | Decimal digits of precision    | `float{size: 16}.precision`          | `3`              |
+| `.min_exponent`   | Minimum exponent               | `float{size: 32}.min_exponent`       | `-126`           |
+| `.max_exponent`   | Maximum exponent               | `float{size: 64}.max_exponent`       | `1023`           |
+| `.size`           | Bit width                      | `float.size`                         | `64`             |
+
+Default `float` is `float{size: 64}`.
+
+### bool members
+
+| Member   | Description | Example        | Result |
+|----------|-------------|----------------|--------|
+| `.size`  | Bit width   | `bool.size`    | `8`    |
+
+### .type member
+
+Every value has a `.type` member that returns a type descriptor, which supports the same members above:
+
+```go
+var a: int{size: 8} = 42;
+print(a.type);       // "8-bit signed int"
+print(a.type.min);   // -128
+print(a.type.max);   // 127
+```
