@@ -190,6 +190,10 @@ func (i *Interpreter) evalTypeMember(td Value, member string) (Value, error) {
 			return Value{IType: td.IType, Data: int64(size)}, nil
 		}
 	} else if td.IsBool {
+		switch member {
+		case "size":
+			return Value{IType: td.IType, Data: 8}, nil
+		}
 	} else {
 		switch member {
 		case "min":

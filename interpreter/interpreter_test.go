@@ -4482,6 +4482,41 @@ func TestBoolTypeMemberType(t *testing.T) {
 	}
 }
 
+func TestBoolSize(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Kind: "bool", BType: ast.BoolType{Nullable: false}},
+		Member: "size",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != 8 {
+		t.Errorf("expected 8, got %d", val.Data)
+	}
+}
+
+func TestPrintBoolSize(t *testing.T) {
+	input := "print(bool.size);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "8" {
+		t.Errorf("expected 8, got %q", output)
+	}
+}
+
 func TestBoolTypePrint(t *testing.T) {
 	input := "print(bool);"
 	l := lexer.New(input)

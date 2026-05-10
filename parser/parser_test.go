@@ -1918,6 +1918,33 @@ func TestParseTypeRefBool(t *testing.T) {
 	}
 }
 
+func TestParseBoolSize(t *testing.T) {
+	input := "print(bool.size);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	ma, ok := stmt.Expr.(*ast.MemberAccess)
+	if !ok {
+		t.Fatalf("expected *ast.MemberAccess, got %T", stmt.Expr)
+	}
+	if ma.Member != "size" {
+		t.Errorf("expected Member 'size', got %q", ma.Member)
+	}
+	tr, ok := ma.Object.(*ast.TypeRef)
+	if !ok {
+		t.Fatalf("expected Object *ast.TypeRef, got %T", ma.Object)
+	}
+	if tr.Kind != "bool" {
+		t.Errorf("expected Kind 'bool', got %q", tr.Kind)
+	}
+}
+
 func TestParseIntDotMin(t *testing.T) {
 	input := "print(int.min);"
 	l := lexer.New(input)
