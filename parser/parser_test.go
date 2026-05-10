@@ -2552,13 +2552,23 @@ func TestParseIfMissingRParen(t *testing.T) {
 	}
 }
 
-func TestParseIfMissingOpenBrace(t *testing.T) {
+func TestParseIfSingleStmt(t *testing.T) {
 	input := "if (true) print(1);"
 	l := lexer.New(input)
 	p := New(l)
-	p.ParseProgram()
-	if len(p.Errors()) == 0 {
-		t.Errorf("expected error for missing '{'")
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	ifStmt, ok := program.Stmts[0].(*ast.IfStmt)
+	if !ok {
+		t.Fatalf("expected *ast.IfStmt, got %T", program.Stmts[0])
+	}
+	if ifStmt.Then == nil || len(ifStmt.Then.Stmts) != 1 {
+		t.Fatalf("expected then block with 1 statement")
 	}
 }
 
@@ -2572,13 +2582,27 @@ func TestParseIfMissingCloseBrace(t *testing.T) {
 	}
 }
 
-func TestParseIfElseMissingBraceOrIf(t *testing.T) {
+func TestParseIfElseSingleStmt(t *testing.T) {
 	input := "if (true) { print(1); } else print(2);"
 	l := lexer.New(input)
 	p := New(l)
-	p.ParseProgram()
-	if len(p.Errors()) == 0 {
-		t.Errorf("expected error for missing '{' or 'if' after else")
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	ifStmt, ok := program.Stmts[0].(*ast.IfStmt)
+	if !ok {
+		t.Fatalf("expected *ast.IfStmt, got %T", program.Stmts[0])
+	}
+	elseBlock, ok := ifStmt.Else.(*ast.BlockStmt)
+	if !ok {
+		t.Fatalf("expected *ast.BlockStmt for else, got %T", ifStmt.Else)
+	}
+	if len(elseBlock.Stmts) != 1 {
+		t.Fatalf("expected 1 statement in else block, got %d", len(elseBlock.Stmts))
 	}
 }
 
@@ -2828,23 +2852,43 @@ func TestParseForUpdateInvalidOp(t *testing.T) {
 	}
 }
 
-func TestParseForNoBlock(t *testing.T) {
+func TestParseForSingleStmt(t *testing.T) {
 	input := "for (i = 0; i < 10; i = i + 1) print(i);"
 	l := lexer.New(input)
 	p := New(l)
-	p.ParseProgram()
-	if len(p.Errors()) == 0 {
-		t.Errorf("expected error for missing block")
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	forStmt, ok := program.Stmts[0].(*ast.ForStmt)
+	if !ok {
+		t.Fatalf("expected *ast.ForStmt, got %T", program.Stmts[0])
+	}
+	if forStmt.Body == nil || len(forStmt.Body.Stmts) != 1 {
+		t.Fatalf("expected body with 1 statement")
 	}
 }
 
-func TestParseWhileNoBlock(t *testing.T) {
+func TestParseWhileSingleStmt(t *testing.T) {
 	input := "while (i < 10) print(i);"
 	l := lexer.New(input)
 	p := New(l)
-	p.ParseProgram()
-	if len(p.Errors()) == 0 {
-		t.Errorf("expected error for missing block")
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	whileStmt, ok := program.Stmts[0].(*ast.WhileStmt)
+	if !ok {
+		t.Fatalf("expected *ast.WhileStmt, got %T", program.Stmts[0])
+	}
+	if whileStmt.Body == nil || len(whileStmt.Body.Stmts) != 1 {
+		t.Fatalf("expected body with 1 statement")
 	}
 }
 

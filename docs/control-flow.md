@@ -12,7 +12,7 @@ if (condition) {
 }
 ```
 
-Condition must be a `bool`. The `else` and `else if` clauses are optional. Blocks (`{ }`) are required.
+Condition must be a `bool`. The `else` and `else if` clauses are optional. Braces are required for multi-statement bodies, but optional for single-statement bodies.
 
 Each `if`, `else if`, and `else` body creates a new scope:
 
@@ -26,6 +26,18 @@ if (true) {
 
 print(x);  // 3
 print(y);  // error: y is not defined
+```
+
+Single-statement bodies can omit braces:
+
+```
+if (condition) statement;
+else if (condition) statement;
+else statement;
+
+for (init; condition; update) statement;
+
+while (condition) statement;
 ```
 
 ## For Loops

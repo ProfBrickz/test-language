@@ -362,25 +362,29 @@ func (p *Parser) parsePrint() *ast.PrintStmt {
 func (p *Parser) parseBlock() *ast.BlockStmt {
 	block := &ast.BlockStmt{}
 
-	if p.curToken.Type != lexer.TOK_LBRACE {
-		p.addError("expected '{', got %s", p.curToken.Type)
-		return nil
-	}
-	p.nextToken()
-
-	for p.curToken.Type != lexer.TOK_RBRACE && p.curToken.Type != lexer.TOK_EOF {
-		stmt := p.parseStmt()
-		if stmt != nil {
-			block.Stmts = append(block.Stmts, stmt)
-		}
+	if p.curToken.Type == lexer.TOK_LBRACE {
 		p.nextToken()
+
+		for p.curToken.Type != lexer.TOK_RBRACE && p.curToken.Type != lexer.TOK_EOF {
+			stmt := p.parseStmt()
+			if stmt != nil {
+				block.Stmts = append(block.Stmts, stmt)
+			}
+			p.nextToken()
+		}
+
+		if p.curToken.Type == lexer.TOK_EOF {
+			p.addError("expected '}'")
+			return nil
+		}
+
+		return block
 	}
 
-	if p.curToken.Type == lexer.TOK_EOF {
-		p.addError("expected '}'")
-		return nil
+	stmt := p.parseStmt()
+	if stmt != nil {
+		block.Stmts = append(block.Stmts, stmt)
 	}
-
 	return block
 }
 
@@ -413,11 +417,8 @@ func (p *Parser) parseIf() *ast.IfStmt {
 
 		if p.curToken.Type == lexer.TOK_IF {
 			elseStmt = p.parseIf()
-		} else if p.curToken.Type == lexer.TOK_LBRACE {
-			elseStmt = p.parseBlock()
 		} else {
-			p.addError("expected '{' or 'if' after else, got %s", p.curToken.Type)
-			return nil
+			elseStmt = p.parseBlock()
 		}
 	}
 
