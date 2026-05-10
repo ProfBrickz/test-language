@@ -347,7 +347,52 @@ func (p *Parser) parsePrint() *ast.PrintStmt {
 }
 
 func (p *Parser) parseExpr() ast.Expr {
-	return p.parseAddSub()
+	return p.parseOr()
+}
+
+func (p *Parser) parseOr() ast.Expr {
+	left := p.parseAnd()
+	for p.curToken.Type == lexer.TOK_OR {
+		op := p.curToken.Literal
+		p.nextToken()
+		right := p.parseAnd()
+		left = &ast.BinaryExpr{Left: left, Op: op, Right: right}
+	}
+	return left
+}
+
+func (p *Parser) parseAnd() ast.Expr {
+	left := p.parseEquality()
+	for p.curToken.Type == lexer.TOK_AND {
+		op := p.curToken.Literal
+		p.nextToken()
+		right := p.parseEquality()
+		left = &ast.BinaryExpr{Left: left, Op: op, Right: right}
+	}
+	return left
+}
+
+func (p *Parser) parseEquality() ast.Expr {
+	left := p.parseComparison()
+	for p.curToken.Type == lexer.TOK_EQ || p.curToken.Type == lexer.TOK_NOT_EQ {
+		op := p.curToken.Literal
+		p.nextToken()
+		right := p.parseComparison()
+		left = &ast.BinaryExpr{Left: left, Op: op, Right: right}
+	}
+	return left
+}
+
+func (p *Parser) parseComparison() ast.Expr {
+	left := p.parseAddSub()
+	for p.curToken.Type == lexer.TOK_LT || p.curToken.Type == lexer.TOK_GT ||
+		p.curToken.Type == lexer.TOK_LTE || p.curToken.Type == lexer.TOK_GTE {
+		op := p.curToken.Literal
+		p.nextToken()
+		right := p.parseAddSub()
+		left = &ast.BinaryExpr{Left: left, Op: op, Right: right}
+	}
+	return left
 }
 
 func (p *Parser) parseAddSub() ast.Expr {
@@ -389,6 +434,11 @@ func (p *Parser) parseUnary() ast.Expr {
 			Op:    "-",
 			Right: expr,
 		}
+	}
+	if p.curToken.Type == lexer.TOK_NOT {
+		p.nextToken()
+		expr := p.parseUnary()
+		return &ast.UnaryExpr{Op: "!", Right: expr}
 	}
 	return p.parseMember()
 }

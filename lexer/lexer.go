@@ -36,6 +36,15 @@ const (
 	TOK_STAR      TokenType = "*"
 	TOK_SLASH     TokenType = "/"
 	TOK_DOT       TokenType = "."
+	TOK_EQ        TokenType = "=="
+	TOK_NOT_EQ    TokenType = "!="
+	TOK_LT        TokenType = "<"
+	TOK_GT        TokenType = ">"
+	TOK_LTE       TokenType = "<="
+	TOK_GTE       TokenType = ">="
+	TOK_AND       TokenType = "&&"
+	TOK_OR        TokenType = "||"
+	TOK_NOT       TokenType = "!"
 
 	TOK_LBRACE TokenType = "{"
 	TOK_RBRACE TokenType = "}"
@@ -114,7 +123,35 @@ func (l *Lexer) NextToken() Token {
 		}
 		return l.makeToken(TOK_SLASH, 1)
 	case '=':
+		if l.peekNext() == '=' {
+			return l.makeToken(TOK_EQ, 2)
+		}
 		return l.makeToken(TOK_ASSIGN, 1)
+	case '!':
+		if l.peekNext() == '=' {
+			return l.makeToken(TOK_NOT_EQ, 2)
+		}
+		return l.makeToken(TOK_NOT, 1)
+	case '<':
+		if l.peekNext() == '=' {
+			return l.makeToken(TOK_LTE, 2)
+		}
+		return l.makeToken(TOK_LT, 1)
+	case '>':
+		if l.peekNext() == '=' {
+			return l.makeToken(TOK_GTE, 2)
+		}
+		return l.makeToken(TOK_GT, 1)
+	case '&':
+		if l.peekNext() == '&' {
+			return l.makeToken(TOK_AND, 2)
+		}
+		return l.makeToken(TOK_INT_LIT, 1)
+	case '|':
+		if l.peekNext() == '|' {
+			return l.makeToken(TOK_OR, 2)
+		}
+		return l.makeToken(TOK_INT_LIT, 1)
 	case '.':
 		if l.pos+1 < len(l.input) && unicode.IsDigit(rune(l.input[l.pos+1])) {
 			return l.readFloatAfterDot()

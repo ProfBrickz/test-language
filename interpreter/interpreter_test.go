@@ -4757,3 +4757,787 @@ func TestValueMemberError(t *testing.T) {
 		t.Errorf("expected error for nonexistent value member")
 	}
 }
+
+func TestEqInt(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 1, Untyped: true},
+		Op:    "==",
+		Right: &ast.IntegerLit{Value: 1, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsBool {
+		t.Errorf("expected IsBool")
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestEqIntFalse(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 1, Untyped: true},
+		Op:    "==",
+		Right: &ast.IntegerLit{Value: 2, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != false {
+		t.Errorf("expected false, got %v", val.BData)
+	}
+}
+
+func TestEqFloat(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 1.5, Untyped: true},
+		Op:    "==",
+		Right: &ast.FloatLit{Value: 1.5, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestEqBool(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.BoolLit{Value: true, Untyped: true},
+		Op:    "==",
+		Right: &ast.BoolLit{Value: true, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestNotEq(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 1, Untyped: true},
+		Op:    "!=",
+		Right: &ast.IntegerLit{Value: 2, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestNotEqFalse(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 1, Untyped: true},
+		Op:    "!=",
+		Right: &ast.IntegerLit{Value: 1, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != false {
+		t.Errorf("expected false, got %v", val.BData)
+	}
+}
+
+func TestLtInt(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 1, Untyped: true},
+		Op:    "<",
+		Right: &ast.IntegerLit{Value: 2, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestLtFloat(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 1.0, Untyped: true},
+		Op:    "<",
+		Right: &ast.FloatLit{Value: 2.0, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestGtInt(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 2, Untyped: true},
+		Op:    ">",
+		Right: &ast.IntegerLit{Value: 1, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestLteInt(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 1, Untyped: true},
+		Op:    "<=",
+		Right: &ast.IntegerLit{Value: 2, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestLteIntEqual(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 1, Untyped: true},
+		Op:    "<=",
+		Right: &ast.IntegerLit{Value: 1, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestGteInt(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 2, Untyped: true},
+		Op:    ">=",
+		Right: &ast.IntegerLit{Value: 1, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestGteIntEqual(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 1, Untyped: true},
+		Op:    ">=",
+		Right: &ast.IntegerLit{Value: 1, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestAnd(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.BoolLit{Value: true, Untyped: true},
+		Op:    "&&",
+		Right: &ast.BoolLit{Value: true, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsBool {
+		t.Errorf("expected IsBool")
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestAndFalse(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.BoolLit{Value: true, Untyped: true},
+		Op:    "&&",
+		Right: &ast.BoolLit{Value: false, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != false {
+		t.Errorf("expected false, got %v", val.BData)
+	}
+}
+
+func TestOr(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.BoolLit{Value: true, Untyped: true},
+		Op:    "||",
+		Right: &ast.BoolLit{Value: false, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestOrFalse(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.BoolLit{Value: false, Untyped: true},
+		Op:    "||",
+		Right: &ast.BoolLit{Value: false, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != false {
+		t.Errorf("expected false, got %v", val.BData)
+	}
+}
+
+func TestNot(t *testing.T) {
+	i := New()
+	expr := &ast.UnaryExpr{
+		Op:    "!",
+		Right: &ast.BoolLit{Value: false, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsBool {
+		t.Errorf("expected IsBool")
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestNotTrue(t *testing.T) {
+	i := New()
+	expr := &ast.UnaryExpr{
+		Op:    "!",
+		Right: &ast.BoolLit{Value: true, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != false {
+		t.Errorf("expected false, got %v", val.BData)
+	}
+}
+
+func TestNotOnNonBool(t *testing.T) {
+	i := New()
+	expr := &ast.UnaryExpr{
+		Op:    "!",
+		Right: &ast.IntegerLit{Value: 1, Untyped: true},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for ! on non-bool")
+	}
+}
+
+func TestAndOnNonBool(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 1, Untyped: true},
+		Op:    "&&",
+		Right: &ast.IntegerLit{Value: 2, Untyped: true},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for && on non-bool")
+	}
+}
+
+func TestOrOnNonBool(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 1, Untyped: true},
+		Op:    "||",
+		Right: &ast.IntegerLit{Value: 2, Untyped: true},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for || on non-bool")
+	}
+}
+
+func TestEqNull(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 1, Untyped: true},
+		Op:    "==",
+		Right: &ast.NullLit{},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.Null {
+		t.Errorf("expected null result")
+	}
+}
+
+func TestNullNot(t *testing.T) {
+	i := New()
+	expr := &ast.UnaryExpr{
+		Op:    "!",
+		Right: &ast.NullLit{},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.Null {
+		t.Errorf("expected null result")
+	}
+}
+
+func TestPrintEq(t *testing.T) {
+	input := "print(1 == 1);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true" {
+		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+func TestPrintGt(t *testing.T) {
+	input := "print(2 > 1);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true" {
+		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+func TestPrintLtFloat(t *testing.T) {
+	input := "print(1.5 < 2.5);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true" {
+		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+func TestPrintAnd(t *testing.T) {
+	input := "print(true && false);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "false" {
+		t.Errorf("expected 'false', got %q", output)
+	}
+}
+
+func TestPrintOr(t *testing.T) {
+	input := "print(true || false);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true" {
+		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+func TestPrintNot(t *testing.T) {
+	input := "print(!true);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "false" {
+		t.Errorf("expected 'false', got %q", output)
+	}
+}
+
+func TestPrintNotNot(t *testing.T) {
+	input := "print(!!true);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true" {
+		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+func TestPrintPrecedenceOrAnd(t *testing.T) {
+	input := "print(true || false && false);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	// true || (false && false) = true || false = true
+	if output != "true" {
+		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+func TestPrintPrecedenceCmpAdd(t *testing.T) {
+	input := "print(1 + 2 < 3);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	// (1 + 2) < 3 = 3 < 3 = false
+	if output != "false" {
+		t.Errorf("expected 'false', got %q", output)
+	}
+}
+
+func TestPrintNotEq(t *testing.T) {
+	input := "print(1 != 2);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true" {
+		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+func TestUnknownUnaryOp(t *testing.T) {
+	i := New()
+	expr := &ast.UnaryExpr{
+		Op:    "~",
+		Right: &ast.IntegerLit{Value: 1, Untyped: true},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for unknown unary operator")
+	}
+}
+
+func TestUnaryUndefinedVar(t *testing.T) {
+	i := New()
+	expr := &ast.UnaryExpr{
+		Op:    "!",
+		Right: &ast.VarRef{Name: "nonexistent"},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for undefined var in unary")
+	}
+}
+
+func TestGtFloat(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 2.0, Untyped: true},
+		Op:    ">",
+		Right: &ast.FloatLit{Value: 1.0, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestLteFloat(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 1.0, Untyped: true},
+		Op:    "<=",
+		Right: &ast.FloatLit{Value: 2.0, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestGteFloat(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 2.0, Untyped: true},
+		Op:    ">=",
+		Right: &ast.FloatLit{Value: 1.0, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestLteFloatEqual(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 1.0, Untyped: true},
+		Op:    "<=",
+		Right: &ast.FloatLit{Value: 1.0, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestGteFloatEqual(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 1.0, Untyped: true},
+		Op:    ">=",
+		Right: &ast.FloatLit{Value: 1.0, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestTypedInt64EqFloat64Error(t *testing.T) {
+	i := New()
+	i.env.Set("a", Value{IType: ast.IntegerType{Size: 64, Signed: true}, Data: 5})
+	i.env.Set("b", Value{FType: ast.FloatType{Size: 64}, FData: 5.0, IsFloat: true})
+	expr := &ast.BinaryExpr{
+		Left:  &ast.VarRef{Name: "a"},
+		Op:    "==",
+		Right: &ast.VarRef{Name: "b"},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for int64 == float64")
+	}
+}
+
+func TestTypedInt32EqFloat64(t *testing.T) {
+	i := New()
+	i.env.Set("a", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 5})
+	i.env.Set("b", Value{FType: ast.FloatType{Size: 64}, FData: 5.0, IsFloat: true})
+	expr := &ast.BinaryExpr{
+		Left:  &ast.VarRef{Name: "a"},
+		Op:    "==",
+		Right: &ast.VarRef{Name: "b"},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestUntypedIntEqFloat(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 5, Untyped: true},
+		Op:    "==",
+		Right: &ast.FloatLit{Value: 5.0, Untyped: true},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.BData != true {
+		t.Errorf("expected true, got %v", val.BData)
+	}
+}
+
+func TestTypedInt64LtFloat64Error(t *testing.T) {
+	i := New()
+	i.env.Set("a", Value{IType: ast.IntegerType{Size: 64, Signed: true}, Data: 5})
+	i.env.Set("b", Value{FType: ast.FloatType{Size: 64}, FData: 10.0, IsFloat: true})
+	expr := &ast.BinaryExpr{
+		Left:  &ast.VarRef{Name: "a"},
+		Op:    "<",
+		Right: &ast.VarRef{Name: "b"},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for int64 < float64")
+	}
+}
+
+func TestBoolEqIntError(t *testing.T) {
+	i := New()
+	i.env.Set("a", Value{Untyped: true, BData: true, IsBool: true})
+	i.env.Set("b", Value{Untyped: true, Data: 1})
+	expr := &ast.BinaryExpr{
+		Left:  &ast.VarRef{Name: "a"},
+		Op:    "==",
+		Right: &ast.VarRef{Name: "b"},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for bool == int")
+	}
+}
+
+func TestPrintTypedInt64EqFloat64Error(t *testing.T) {
+	input := `
+var a: int = 5;
+var b: float = 5;
+print(a == b);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for int64 == float64 comparison")
+	}
+}

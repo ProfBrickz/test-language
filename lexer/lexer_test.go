@@ -277,11 +277,14 @@ func TestReadNumberDotWithoutDigit(t *testing.T) {
 }
 
 func TestDefaultCaseNextToken(t *testing.T) {
-	input := "&"
+	input := "@"
 	l := New(input)
 	tok := l.NextToken()
 	if tok.Type != TOK_INT_LIT {
 		t.Errorf("expected INT_LIT for unknown char, got %s", tok.Type)
+	}
+	if tok.Literal != "@" {
+		t.Errorf("expected literal '@', got %q", tok.Literal)
 	}
 }
 
@@ -634,5 +637,62 @@ func TestDotLeadingFloat(t *testing.T) {
 		if tok.Literal != tt.expectedLit {
 			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.expectedLit, tok.Literal)
 		}
+	}
+}
+
+func TestConditionTokens(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedType TokenType
+		expectedLit  string
+	}{
+		{"==", TOK_EQ, "=="},
+		{"!=", TOK_NOT_EQ, "!="},
+		{"<", TOK_LT, "<"},
+		{">", TOK_GT, ">"},
+		{"<=", TOK_LTE, "<="},
+		{">=", TOK_GTE, ">="},
+		{"&&", TOK_AND, "&&"},
+		{"||", TOK_OR, "||"},
+		{"!", TOK_NOT, "!"},
+	}
+
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("input %q: expected %s, got %s", tt.input, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLit {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.expectedLit, tok.Literal)
+		}
+	}
+}
+
+func TestConditionTokensInSequence(t *testing.T) {
+	input := "== != < > <= >= && || !"
+	l := New(input)
+	tests := []TokenType{TOK_EQ, TOK_NOT_EQ, TOK_LT, TOK_GT, TOK_LTE, TOK_GTE, TOK_AND, TOK_OR, TOK_NOT}
+	for _, expected := range tests {
+		tok := l.NextToken()
+		if tok.Type != expected {
+			t.Errorf("expected %s, got %s", expected, tok.Type)
+		}
+	}
+}
+
+func TestSingleAmpersandAsIntLit(t *testing.T) {
+	l := New("&")
+	tok := l.NextToken()
+	if tok.Type != TOK_INT_LIT {
+		t.Errorf("expected INT_LIT, got %s", tok.Type)
+	}
+}
+
+func TestSinglePipeAsIntLit(t *testing.T) {
+	l := New("|")
+	tok := l.NextToken()
+	if tok.Type != TOK_INT_LIT {
+		t.Errorf("expected INT_LIT, got %s", tok.Type)
 	}
 }

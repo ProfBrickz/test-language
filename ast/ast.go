@@ -51,6 +51,11 @@ type VarRef struct {
 	Name string
 }
 
+type UnaryExpr struct {
+	Op    string
+	Right Expr
+}
+
 type BinaryExpr struct {
 	Left  Expr
 	Op    string

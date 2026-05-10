@@ -2029,36 +2029,214 @@ func TestParseVarDotType(t *testing.T) {
 	}
 }
 
-func TestParseChainedMemberAccess(t *testing.T) {
-	input := "print(a.type.min);"
+func TestParseEquality(t *testing.T) {
+	input := "print(1 == 2);"
 	l := lexer.New(input)
 	p := New(l)
 	program := p.ParseProgram()
-
 	if len(p.Errors()) > 0 {
 		t.Fatalf("unexpected errors: %v", p.Errors())
 	}
-
 	stmt := program.Stmts[0].(*ast.PrintStmt)
-	outer, ok := stmt.Expr.(*ast.MemberAccess)
+	be, ok := stmt.Expr.(*ast.BinaryExpr)
 	if !ok {
-		t.Fatalf("expected *ast.MemberAccess, got %T", stmt.Expr)
+		t.Fatalf("expected *ast.BinaryExpr, got %T", stmt.Expr)
 	}
-	if outer.Member != "min" {
-		t.Errorf("expected Member 'min', got %q", outer.Member)
+	if be.Op != "==" {
+		t.Errorf("expected Op '==', got %q", be.Op)
 	}
-	inner, ok := outer.Object.(*ast.MemberAccess)
+}
+
+func TestParseNotEqual(t *testing.T) {
+	input := "print(1 != 2);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	be, ok := stmt.Expr.(*ast.BinaryExpr)
 	if !ok {
-		t.Fatalf("expected inner *ast.MemberAccess, got %T", outer.Object)
+		t.Fatalf("expected *ast.BinaryExpr, got %T", stmt.Expr)
 	}
-	if inner.Member != "type" {
-		t.Errorf("expected Member 'type', got %q", inner.Member)
+	if be.Op != "!=" {
+		t.Errorf("expected Op '!=', got %q", be.Op)
 	}
-	vr, ok := inner.Object.(*ast.VarRef)
+}
+
+func TestParseComparison(t *testing.T) {
+	input := "print(1 < 2);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	be, ok := stmt.Expr.(*ast.BinaryExpr)
 	if !ok {
-		t.Fatalf("expected Object *ast.VarRef, got %T", inner.Object)
+		t.Fatalf("expected *ast.BinaryExpr, got %T", stmt.Expr)
 	}
-	if vr.Name != "a" {
-		t.Errorf("expected Name 'a', got %q", vr.Name)
+	if be.Op != "<" {
+		t.Errorf("expected Op '<', got %q", be.Op)
+	}
+}
+
+func TestParseLTE(t *testing.T) {
+	input := "print(1 <= 2);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	be, ok := stmt.Expr.(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected *ast.BinaryExpr, got %T", stmt.Expr)
+	}
+	if be.Op != "<=" {
+		t.Errorf("expected Op '<=', got %q", be.Op)
+	}
+}
+
+func TestParseGT(t *testing.T) {
+	input := "print(1 > 2);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	be, ok := stmt.Expr.(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected *ast.BinaryExpr, got %T", stmt.Expr)
+	}
+	if be.Op != ">" {
+		t.Errorf("expected Op '>', got %q", be.Op)
+	}
+}
+
+func TestParseGTE(t *testing.T) {
+	input := "print(1 >= 2);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	be, ok := stmt.Expr.(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected *ast.BinaryExpr, got %T", stmt.Expr)
+	}
+	if be.Op != ">=" {
+		t.Errorf("expected Op '>=', got %q", be.Op)
+	}
+}
+
+func TestParseLogicalAnd(t *testing.T) {
+	input := "print(true && false);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	be, ok := stmt.Expr.(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected *ast.BinaryExpr, got %T", stmt.Expr)
+	}
+	if be.Op != "&&" {
+		t.Errorf("expected Op '&&', got %q", be.Op)
+	}
+}
+
+func TestParseLogicalOr(t *testing.T) {
+	input := "print(true || false);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	be, ok := stmt.Expr.(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected *ast.BinaryExpr, got %T", stmt.Expr)
+	}
+	if be.Op != "||" {
+		t.Errorf("expected Op '||', got %q", be.Op)
+	}
+}
+
+func TestParseNot(t *testing.T) {
+	input := "print(!true);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	ue, ok := stmt.Expr.(*ast.UnaryExpr)
+	if !ok {
+		t.Fatalf("expected *ast.UnaryExpr, got %T", stmt.Expr)
+	}
+	if ue.Op != "!" {
+		t.Errorf("expected Op '!', got %q", ue.Op)
+	}
+}
+
+func TestParsePrecedenceOrVsAnd(t *testing.T) {
+	input := "print(true || false && false);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	outer, ok := stmt.Expr.(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected *ast.BinaryExpr, got %T", stmt.Expr)
+	}
+	if outer.Op != "||" {
+		t.Errorf("expected outer Op '||', got %q", outer.Op)
+	}
+	inner, ok := outer.Right.(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected inner *ast.BinaryExpr, got %T", outer.Right)
+	}
+	if inner.Op != "&&" {
+		t.Errorf("expected inner Op '&&', got %q", inner.Op)
+	}
+}
+
+func TestParsePrecedenceComparisonVsAdd(t *testing.T) {
+	input := "print(1 + 2 < 3);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	outer, ok := stmt.Expr.(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected *ast.BinaryExpr, got %T", stmt.Expr)
+	}
+	if outer.Op != "<" {
+		t.Errorf("expected outer Op '<', got %q", outer.Op)
+	}
+	left, ok := outer.Left.(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected left *ast.BinaryExpr, got %T", outer.Left)
+	}
+	if left.Op != "+" {
+		t.Errorf("expected left Op '+', got %q", left.Op)
 	}
 }
