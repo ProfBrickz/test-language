@@ -44,6 +44,6 @@ go build -o interp .
 
 Single-line comments use `//`:
 
-```go
+```
 var x: int = 42; // anything after // is ignored
 ```

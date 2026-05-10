@@ -2416,23 +2416,13 @@ func TestParseDoubleUnaryNot(t *testing.T) {
 	}
 }
 
-func TestParseDoubleUnaryMinus(t *testing.T) {
+func TestParseDecrementExpr(t *testing.T) {
 	input := "print(--5);"
 	l := lexer.New(input)
 	p := New(l)
 	p.ParseProgram()
 	if len(p.Errors()) == 0 {
-		t.Errorf("expected error for double unary minus, got none")
-	}
-	found := false
-	for _, err := range p.Errors() {
-		if strings.Contains(err, "unary minus") {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("expected error containing 'unary minus', got %v", p.Errors())
+		t.Errorf("expected error for prefix --, got none")
 	}
 }
 
@@ -2589,5 +2579,428 @@ func TestParseIfElseMissingBraceOrIf(t *testing.T) {
 	p.ParseProgram()
 	if len(p.Errors()) == 0 {
 		t.Errorf("expected error for missing '{' or 'if' after else")
+	}
+}
+
+func TestParseForStmt(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+for (i = 0; i < 10; i = i + 1) {
+	print(i);
+}
+`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(program.Stmts))
+	}
+	forStmt, ok := program.Stmts[1].(*ast.ForStmt)
+	if !ok {
+		t.Fatalf("expected *ast.ForStmt, got %T", program.Stmts[1])
+	}
+	if forStmt.Condition == nil {
+		t.Errorf("expected condition, got nil")
+	}
+	if forStmt.Body == nil {
+		t.Errorf("expected body, got nil")
+	}
+	if len(forStmt.Body.Stmts) != 1 {
+		t.Errorf("expected 1 statement in body, got %d", len(forStmt.Body.Stmts))
+	}
+}
+
+func TestParseForWithVarDecl(t *testing.T) {
+	input := `
+for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 10; i = i + 1) {
+	print(i);
+}
+`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	_, ok := program.Stmts[0].(*ast.ForStmt)
+	if !ok {
+		t.Fatalf("expected *ast.ForStmt, got %T", program.Stmts[0])
+	}
+}
+
+func TestParseForMissingLParen(t *testing.T) {
+	input := "for i = 0; i < 10; i = i + 1) { }"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '('")
+	}
+}
+
+func TestParseForBadInit(t *testing.T) {
+	input := "for (print(1); i < 10; i = i + 1) { }"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for bad init")
+	}
+}
+
+func TestParseForMissingSemicolonAfterCondition(t *testing.T) {
+	input := "for (i = 0; i < 10 i = i + 1) { }"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ';'")
+	}
+}
+
+func TestParseForBadUpdate(t *testing.T) {
+	input := "for (i = 0; i < 10; print(1)) { }"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for bad update")
+	}
+}
+
+func TestParseForMissingRParen(t *testing.T) {
+	input := "for (i = 0; i < 10; i = i + 1 { }"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ')'")
+	}
+}
+
+func TestParseWhileStmt(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+while (i < 10) {
+	print(i);
+}
+`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(program.Stmts))
+	}
+	whileStmt, ok := program.Stmts[1].(*ast.WhileStmt)
+	if !ok {
+		t.Fatalf("expected *ast.WhileStmt, got %T", program.Stmts[1])
+	}
+	if whileStmt.Condition == nil {
+		t.Errorf("expected condition, got nil")
+	}
+	if whileStmt.Body == nil {
+		t.Errorf("expected body, got nil")
+	}
+	if len(whileStmt.Body.Stmts) != 1 {
+		t.Errorf("expected 1 statement in body, got %d", len(whileStmt.Body.Stmts))
+	}
+}
+
+func TestParseWhileMissingLParen(t *testing.T) {
+	input := "while i < 10) { }"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '('")
+	}
+}
+
+func TestParseWhileMissingRParen(t *testing.T) {
+	input := "while (i < 10 { }"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ')'")
+	}
+}
+
+func TestParseBreakStmt(t *testing.T) {
+	input := "break;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseBreakMissingSemicolon(t *testing.T) {
+	input := "break"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ';'")
+	}
+}
+
+func TestParseSkipStmt(t *testing.T) {
+	input := "skip;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseSkipMissingSemicolon(t *testing.T) {
+	input := "skip"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ';'")
+	}
+}
+
+func TestParseForUpdatePlusEq(t *testing.T) {
+	input := "for (i = 0; i < 10; i += 1) { }"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseForUpdateMinusEq(t *testing.T) {
+	input := "for (i = 10; i > 0; i -= 1) { }"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseForUpdateStarEq(t *testing.T) {
+	input := "for (i = 0; i < 10; i *= 2) { }"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseForUpdateSlashEq(t *testing.T) {
+	input := "for (i = 10; i > 0; i /= 2) { }"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseForUpdateInvalidOp(t *testing.T) {
+	input := "for (i = 0; i < 10; i =* 1) { }"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid update operator")
+	}
+}
+
+func TestParseForNoBlock(t *testing.T) {
+	input := "for (i = 0; i < 10; i = i + 1) print(i);"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing block")
+	}
+}
+
+func TestParseWhileNoBlock(t *testing.T) {
+	input := "while (i < 10) print(i);"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing block")
+	}
+}
+
+func TestParseIncDecStmt(t *testing.T) {
+	input := "i++;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	inc, ok := program.Stmts[0].(*ast.IncDecStmt)
+	if !ok {
+		t.Fatalf("expected *ast.IncDecStmt, got %T", program.Stmts[0])
+	}
+	if inc.Name != "i" {
+		t.Errorf("expected name 'i', got %q", inc.Name)
+	}
+	if inc.Op != "++" {
+		t.Errorf("expected op '++', got %q", inc.Op)
+	}
+}
+
+func TestParseDecStmt(t *testing.T) {
+	input := "i--;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	dec, ok := program.Stmts[0].(*ast.IncDecStmt)
+	if !ok {
+		t.Fatalf("expected *ast.IncDecStmt, got %T", program.Stmts[0])
+	}
+	if dec.Name != "i" {
+		t.Errorf("expected name 'i', got %q", dec.Name)
+	}
+	if dec.Op != "--" {
+		t.Errorf("expected op '--', got %q", dec.Op)
+	}
+}
+
+func TestParseIncDecMissingSemicolon(t *testing.T) {
+	input := "i++"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing semicolon")
+	}
+}
+
+func TestParseForUpdateIncDec(t *testing.T) {
+	input := "for (i = 0; i < 10; i++) { }"
+	l := lexer.New(input)
+	p := New(l)
+	_ = p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseForUpdateDec(t *testing.T) {
+	input := "for (i = 10; i > 0; i--) { }"
+	l := lexer.New(input)
+	p := New(l)
+	_ = p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseForUpdateDefaultError(t *testing.T) {
+	input := "for (i = 0; i < 10; i + 1) { }"
+	l := lexer.New(input)
+	p := New(l)
+	_ = p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid update")
+	}
+}
+
+func TestParsePrefixIncrement(t *testing.T) {
+	input := "++i;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for prefix ++")
+	}
+}
+
+func TestParsePrefixDecrement(t *testing.T) {
+	input := "--i;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for prefix --")
+	}
+}
+
+func TestParseIncDecInForInit(t *testing.T) {
+	input := "for (i++; i < 10; i = i + 1) { }"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for inc/dec in for init")
+	}
+}
+
+func TestParseMultipleIncDec(t *testing.T) {
+	input := "i++; j--;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(program.Stmts))
+	}
+	inc, ok := program.Stmts[0].(*ast.IncDecStmt)
+	if !ok {
+		t.Fatalf("expected *ast.IncDecStmt, got %T", program.Stmts[0])
+	}
+	if inc.Name != "i" || inc.Op != "++" {
+		t.Errorf("expected i++, got %s%s", inc.Name, inc.Op)
+	}
+	dec, ok := program.Stmts[1].(*ast.IncDecStmt)
+	if !ok {
+		t.Fatalf("expected *ast.IncDecStmt, got %T", program.Stmts[1])
+	}
+	if dec.Name != "j" || dec.Op != "--" {
+		t.Errorf("expected j--, got %s%s", dec.Name, dec.Op)
+	}
+}
+
+func TestParseDoubleUnaryMinusWithSpace(t *testing.T) {
+	input := "print(- -5);"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for double unary minus, got none")
+	}
+	found := false
+	for _, err := range p.Errors() {
+		if strings.Contains(err, "unary minus") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected error containing 'unary minus', got %v", p.Errors())
 	}
 }

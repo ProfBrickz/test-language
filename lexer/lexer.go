@@ -23,36 +23,42 @@ const (
 	TOK_TRUE      TokenType = "TRUE"
 	TOK_FALSE     TokenType = "FALSE"
 
-	TOK_COLON     TokenType = ":"
-	TOK_SEMICOLON TokenType = ";"
-	TOK_COMMA     TokenType = ","
-	TOK_ASSIGN    TokenType = "="
-	TOK_PLUS_EQ   TokenType = "+="
-	TOK_MINUS_EQ  TokenType = "-="
-	TOK_STAR_EQ   TokenType = "*="
-	TOK_SLASH_EQ  TokenType = "/="
-	TOK_PLUS      TokenType = "+"
-	TOK_MINUS     TokenType = "-"
-	TOK_STAR      TokenType = "*"
-	TOK_SLASH     TokenType = "/"
-	TOK_DOT       TokenType = "."
-	TOK_EQ        TokenType = "=="
-	TOK_NOT_EQ    TokenType = "!="
-	TOK_LT        TokenType = "<"
-	TOK_GT        TokenType = ">"
-	TOK_LTE       TokenType = "<="
-	TOK_GTE       TokenType = ">="
-	TOK_AND       TokenType = "&&"
-	TOK_OR        TokenType = "||"
-	TOK_NOT       TokenType = "!"
+	TOK_COLON       TokenType = ":"
+	TOK_SEMICOLON   TokenType = ";"
+	TOK_COMMA       TokenType = ","
+	TOK_ASSIGN      TokenType = "="
+	TOK_PLUS_PLUS   TokenType = "++"
+	TOK_MINUS_MINUS TokenType = "--"
+	TOK_PLUS_EQ     TokenType = "+="
+	TOK_MINUS_EQ    TokenType = "-="
+	TOK_STAR_EQ     TokenType = "*="
+	TOK_SLASH_EQ    TokenType = "/="
+	TOK_PLUS        TokenType = "+"
+	TOK_MINUS       TokenType = "-"
+	TOK_STAR        TokenType = "*"
+	TOK_SLASH       TokenType = "/"
+	TOK_DOT         TokenType = "."
+	TOK_EQ          TokenType = "=="
+	TOK_NOT_EQ      TokenType = "!="
+	TOK_LT          TokenType = "<"
+	TOK_GT          TokenType = ">"
+	TOK_LTE         TokenType = "<="
+	TOK_GTE         TokenType = ">="
+	TOK_AND         TokenType = "&&"
+	TOK_OR          TokenType = "||"
+	TOK_NOT         TokenType = "!"
 
 	TOK_LBRACE TokenType = "{"
 	TOK_RBRACE TokenType = "}"
 	TOK_LPAREN TokenType = "("
 	TOK_RPAREN TokenType = ")"
 
-	TOK_IF   TokenType = "IF"
-	TOK_ELSE TokenType = "ELSE"
+	TOK_IF    TokenType = "IF"
+	TOK_ELSE  TokenType = "ELSE"
+	TOK_FOR   TokenType = "FOR"
+	TOK_WHILE TokenType = "WHILE"
+	TOK_BREAK TokenType = "BREAK"
+	TOK_SKIP  TokenType = "SKIP"
 
 	TOK_EOF TokenType = "EOF"
 )
@@ -106,11 +112,17 @@ func (l *Lexer) NextToken() Token {
 	case ')':
 		return l.makeToken(TOK_RPAREN, 1)
 	case '+':
+		if l.peekNext() == '+' {
+			return l.makeToken(TOK_PLUS_PLUS, 2)
+		}
 		if l.peekNext() == '=' {
 			return l.makeToken(TOK_PLUS_EQ, 2)
 		}
 		return l.makeToken(TOK_PLUS, 1)
 	case '-':
+		if l.peekNext() == '-' {
+			return l.makeToken(TOK_MINUS_MINUS, 2)
+		}
 		if l.peekNext() == '=' {
 			return l.makeToken(TOK_MINUS_EQ, 2)
 		}
@@ -386,6 +398,14 @@ func (l *Lexer) readIdentifier() Token {
 		return Token{TOK_IF, word, l.line}
 	case "else":
 		return Token{TOK_ELSE, word, l.line}
+	case "for":
+		return Token{TOK_FOR, word, l.line}
+	case "while":
+		return Token{TOK_WHILE, word, l.line}
+	case "break":
+		return Token{TOK_BREAK, word, l.line}
+	case "skip":
+		return Token{TOK_SKIP, word, l.line}
 	case "var":
 		return Token{TOK_VAR, word, l.line}
 	case "bool":

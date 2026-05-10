@@ -6748,3 +6748,1244 @@ if (x == 0) {
 		t.Errorf("expected empty output, got %q", output)
 	}
 }
+
+func TestForLoopCount(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+for (i = 0; i < 5; i = i + 1) {
+	print(i);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "0\n1\n2\n3\n4" {
+		t.Errorf("expected '0\\n1\\n2\\n3\\n4', got %q", output)
+	}
+}
+
+func TestForLoopWithVarDeclInit(t *testing.T) {
+	input := `
+for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 3; i = i + 1) {
+	print(i);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "0\n1\n2" {
+		t.Errorf("expected '0\\n1\\n2', got %q", output)
+	}
+}
+
+func TestForLoopVarScopedToLoop(t *testing.T) {
+	input := `
+for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 1; i = i + 1) {
+	print(i);
+}
+print(i);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error: i is scoped to for loop")
+	}
+}
+
+func TestForLoopEmptyInitCondUpdate(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+for (;;) {
+	print(i);
+	i = i + 1;
+	if (i >= 3) {
+		break;
+	}
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "0\n1\n2" {
+		t.Errorf("expected '0\\n1\\n2', got %q", output)
+	}
+}
+
+func TestWhileLoop(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+while (i < 3) {
+	print(i);
+	i = i + 1;
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "0\n1\n2" {
+		t.Errorf("expected '0\\n1\\n2', got %q", output)
+	}
+}
+
+func TestBreakInLoop(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+while (true) {
+	print(i);
+	if (i >= 2) {
+		break;
+	}
+	i = i + 1;
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "0\n1\n2" {
+		t.Errorf("expected '0\\n1\\n2', got %q", output)
+	}
+}
+
+func TestSkipInLoop(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+while (i < 5) {
+	i = i + 1;
+	if (i == 3) {
+		skip;
+	}
+	print(i);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1\n2\n4\n5" {
+		t.Errorf("expected '1\\n2\\n4\\n5', got %q", output)
+	}
+}
+
+func TestSkipInForLoop(t *testing.T) {
+	input := `
+for (var i: int{size: 32, signed: true, nullable: false} = 1; i <= 5; i = i + 1) {
+	if (i == 3) {
+		skip;
+	}
+	print(i);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1\n2\n4\n5" {
+		t.Errorf("expected '1\\n2\\n4\\n5', got %q", output)
+	}
+}
+
+func TestBreakOutsideLoop(t *testing.T) {
+	input := "break;"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for break outside loop")
+	}
+}
+
+func TestSkipOutsideLoop(t *testing.T) {
+	input := "skip;"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for skip outside loop")
+	}
+}
+
+func TestNestedLoops(t *testing.T) {
+	input := `
+for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 2; i = i + 1) {
+	for (var j: int{size: 32, signed: true, nullable: false} = 0; j < 2; j = j + 1) {
+		print(i * 10 + j);
+	}
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "0\n1\n10\n11" {
+		t.Errorf("expected '0\\n1\\n10\\n11', got %q", output)
+	}
+}
+
+func TestForLoopConditionNotBool(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 0;
+for (; x; ) { }
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for non-bool for condition")
+	}
+}
+
+func TestWhileLoopConditionNotBool(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 0;
+while (x) { }
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for non-bool while condition")
+	}
+}
+
+func TestForLoopBreakFromInnerIf(t *testing.T) {
+	input := `
+for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 10; i = i + 1) {
+	if (i == 3) {
+		break;
+	}
+}
+print(1);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestForLoopInitError(t *testing.T) {
+	input := `
+for (var x: int{size: 8, signed: true, nullable: false} = 1000; false; ) { }
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for overflow in for init")
+	}
+}
+
+func TestForLoopBodyScopedVar(t *testing.T) {
+	input := `
+for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 1; i = i + 1) {
+	var x: int{size: 32, signed: true, nullable: false} = 42;
+	print(x);
+}
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error: x is scoped to for body")
+	}
+}
+
+func TestBreakWithSkipInSameLoop(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+while (i < 10) {
+	i = i + 1;
+	if (i == 3) {
+		skip;
+	}
+	if (i == 5) {
+		break;
+	}
+	print(i);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1\n2\n4" {
+		t.Errorf("expected '1\\n2\\n4', got %q", output)
+	}
+}
+
+func TestBreakOutsideLoopError(t *testing.T) {
+	input := "break;"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Fatalf("expected error for break outside loop")
+	}
+	if err.Error() != "break outside loop" {
+		t.Errorf("expected 'break outside loop', got %q", err.Error())
+	}
+}
+
+func TestSkipOutsideLoopError(t *testing.T) {
+	input := "skip;"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Fatalf("expected error for skip outside loop")
+	}
+	if err.Error() != "skip outside loop" {
+		t.Errorf("expected 'skip outside loop', got %q", err.Error())
+	}
+}
+
+func TestForLoopConditionError(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+for (; undefinedVar; ) { }
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for undefined condition variable")
+	}
+}
+
+func TestForLoopBodyError(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+for (; i < 1; i = i + 1) {
+	var x: int{size: 32, signed: true, nullable: false} = y;
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for undefined variable in body")
+	}
+}
+
+func TestForLoopUpdateError(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+for (; i < 1; i = undefinedVar) { }
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for undefined variable in update")
+	}
+}
+
+func TestWhileLoopConditionError(t *testing.T) {
+	input := "while (undefinedVar) { }"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for undefined condition variable")
+	}
+}
+
+func TestWhileLoopBodyError(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+while (i < 1) {
+	var x: int{size: 32, signed: true, nullable: false} = y;
+	i = i + 1;
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for undefined variable in body")
+	}
+}
+
+func TestLoopSignalUnknown(t *testing.T) {
+	var s LoopSignal = 99
+	msg := s.Error()
+	if msg != "unknown loop control" {
+		t.Errorf("expected 'unknown loop control', got %q", msg)
+	}
+}
+
+func TestWhileBreakInsideIf(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+while (i < 10) {
+	if (i == 3) {
+		break;
+	}
+	i = i + 1;
+}
+print(i);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "3" {
+		t.Errorf("expected '3', got %q", output)
+	}
+}
+
+func TestWhileFalseCondition(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 5;
+while (false) {
+	x = 10;
+}
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "5" {
+		t.Errorf("expected '5', got %q", output)
+	}
+}
+
+func TestForLoopFalseCondition(t *testing.T) {
+	input := `
+for (var i: int{size: 32, signed: true, nullable: false} = 42; false; i = i + 1) {
+	print(i);
+}
+print(i);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error: i is scoped to for loop")
+	}
+}
+
+func TestForLoopCompoundUpdate(t *testing.T) {
+	input := `
+for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 3; i += 1) {
+	print(i);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "0\n1\n2" {
+		t.Errorf("expected '0\\n1\\n2', got %q", output)
+	}
+}
+
+func TestForLoopVarDeclWithoutInit(t *testing.T) {
+	input := `
+for (var i: int{size: 32, signed: true, nullable: false}; i < 3; i = i + 1) {
+	print(i);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "0\n1\n2" {
+		t.Errorf("expected '0\\n1\\n2', got %q", output)
+	}
+}
+
+func TestForLoopInitRefOuterVar(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 5;
+for (var i: int{size: 32, signed: true, nullable: false} = x; i < x + 2; i = i + 1) {
+	print(i);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "5\n6" {
+		t.Errorf("expected '5\\n6', got %q", output)
+	}
+}
+
+func TestForLoopOnlyInitBreak(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+for (i = 0;;) {
+	if (i >= 3) {
+		break;
+	}
+	print(i);
+	i = i + 1;
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "0\n1\n2" {
+		t.Errorf("expected '0\\n1\\n2', got %q", output)
+	}
+}
+
+func TestNestedLoopsBreakInner(t *testing.T) {
+	input := `
+for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 3; i = i + 1) {
+	for (var j: int{size: 32, signed: true, nullable: false} = 0; j < 3; j = j + 1) {
+		if (j == 1) {
+			break;
+		}
+		print(i * 10 + j);
+	}
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "0\n10\n20" {
+		t.Errorf("expected '0\\n10\\n20', got %q", output)
+	}
+}
+
+func TestForLoopBodyVarNotVisibleInUpdate(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+for (; i < 1; i = x) {
+	var x: int{size: 32, signed: true, nullable: false} = 42;
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error: body-scoped var should not be visible in update")
+	}
+}
+
+func TestWhileLoopBodyVarNotVisibleInCondition(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+while (i < 3) {
+	var x: int{size: 32, signed: true, nullable: false} = 42;
+	i = i + 1;
+}
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error: body-scoped var should not be visible after loop")
+	}
+}
+
+func TestIncrementInt(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 5;
+i++;
+print(i);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	output := captureOutput(func() {
+		err := interp.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "6" {
+		t.Errorf("expected '6', got %q", output)
+	}
+}
+
+func TestDecrementInt(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 5;
+i--;
+print(i);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	output := captureOutput(func() {
+		err := interp.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "4" {
+		t.Errorf("expected '4', got %q", output)
+	}
+}
+
+func TestIncrementFloat(t *testing.T) {
+	input := `
+var f: float{size: 64, nullable: false} = 3.5;
+f++;
+print(f);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	output := captureOutput(func() {
+		err := interp.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "4.5" {
+		t.Errorf("expected '4.5', got %q", output)
+	}
+}
+
+func TestDecrementFloat(t *testing.T) {
+	input := `
+var f: float{size: 64, nullable: false} = 3.5;
+f--;
+print(f);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	output := captureOutput(func() {
+		err := interp.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "2.5" {
+		t.Errorf("expected '2.5', got %q", output)
+	}
+}
+
+func TestIncrementInForLoop(t *testing.T) {
+	input := `
+for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 3; i++) {
+	print(i);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	output := captureOutput(func() {
+		err := interp.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "0\n1\n2" {
+		t.Errorf("expected '0\\n1\\n2', got %q", output)
+	}
+}
+
+func TestDecrementInForLoop(t *testing.T) {
+	input := `
+for (var i: int{size: 32, signed: true, nullable: false} = 2; i >= 0; i--) {
+	print(i);
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	output := captureOutput(func() {
+		err := interp.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "2\n1\n0" {
+		t.Errorf("expected '2\\n1\\n0', got %q", output)
+	}
+}
+
+func TestIncrementUndefinedVar(t *testing.T) {
+	input := "undefinedVar++;"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	err := interp.Run(program)
+	if err == nil {
+		t.Errorf("expected error for undefined variable")
+	}
+}
+
+func TestIncrementNullVar(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: true};
+i++;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	err := interp.Run(program)
+	if err == nil {
+		t.Errorf("expected error for null increment")
+	}
+}
+
+func TestIncrementBoolVar(t *testing.T) {
+	input := `
+var b: bool{nullable: false} = true;
+b++;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	err := interp.Run(program)
+	if err == nil {
+		t.Errorf("expected error for bool increment")
+	}
+}
+
+func TestIncrementOverflow(t *testing.T) {
+	input := `
+var i: int{size: 8, signed: true, nullable: false} = 127;
+i++;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	err := interp.Run(program)
+	if err == nil {
+		t.Errorf("expected overflow error")
+	}
+}
+
+func TestIncrementFromBlock(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 5;
+if (true) {
+	i++;
+}
+print(i);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	output := captureOutput(func() {
+		err := interp.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "6" {
+		t.Errorf("expected '6', got %q", output)
+	}
+}
+
+func TestDecrementFromBlock(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 5;
+if (true) {
+	i--;
+}
+print(i);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	output := captureOutput(func() {
+		err := interp.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "4" {
+		t.Errorf("expected '4', got %q", output)
+	}
+}
+
+func TestIncrementZero(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+i++;
+print(i);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	output := captureOutput(func() {
+		err := interp.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestDecrementZero(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = 0;
+i--;
+print(i);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	output := captureOutput(func() {
+		err := interp.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "-1" {
+		t.Errorf("expected '-1', got %q", output)
+	}
+}
+
+func TestIncrementNegative(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = -3;
+i++;
+print(i);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	output := captureOutput(func() {
+		err := interp.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "-2" {
+		t.Errorf("expected '-2', got %q", output)
+	}
+}
+
+func TestDecrementNegative(t *testing.T) {
+	input := `
+var i: int{size: 32, signed: true, nullable: false} = -3;
+i--;
+print(i);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	output := captureOutput(func() {
+		err := interp.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "-4" {
+		t.Errorf("expected '-4', got %q", output)
+	}
+}
+
+func TestDecrementOverflow(t *testing.T) {
+	input := `
+var i: int{size: 8, signed: true, nullable: false} = -128;
+i--;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	interp := New()
+	err := interp.Run(program)
+	if err == nil {
+		t.Errorf("expected overflow error")
+	}
+}

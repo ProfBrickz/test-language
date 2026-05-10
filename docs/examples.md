@@ -2,13 +2,13 @@
 
 ## Hello World
 
-```go
+```
 print("Hello, World!");
 ```
 
 ## Variables and Types
 
-```go
+```
 // Basic variable declarations
 var x: int{size: 32, signed: true} = 42;
 var y: float{size: 64} = 3.14;
@@ -22,7 +22,7 @@ var c: bool = false;    // bool{nullable: true}
 
 ## Nullable Types
 
-```go
+```
 var x: int{nullable: true} = null;
 var y: int{nullable: true};  // defaults to null
 
@@ -31,7 +31,7 @@ var z: int{nullable: false} = 0;  // defaults to 0
 
 ## Arithmetic
 
-```go
+```
 var x: int = 10;
 var y: int = 3;
 
@@ -48,7 +48,7 @@ print(a / b);  // 3.3333333333333335
 
 ## Comparison Operators
 
-```go
+```
 // Integer comparisons
 print(5 == 5);   // true
 print(5 != 3);   // true
@@ -75,7 +75,7 @@ print(null < 10);      // false (warning: null literal used with <)
 
 ## Logical Operators
 
-```go
+```
 print(true && true);    // true
 print(true && false);   // false
 print(false && true);   // false (short-circuit: false && anything is false)
@@ -96,7 +96,7 @@ print(true || null);       // true (short-circuits, right not evaluated)
 
 ## Operator Precedence
 
-```go
+```
 print(1 + 2 * 3);      // 7
 print((1 + 2) * 3);    // 9
 print(10 - 4 / 2);     // 8
@@ -109,7 +109,7 @@ print((true || false) && false);  // false (with parentheses)
 
 ## If / Else
 
-```go
+```
 var x: int{size: 32} = 42;
 var flag: bool{nullable: false} = true;
 
@@ -148,9 +148,11 @@ if (x == 0) {
 
 ## Scoping
 
-Variables declared inside an if/else block are scoped to that block:
+Variables declared inside any block (`{ }`) are scoped to that block.
 
-```go
+### If / Else Scoping
+
+```
 var a: int{size: 32} = 1;
 
 if (true) {
@@ -164,7 +166,7 @@ print(b);  // error: b is not defined
 
 Outer variables can be modified from within:
 
-```go
+```
 var x: int{size: 32} = 0;
 
 if (true) {
@@ -174,9 +176,40 @@ if (true) {
 print(x);  // 5
 ```
 
+### Loop Scoping
+
+Variables declared in a for loop init are scoped to the loop:
+
+```
+for (var i: int{size: 32} = 0; i < 3; i++) {
+    print(i);  // 0, 1, 2
+}
+print(i);  // error: i is not defined
+```
+
+Variables declared in a for or while body are scoped per iteration:
+
+```
+for (var i: int{size: 32} = 0; i < 3; i++) {
+    var x: int{size: 32} = i * 10;  // scoped to this iteration
+    print(x);
+}
+print(x);  // error: x is not defined
+```
+
+Outer variables are accessible and modifiable from within loops:
+
+```
+var total: int{size: 32} = 0;
+for (var i: int{size: 32} = 0; i < 3; i++) {
+    total = total + i;  // modifies outer total
+}
+print(total);  // 3
+```
+
 ## Assignments
 
-```go
+```
 var x: int{size: 32} = 10;
 
 x = 20;     // simple assignment
@@ -186,9 +219,98 @@ x *= 2;     // operator: x = x * 2 → 44
 x /= 4;     // operator: x = x / 4 → 11
 ```
 
+## Increment / Decrement
+
+```
+var i: int{size: 32} = 5;
+i++;
+print(i);  // 6
+i--;
+print(i);  // 5
+
+// Works on floats too
+var f: float = 3.5;
+f++;
+print(f);  // 4.5
+
+// Common use in for loops
+for (var j: int{size: 32} = 0; j < 3; j++) {
+    print(j);  // 0, 1, 2
+}
+```
+
+## For Loops
+
+```
+// Basic for loop
+for (var i: int{size: 32} = 0; i < 5; i++) {
+    print(i);  // 0, 1, 2, 3, 4
+}
+
+// All parts optional (infinite loop with break)
+var x: int{size: 32} = 0;
+for (;;) {
+    if (x >= 3) {
+        break;
+    }
+    print(x);
+    x++;
+}
+
+// Init can be assignment
+for (x = 0; x < 3; x++) {
+    print(x);
+}
+
+// Condition only (while-like)
+for (; x < 6; x++) {
+    print(x);
+}
+```
+
+## While Loops
+
+```
+var i: int{size: 32} = 0;
+while (i < 3) {
+    print(i);  // 0, 1, 2
+    i++;
+}
+```
+
+## Break / Skip
+
+```
+// Break exits the loop
+for (var i: int{size: 32} = 0; i < 10; i++) {
+    if (i == 3) {
+        break;  // stops at 3
+    }
+    print(i);  // 0, 1, 2
+}
+
+// Skip skips to the next iteration
+for (var i: int{size: 32} = 0; i < 5; i++) {
+    if (i == 2) {
+        skip;  // skip printing 2
+    }
+    print(i);  // 0, 1, 3, 4
+}
+
+// Works in while loops too
+var n: int{size: 32} = 0;
+while (n < 5) {
+    n++;
+    if (n == 3) {
+        skip;
+    }
+    print(n);  // 1, 2, 4, 5
+}
+```
+
 ## Automatic Type Conversion
 
-```go
+```
 // Integer widening
 var a: int{size: 8, signed: true} = 10;
 var b: int{size: 32, signed: true} = a;  // OK: int8 → int32
@@ -208,7 +330,7 @@ var h: int{nullable: true} = g;          // OK
 
 ## Literal Formats
 
-```go
+```
 // Integer literals
 var dec: int = 100_000;     // underscores for readability
 var hex: int = 0xFF;        // hexadecimal: 255
@@ -234,14 +356,14 @@ var ninf: float = -infinity;         // Negative infinity
 
 Overflow is a runtime error:
 
-```go
+```
 var x: int{size: 8, signed: true} = 200;   // error: value overflows type
 var y: int{size: 8, signed: false} = 256;  // error: value overflows type
 ```
 
 ## Complete Program
 
-```go
+```
 // Variable declarations
 var x: int{size: 32} = 42;
 var y: int{size: 32} = 10;
@@ -286,7 +408,7 @@ print(!null);         // true
 
 ## Type Members
 
-```go
+```
 // Integer type properties
 print(int.min);                 // -9223372036854775808
 print(int{size: 8}.max);        // 127

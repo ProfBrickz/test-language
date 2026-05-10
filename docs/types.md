@@ -4,7 +4,7 @@ Every variable must declare its type at definition. The three primitive types ar
 
 ## int
 
-```go
+```
 var x: int{size: 32, signed: true, nullable: false} = 42;
 ```
 
@@ -14,7 +14,7 @@ var x: int{size: 32, signed: true, nullable: false} = 42;
 
 ## float
 
-```go
+```
 var a: float{size: 32, nullable: false} = 3.14;
 ```
 
@@ -23,7 +23,7 @@ var a: float{size: 32, nullable: false} = 3.14;
 
 ## bool
 
-```go
+```
 var x: bool{nullable: false} = true;
 ```
 
@@ -33,7 +33,7 @@ var x: bool{nullable: false} = true;
 
 When using all defaults, drop the braces:
 
-```go
+```
 var x: int = 42;      // int{size: 64, signed: true, nullable: true}
 var a: float = 3.14;  // float{size: 64, nullable: true}
 var b: bool = true;    // bool{nullable: true}
@@ -43,7 +43,7 @@ var b: bool = true;    // bool{nullable: true}
 
 `nullable: true` means the variable can be `null`. Non-nullable types reject `null` at runtime.
 
-```go
+```
 var x: int{nullable: true} = null;   // fine
 var y: int{nullable: false} = null;  // runtime error
 ```
@@ -87,7 +87,7 @@ Values are automatically converted in assignments and operator assignments follo
 
 When a value exceeds its target range, a runtime error is raised:
 
-```go
+```
 var x: int{size: 8, signed: true} = 200;   // error: overflows 8-bit signed int
 var y: int{size: 8, signed: false} = 256;  // error: overflows 8-bit unsigned int
 var a: float{size: 16} = 70000.0;          // error: overflows 16-bit float
@@ -134,7 +134,7 @@ Default `float` is `float{size: 64}`.
 
 Every value has a `.type` member that returns a type descriptor, which supports the same members above:
 
-```go
+```
 var a: int{size: 8} = 42;
 print(a.type);       // "8-bit signed int"
 print(a.type.min);   // -128

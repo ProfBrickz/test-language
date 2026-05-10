@@ -105,6 +105,27 @@ type IfStmt struct {
 	Else      Stmt // *BlockStmt (else) or *IfStmt (else if)
 }
 
+type ForStmt struct {
+	Init      Stmt
+	Condition Expr
+	Update    Stmt
+	Body      *BlockStmt
+}
+
+type WhileStmt struct {
+	Condition Expr
+	Body      *BlockStmt
+}
+
+type BreakStmt struct{}
+
+type SkipStmt struct{}
+
+type IncDecStmt struct {
+	Name string
+	Op   string // "++" or "--"
+}
+
 type Program struct {
 	Stmts []Stmt
 }

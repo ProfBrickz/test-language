@@ -106,7 +106,7 @@ func TestBoolKeyword(t *testing.T) {
 }
 
 func TestKeywords(t *testing.T) {
-	input := "var int print size signed nullable null true false bool if else"
+	input := "var int print size signed nullable null true false bool if else for while break skip"
 	l := New(input)
 
 	tests := []struct {
@@ -124,6 +124,10 @@ func TestKeywords(t *testing.T) {
 		{TOK_BOOL},
 		{TOK_IF},
 		{TOK_ELSE},
+		{TOK_FOR},
+		{TOK_WHILE},
+		{TOK_BREAK},
+		{TOK_SKIP},
 	}
 
 	for i, tt := range tests {
@@ -135,7 +139,7 @@ func TestKeywords(t *testing.T) {
 }
 
 func TestOperators(t *testing.T) {
-	input := "+ - * / = += -= *= /="
+	input := "+ - * / = += -= *= /= ++ --"
 	l := New(input)
 
 	tests := []struct {
@@ -150,6 +154,8 @@ func TestOperators(t *testing.T) {
 		{TOK_MINUS_EQ},
 		{TOK_STAR_EQ},
 		{TOK_SLASH_EQ},
+		{TOK_PLUS_PLUS},
+		{TOK_MINUS_MINUS},
 	}
 
 	for i, tt := range tests {

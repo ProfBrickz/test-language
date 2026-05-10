@@ -450,10 +450,26 @@ func convertFloat(val float64, ftype ast.FloatType) float64 {
 		return float64(float16.Fromfloat32(float32(val)).Float32())
 	case 32:
 		return float64(float32(val))
-	case 64:
+	default:
 		return val
 	}
-	return val
+}
+
+type LoopSignal int
+
+const (
+	BreakSignal LoopSignal = iota
+	SkipSignal
+)
+
+func (s LoopSignal) Error() string {
+	switch s {
+	case BreakSignal:
+		return "break outside loop"
+	case SkipSignal:
+		return "skip outside loop"
+	}
+	return "unknown loop control"
 }
 
 type Environment struct {
@@ -605,6 +621,48 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 		}
 	case *ast.IfStmt:
 		return i.execIf(s)
+	case *ast.ForStmt:
+		return i.execFor(s)
+	case *ast.WhileStmt:
+		return i.execWhile(s)
+	case *ast.BreakStmt:
+		return BreakSignal
+	case *ast.SkipStmt:
+		return SkipSignal
+	case *ast.IncDecStmt:
+		env := i.env.LookupEnv(s.Name)
+		if env == nil {
+			return fmt.Errorf("undefined variable: %s", s.Name)
+		}
+		val, _ := env.Get(s.Name)
+		if val.Null {
+			return fmt.Errorf("cannot increment/decrement null")
+		}
+		if val.IsBool {
+			return fmt.Errorf("cannot increment/decrement bool")
+		}
+		if s.Op == "++" {
+			if val.IsFloat {
+				val.FData = convertFloat(val.FData+1, val.FType)
+			} else {
+				newVal := val.Data + 1
+				if err := checkIntFits(newVal, val.IType); err != nil {
+					return err
+				}
+				val.Data = newVal
+			}
+		} else {
+			if val.IsFloat {
+				val.FData = convertFloat(val.FData-1, val.FType)
+			} else {
+				newVal := val.Data - 1
+				if err := checkIntFits(newVal, val.IType); err != nil {
+					return err
+				}
+				val.Data = newVal
+			}
+		}
+		env.Set(s.Name, val)
 	case *ast.PrintStmt:
 		val, err := i.evalExpr(s.Expr)
 		if err != nil {
@@ -664,6 +722,86 @@ func (i *Interpreter) execElse(stmt ast.Stmt) error {
 		return i.execIf(s)
 	default:
 		return fmt.Errorf("unexpected else type: %T", stmt)
+	}
+}
+
+func (i *Interpreter) execFor(s *ast.ForStmt) error {
+	i.pushScope()
+	defer i.popScope()
+
+	if s.Init != nil {
+		if err := i.executeStmt(s.Init); err != nil {
+			return err
+		}
+	}
+
+	for {
+		if s.Condition != nil {
+			condVal, err := i.evalExpr(s.Condition)
+			if err != nil {
+				return err
+			}
+			if !condVal.IsBool {
+				return fmt.Errorf("for condition must be a bool, got %s", typeDescForVal(condVal))
+			}
+			if !condVal.BData {
+				return nil
+			}
+		}
+
+		i.pushScope()
+		err := i.executeStmt(s.Body)
+		i.popScope()
+
+		if err != nil {
+			if sig, ok := err.(LoopSignal); ok {
+				switch sig {
+				case SkipSignal:
+					goto doUpdate
+				case BreakSignal:
+					return nil
+				}
+			}
+			return err
+		}
+
+	doUpdate:
+		if s.Update != nil {
+			if err := i.executeStmt(s.Update); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+func (i *Interpreter) execWhile(s *ast.WhileStmt) error {
+	for {
+		condVal, err := i.evalExpr(s.Condition)
+		if err != nil {
+			return err
+		}
+		if !condVal.IsBool {
+			return fmt.Errorf("while condition must be a bool, got %s", typeDescForVal(condVal))
+		}
+		if !condVal.BData {
+			return nil
+		}
+
+		i.pushScope()
+		err = i.executeStmt(s.Body)
+		i.popScope()
+
+		if err != nil {
+			if sig, ok := err.(LoopSignal); ok {
+				switch sig {
+				case SkipSignal:
+					continue
+				case BreakSignal:
+					return nil
+				}
+			}
+			return err
+		}
 	}
 }
 

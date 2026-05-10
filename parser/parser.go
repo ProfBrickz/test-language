@@ -62,9 +62,20 @@ func (p *Parser) parseStmt() ast.Stmt {
 	case lexer.TOK_PRINT:
 		return p.parsePrint()
 	case lexer.TOK_IDENT:
+		if p.peekToken.Type == lexer.TOK_PLUS_PLUS || p.peekToken.Type == lexer.TOK_MINUS_MINUS {
+			return p.parseIncDec()
+		}
 		return p.parseAssignment()
 	case lexer.TOK_IF:
 		return p.parseIf()
+	case lexer.TOK_FOR:
+		return p.parseFor()
+	case lexer.TOK_WHILE:
+		return p.parseWhile()
+	case lexer.TOK_BREAK:
+		return p.parseBreak()
+	case lexer.TOK_SKIP:
+		return p.parseSkip()
 	default:
 		p.addError("unexpected token: %s", p.curToken.Literal)
 		return nil
@@ -411,6 +422,150 @@ func (p *Parser) parseIf() *ast.IfStmt {
 	}
 
 	return &ast.IfStmt{Condition: condition, Then: thenBlock, Else: elseStmt}
+}
+
+func (p *Parser) parseFor() *ast.ForStmt {
+	p.nextToken()
+
+	if p.curToken.Type != lexer.TOK_LPAREN {
+		p.addError("expected '(', got %s", p.curToken.Type)
+		return nil
+	}
+	p.nextToken()
+
+	var init ast.Stmt
+	if p.curToken.Type != lexer.TOK_SEMICOLON {
+		if p.curToken.Type == lexer.TOK_VAR {
+			init = p.parseVarDecl()
+		} else if p.curToken.Type == lexer.TOK_IDENT {
+			init = p.parseAssignment()
+		} else {
+			p.addError("expected variable declaration or assignment in for init, got %s", p.curToken.Type)
+			return nil
+		}
+	}
+	p.nextToken()
+
+	var cond ast.Expr
+	if p.curToken.Type != lexer.TOK_SEMICOLON {
+		cond = p.parseExpr()
+	}
+	if p.curToken.Type != lexer.TOK_SEMICOLON {
+		p.addError("expected ';' after for condition")
+		return nil
+	}
+	p.nextToken()
+
+	var update ast.Stmt
+	if p.curToken.Type != lexer.TOK_RPAREN {
+		if p.curToken.Type != lexer.TOK_IDENT {
+			p.addError("expected identifier in for update, got %s", p.curToken.Type)
+			return nil
+		}
+		name := p.curToken.Literal
+		p.nextToken()
+
+		if p.curToken.Type == lexer.TOK_PLUS_PLUS || p.curToken.Type == lexer.TOK_MINUS_MINUS {
+			op := p.curToken.Literal
+			p.nextToken()
+			update = &ast.IncDecStmt{Name: name, Op: op}
+		} else {
+			var op string
+			switch p.curToken.Type {
+			case lexer.TOK_ASSIGN:
+				op = "="
+			case lexer.TOK_PLUS_EQ:
+				op = "+="
+			case lexer.TOK_MINUS_EQ:
+				op = "-="
+			case lexer.TOK_STAR_EQ:
+				op = "*="
+			case lexer.TOK_SLASH_EQ:
+				op = "/="
+			default:
+				p.addError("expected assignment operator or '++'/'--' in for update, got %s", p.curToken.Type)
+				return nil
+			}
+			p.nextToken()
+
+			expr := p.parseExpr()
+			update = &ast.Assignment{Name: name, Op: op, Expr: expr}
+		}
+	}
+
+	if p.curToken.Type != lexer.TOK_RPAREN {
+		p.addError("expected ')' after for update, got %s", p.curToken.Type)
+		return nil
+	}
+	p.nextToken()
+
+	body := p.parseBlock()
+	if body == nil {
+		return nil
+	}
+
+	return &ast.ForStmt{Init: init, Condition: cond, Update: update, Body: body}
+}
+
+func (p *Parser) parseWhile() *ast.WhileStmt {
+	p.nextToken()
+
+	if p.curToken.Type != lexer.TOK_LPAREN {
+		p.addError("expected '(', got %s", p.curToken.Type)
+		return nil
+	}
+	p.nextToken()
+
+	cond := p.parseExpr()
+
+	if p.curToken.Type != lexer.TOK_RPAREN {
+		p.addError("expected ')', got %s", p.curToken.Type)
+		return nil
+	}
+	p.nextToken()
+
+	body := p.parseBlock()
+	if body == nil {
+		return nil
+	}
+
+	return &ast.WhileStmt{Condition: cond, Body: body}
+}
+
+func (p *Parser) parseBreak() *ast.BreakStmt {
+	p.nextToken()
+
+	if p.curToken.Type != lexer.TOK_SEMICOLON {
+		p.addError("expected ';', got %s", p.curToken.Type)
+		return nil
+	}
+
+	return &ast.BreakStmt{}
+}
+
+func (p *Parser) parseSkip() *ast.SkipStmt {
+	p.nextToken()
+
+	if p.curToken.Type != lexer.TOK_SEMICOLON {
+		p.addError("expected ';', got %s", p.curToken.Type)
+		return nil
+	}
+
+	return &ast.SkipStmt{}
+}
+
+func (p *Parser) parseIncDec() *ast.IncDecStmt {
+	ident := p.curToken.Literal
+	p.nextToken()
+	op := p.curToken.Literal
+	p.nextToken()
+
+	if p.curToken.Type != lexer.TOK_SEMICOLON {
+		p.addError("expected ';', got %s", p.curToken.Type)
+		return nil
+	}
+
+	return &ast.IncDecStmt{Name: ident, Op: op}
 }
 
 func (p *Parser) parseExpr() ast.Expr {

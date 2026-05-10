@@ -2,7 +2,7 @@
 
 ## Declaring Variables
 
-```go
+```
 var name: type = expression;
 ```
 
@@ -10,7 +10,7 @@ The initializer is optional. Leave it off and nullable types default to `null`, 
 
 ## If / Else
 
-```go
+```
 if (condition) {
     statements;
 } else if (condition) {
@@ -28,7 +28,7 @@ Each `if`, `else if`, and `else` body creates a new scope:
 - Outer variables are accessible from within
 - Assignments to outer variables modify the outer variable (not a shadow)
 
-```go
+```
 var x: int{size: 32} = 1;
 
 if (true) {
@@ -42,7 +42,7 @@ print(y);  // error: y is not defined
 
 ## Print
 
-```go
+```
 print(expression);
 ```
 
@@ -50,7 +50,7 @@ Prints the value to stdout followed by a newline.
 
 ## Assignment
 
-```go
+```
 identifier = expression;
 identifier += expression;
 identifier -= expression;
@@ -59,6 +59,57 @@ identifier /= expression;
 ```
 
 Operator assignments (`+=`, `-=`, `*=`, `/=`) read the current value, apply the operation, and store the result back.
+
+## Increment / Decrement
+
+```
+identifier++;
+identifier--;
+```
+
+Postfix `++` and `--` increment or decrement an integer or float variable by 1. Prefix forms (`++i`, `--i`) are not supported. Works on both integers and floats. Overflow is checked at runtime.
+
+## For Loops
+
+```
+for (init; condition; update) {
+    body;
+}
+```
+
+C-style for loop. All three parts are optional (`for (;;)` is an infinite loop). The init can be a `var` declaration or an assignment. The condition must be a `bool`. The update can be an assignment or `++`/`--`.
+
+The init, condition, and update share a scope. Each iteration creates a new scope for the body. Variables declared in the body are not visible in the condition or update.
+
+## While Loops
+
+```
+while (condition) {
+    body;
+}
+```
+
+Condition must be a `bool`. Each iteration creates a new scope for the body.
+
+## Break / Skip
+
+```
+break;
+skip;
+```
+
+`break` exits the current loop. `skip` skips to the next iteration (like `continue` in C). Both must appear inside a loop. Using them outside a loop is an error.
+
+## Scoping
+
+Variables declared inside any block (`{ }`) are scoped to that block:
+
+- Variables declared inside an `if`, `else`, `for`, or `while` body are not visible outside
+- Outer variables are accessible from within blocks
+- Assignments to outer variables modify the outer variable (not a shadow)
+
+For for loops, variables declared in the `init` are scoped to the entire loop construct
+and are accessible in the condition, update, and body, but not after the loop.
 
 ## Operators
 
@@ -99,7 +150,7 @@ Special float literals: `NaN`, `infinity`, `-infinity`.
 
 The `.` operator accesses properties of types and values:
 
-```go
+```
 print(int.min);              // type property: -9223372036854775808
 print(float.precision);      // type property: 15
 print(float{size: 32}.max);  // type property with parameters: 3.4028235e+38
@@ -108,7 +159,7 @@ print(bool.size);            // type property: 8
 
 The `.type` property returns a value's type descriptor, which can be further accessed:
 
-```go
+```
 var a: int{size: 8} = 42;
 print(a.type);       // "8-bit signed int"
 print(a.type.min);   // -128
