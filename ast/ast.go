@@ -77,6 +77,10 @@ type UnaryExpr struct {
 	Right Expr
 }
 
+type TypeOfExpr struct {
+	Expr Expr
+}
+
 type BinaryExpr struct {
 	Left  Expr
 	Op    string

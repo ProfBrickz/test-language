@@ -15,6 +15,7 @@ const (
 	TOK_LIST      TokenType = "LIST"
 	TOK_VAR       TokenType = "VAR"
 	TOK_PRINT     TokenType = "PRINT"
+	TOK_TYPEOF    TokenType = "TYPEOF"
 	TOK_IDENT     TokenType = "IDENT"
 	TOK_INT_LIT   TokenType = "INT_LIT"
 	TOK_FLOAT_LIT TokenType = "FLOAT_LIT"
@@ -448,6 +449,8 @@ func (l *Lexer) readIdentifier() Token {
 		return Token{TOK_MIN, word, l.line}
 	case "max":
 		return Token{TOK_MAX, word, l.line}
+	case "typeof":
+		return Token{TOK_TYPEOF, word, l.line}
 	case "NaN":
 		return Token{TOK_FLOAT_LIT, word, l.line}
 	case "infinity":

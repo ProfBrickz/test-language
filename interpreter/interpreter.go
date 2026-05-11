@@ -1179,6 +1179,12 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 			elements = append(elements, ev)
 		}
 		return Value{IsArray: true, ArrayData: elements}, nil
+	case *ast.TypeOfExpr:
+		val, err := i.evalExpr(e.Expr)
+		if err != nil {
+			return Value{}, err
+		}
+		return valueToTypeDesc(val), nil
 	case *ast.IndexExpr:
 		obj, err := i.evalExpr(e.Object)
 		if err != nil {
@@ -1203,9 +1209,6 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 		obj, err := i.evalExpr(e.Object)
 		if err != nil {
 			return Value{}, err
-		}
-		if e.Member == "type" {
-			return valueToTypeDesc(obj), nil
 		}
 		if obj.IsType {
 			return i.evalTypeMember(obj, e.Member)

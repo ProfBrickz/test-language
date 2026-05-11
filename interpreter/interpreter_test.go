@@ -4037,10 +4037,10 @@ print(float{size: 32}.size);
 	}
 }
 
-func TestVarDotType(t *testing.T) {
+func TestTypeOf(t *testing.T) {
 	input := `
 var a: int{size: 8} = 42;
-print(a.type);
+print(typeof(a));
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -4062,10 +4062,10 @@ print(a.type);
 	}
 }
 
-func TestVarDotTypeDotMin(t *testing.T) {
+func TestTypeOfDotMin(t *testing.T) {
 	input := `
 var a: int{size: 8} = 42;
-print(a.type.min);
+print(typeof(a).min);
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -4087,10 +4087,10 @@ print(a.type.min);
 	}
 }
 
-func TestVarFloatDotType(t *testing.T) {
+func TestTypeOfFloat(t *testing.T) {
 	input := `
 var a: float{size: 32} = 3.14;
-print(a.type);
+print(typeof(a));
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -4112,10 +4112,10 @@ print(a.type);
 	}
 }
 
-func TestVarFloatDotTypeDotMax(t *testing.T) {
+func TestTypeOfFloatDotMax(t *testing.T) {
 	input := `
 var a: float{size: 32} = 3.14;
-print(a.type.max);
+print(typeof(a).max);
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -4462,18 +4462,29 @@ func TestBoolTypeRef(t *testing.T) {
 	}
 }
 
-func TestBoolTypeMemberType(t *testing.T) {
+func TestTypeOfOnBool(t *testing.T) {
+	input := `
+var a: bool = true;
+print(typeof(a));
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
 	i := New()
-	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Type: ast.BoolType{Nullable: false}},
-		Member: "type",
-	}
-	val, err := i.evalExpr(expr)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !val.IsType || !val.IsBool {
-		t.Errorf("expected IsType and IsBool")
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "bool" {
+		t.Errorf("expected 'bool', got %q", output)
 	}
 }
 
@@ -4534,10 +4545,10 @@ func TestBoolTypePrint(t *testing.T) {
 	}
 }
 
-func TestValueDotTypeOnTypedVar(t *testing.T) {
+func TestTypeOfOnTypedVar(t *testing.T) {
 	input := `
 var a: int{size: 32} = 100;
-print(a.type.min);
+print(typeof(a).min);
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8643,10 +8654,10 @@ func TestArrayTypeEvalMemberNotFound(t *testing.T) {
 	}
 }
 
-func TestVarDotTypeOnArray(t *testing.T) {
+func TestTypeOfOnArray(t *testing.T) {
 	input := `
 var a: array{size: 4}<int> = [1, 2, 3, 4];
-print(a.type);
+print(typeof(a));
 `
 	l := lexer.New(input)
 	p := parser.New(l)

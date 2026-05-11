@@ -130,15 +130,15 @@ Default `float` is `float{size: 64}`.
 |----------|-------------|----------------|--------|
 | `.size`  | Bit width   | `bool.size`    | `8`    |
 
-### .type member
+### typeof operator
 
-Every value has a `.type` member that returns a type descriptor, which supports the same members above:
+The `typeof` operator returns a type descriptor for any value. Type descriptors can be chained with members:
 
 ```
 var a: int{size: 8} = 42;
-print(a.type);       // "8-bit signed int"
-print(a.type.min);   // -128
-print(a.type.max);   // 127
+print(typeof(a));       // "8-bit signed int"
+print(typeof(a).min);   // -128
+print(typeof(a).max);   // 127
 ```
 
 ## array
@@ -163,7 +163,6 @@ print(a);  // [0, 0, 0]
 | Member   | Description         | Example                   | Result |
 |----------|---------------------|---------------------------|--------|
 | `.length`| Number of elements  | `a.length`                | `5`    |
-| `.type`  | Type descriptor     | `a.type`                  | `"array{size: 5}<64-bit signed int>"` |
 
 ### Array Type Members
 
@@ -213,6 +212,5 @@ var b: list{min: 1, max: 10}<int> = [1, 2, 3];
 | `.add(v)`| Append value                           | `a.add(42)`       | `null`        |
 | `.add(v, i)`| Insert value at index               | `a.add(2, 1)`     | `null`        |
 | `.remove(i)`| Remove element at index and return it| `a.remove(0)`     | `1`           |
-| `.type`  | Type descriptor                        | `a.type`          | `"list<64-bit signed int>"` |
 
 Note: `.add()` and `.remove()` are statements (called for their side effects). The bounds (`min`/`max`) are enforced at runtime: adding beyond `max` or removing below `min` produces an error.

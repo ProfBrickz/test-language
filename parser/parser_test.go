@@ -2122,8 +2122,8 @@ func TestParseTypeWithSizeDotMax(t *testing.T) {
 	}
 }
 
-func TestParseVarDotType(t *testing.T) {
-	input := "print(a.type);"
+func TestParseTypeOf(t *testing.T) {
+	input := "print(typeof(a));"
 	l := lexer.New(input)
 	p := New(l)
 	program := p.ParseProgram()
@@ -2133,16 +2133,13 @@ func TestParseVarDotType(t *testing.T) {
 	}
 
 	stmt := program.Stmts[0].(*ast.PrintStmt)
-	ma, ok := stmt.Expr.(*ast.MemberAccess)
+	te, ok := stmt.Expr.(*ast.TypeOfExpr)
 	if !ok {
-		t.Fatalf("expected *ast.MemberAccess, got %T", stmt.Expr)
+		t.Fatalf("expected *ast.TypeOfExpr, got %T", stmt.Expr)
 	}
-	if ma.Member != "type" {
-		t.Errorf("expected Member 'type', got %q", ma.Member)
-	}
-	vr, ok := ma.Object.(*ast.VarRef)
+	vr, ok := te.Expr.(*ast.VarRef)
 	if !ok {
-		t.Fatalf("expected Object *ast.VarRef, got %T", ma.Object)
+		t.Fatalf("expected Object *ast.VarRef, got %T", te.Expr)
 	}
 	if vr.Name != "a" {
 		t.Errorf("expected Name 'a', got %q", vr.Name)

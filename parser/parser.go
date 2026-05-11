@@ -87,6 +87,13 @@ func (p *Parser) parseStmt() ast.Stmt {
 		return p.parseBreak()
 	case lexer.TOK_SKIP:
 		return p.parseSkip()
+	case lexer.TOK_TYPEOF:
+		expr := p.parseExpr()
+		if p.curToken.Type != lexer.TOK_SEMICOLON {
+			p.addError("expected ';'")
+			return nil
+		}
+		return &ast.ExprStmt{Expr: expr}
 	default:
 		p.addError("unexpected token: %s", p.curToken.Literal)
 		return nil
@@ -949,6 +956,20 @@ func (p *Parser) parsePrimary() ast.Expr {
 	case lexer.TOK_LIST:
 		t := p.parseListType()
 		return &ast.TypeRef{Type: t, IsType: true}
+	case lexer.TOK_TYPEOF:
+		if p.peekToken.Type != lexer.TOK_LPAREN {
+			p.addError("expected '(' after 'typeof'")
+			return nil
+		}
+		p.nextToken()
+		p.nextToken()
+		expr := p.parseExpr()
+		if p.curToken.Type != lexer.TOK_RPAREN {
+			p.addError("expected ')' after typeof operand")
+			return nil
+		}
+		p.nextToken()
+		return &ast.TypeOfExpr{Expr: expr}
 	default:
 		p.addError("unexpected token in expression: %s", p.curToken.Literal)
 		return nil

@@ -422,9 +422,9 @@ print(float{size: 16}.max);     // 65504
 // Bool type properties
 print(bool.size);               // 8
 
-// .type on values
+// typeof on values
 var a: int{size: 8} = 100;
-print(a.type);                  // 8-bit signed int
-print(a.type.min);              // -128
-print(a.type.max);              // 127
+print(typeof(a));               // 8-bit signed int
+print(typeof(a).min);           // -128
+print(typeof(a).max);           // 127
 ```

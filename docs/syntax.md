@@ -200,13 +200,13 @@ print(float{size: 32}.max);  // type property with parameters: 3.4028235e+38
 print(bool.size);            // type property: 8
 ```
 
-The `.type` property returns a value's type descriptor, which can be further accessed:
+The `typeof` operator returns a value's type descriptor, which can be further accessed:
 
 ```
 var a: int{size: 8} = 42;
-print(a.type);       // "8-bit signed int"
-print(a.type.min);   // -128
-print(a.type.max);   // 127
+print(typeof(a));       // "8-bit signed int"
+print(typeof(a).min);   // -128
+print(typeof(a).max);   // 127
 ```
 
 ## Identifiers

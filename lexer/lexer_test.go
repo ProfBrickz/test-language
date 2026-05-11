@@ -106,7 +106,7 @@ func TestBoolKeyword(t *testing.T) {
 }
 
 func TestKeywords(t *testing.T) {
-	input := "var int print size signed nullable null true false bool if else for while break skip array list auto min max"
+	input := "var int print size signed nullable null true false bool if else for while break skip array list auto min max typeof"
 	l := New(input)
 
 	tests := []struct {
@@ -133,6 +133,7 @@ func TestKeywords(t *testing.T) {
 		{TOK_AUTO},
 		{TOK_MIN},
 		{TOK_MAX},
+		{TOK_TYPEOF},
 	}
 
 	for i, tt := range tests {
