@@ -140,3 +140,79 @@ print(a.type);       // "8-bit signed int"
 print(a.type.min);   // -128
 print(a.type.max);   // 127
 ```
+
+## array
+
+Fixed-size sequence of elements of the same type.
+
+```
+var a: array{size: 5}<int> = [1, 2, 3, 4, 5];
+```
+
+- **size** - number of elements (required)
+- **Element type** - any type, specified in angle brackets `< >`
+- **Default initializer**: zero-filled (all elements are `0`)
+
+```
+var a: array{size: 3}<int>;
+print(a);  // [0, 0, 0]
+```
+
+### Array Members
+
+| Member   | Description         | Example                   | Result |
+|----------|---------------------|---------------------------|--------|
+| `.length`| Number of elements  | `a.length`                | `5`    |
+| `.type`  | Type descriptor     | `a.type`                  | `"array{size: 5}<64-bit signed int>"` |
+
+### Array Type Members
+
+| Member   | Description         | Example                              | Result |
+|----------|---------------------|--------------------------------------|--------|
+| `.size`  | Array capacity      | `array{size: 5}<int>.size`           | `5`    |
+| `.length`| Array capacity      | `array{size: 5}<int>.length`         | `5`    |
+| `.elem_type` | Element type descriptor | `array{size: 5}<int>.elem_type`  | `"64-bit signed int"` |
+
+Chaining works: `array{size: 5}<int>.elem_type.size` returns `64`.
+
+### Array Shorthand Syntax
+
+Square brackets can be used instead of `{size: N}`:
+
+```
+var a: array[5]<int>;      // same as array{size: 5}<int>
+```
+
+### Size Inference
+
+When the size is omitted, it is inferred from the initializer:
+
+```
+var a: array<int> = [1, 2, 3];  // size inferred as 3
+print(a.length);                 // 3
+```
+
+## list
+
+Variable-size sequence of elements of the same type.
+
+```
+var a: list<int> = [1, 2, 3];
+var b: list{min: 1, max: 10}<int> = [1, 2, 3];
+```
+
+- **min** - minimum number of elements (optional, default `auto` i.e. unbounded)
+- **max** - maximum number of elements (optional, default `auto` i.e. unbounded)
+- **Initializer is required when `min > 0`**
+
+### List Members
+
+| Member   | Description                            | Example           | Result        |
+|----------|----------------------------------------|-------------------|---------------|
+| `.length`| Number of elements                     | `a.length`        | `3`           |
+| `.add(v)`| Append value                           | `a.add(42)`       | `null`        |
+| `.add(v, i)`| Insert value at index               | `a.add(2, 1)`     | `null`        |
+| `.remove(i)`| Remove element at index and return it| `a.remove(0)`     | `1`           |
+| `.type`  | Type descriptor                        | `a.type`          | `"list<64-bit signed int>"` |
+
+Note: `.add()` and `.remove()` are statements (called for their side effects). The bounds (`min`/`max`) are enforced at runtime: adding beyond `max` or removing below `min` produces an error.

@@ -146,6 +146,49 @@ Special float literals: `NaN`, `infinity`, `-infinity`.
 
 **Null:** `null`.
 
+## Indexed Assignment
+
+Assign to an element of an array or list by index:
+
+```
+arr[0] = 42;
+arr[i] = val;
+```
+
+Supports compound operators too:
+
+```
+arr[0] += 5;
+```
+
+## Method Call Statements
+
+Call methods on arrays and lists as standalone statements:
+
+```
+a.add(42);
+a.add(2, 1);
+a.remove(0);
+```
+
+The `.add()` method appends a value (or inserts at an index). The `.remove()` method removes an element at the given index and returns it.
+
+## Index Expression
+
+Access an element of an array or list by index in any expression:
+
+```
+print(arr[0]);
+var x: int = arr[i];
+```
+
+## Array / List Literals
+
+```
+[1, 2, 3]     // array/list literal with three elements
+[]             // empty array/list literal
+```
+
 ## Member Access
 
 The `.` operator accesses properties of types and values:

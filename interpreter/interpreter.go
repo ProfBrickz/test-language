@@ -11,17 +11,20 @@ import (
 )
 
 type Value struct {
-	IType   ast.IntegerType
-	FType   ast.FloatType
-	BType   ast.BoolType
-	Data    int64
-	FData   float64
-	BData   bool
-	Untyped bool
-	IsFloat bool
-	IsBool  bool
-	Null    bool
-	IsType  bool
+	Type      ast.Type
+	IType     ast.IntegerType
+	FType     ast.FloatType
+	BType     ast.BoolType
+	Data      int64
+	FData     float64
+	BData     bool
+	ArrayData []Value
+	Untyped   bool
+	IsFloat   bool
+	IsBool    bool
+	IsArray   bool
+	Null      bool
+	IsType    bool
 }
 
 func intToStr(data int64, itype ast.IntegerType, untyped bool) string {
@@ -70,7 +73,7 @@ func intTypeMax(it ast.IntegerType) int64 {
 		case 32:
 			return 4294967295
 		default:
-			return -1 // int64(-1) has same bit pattern as math.MaxUint64
+			return -1
 		}
 	}
 	switch it.Size {
@@ -153,7 +156,10 @@ func floatTypeMaxExponent(size int) int {
 
 func valueToTypeDesc(val Value) Value {
 	td := Value{IsType: true}
-	if val.IsFloat {
+	if val.IsArray {
+		td.Type = val.Type
+		td.IsArray = true
+	} else if val.IsFloat {
 		td.IsFloat = true
 		td.FType = val.FType
 		td.FType.Nullable = false
@@ -169,6 +175,42 @@ func valueToTypeDesc(val Value) Value {
 }
 
 func (i *Interpreter) evalTypeMember(td Value, member string) (Value, error) {
+	if td.IsArray {
+		switch member {
+		case "length":
+			if at, ok := td.Type.(ast.ArrayType); ok {
+				return Value{Data: int64(at.Size)}, nil
+			}
+			return Value{}, fmt.Errorf("type has no member %q", member)
+		case "size":
+			if at, ok := td.Type.(ast.ArrayType); ok {
+				return Value{Data: int64(at.Size)}, nil
+			}
+			return Value{}, fmt.Errorf("type has no member %q", member)
+		case "elem_type":
+			if at, ok := td.Type.(ast.ArrayType); ok {
+				val := Value{IsType: true, Type: at.ElemType}
+				switch et := at.ElemType.(type) {
+				case ast.IntegerType:
+					val.IType = et
+				case ast.FloatType:
+					val.IsFloat = true
+					val.FType = et
+				case ast.BoolType:
+					val.IsBool = true
+					val.BType = et
+				case ast.ArrayType:
+					val.IsArray = true
+				case ast.ListType:
+					val.IsArray = true
+				}
+				return val, nil
+			}
+			return Value{}, fmt.Errorf("type has no member %q", member)
+		default:
+			return Value{}, fmt.Errorf("type %s has no member %q", typeDescForVal(td), member)
+		}
+	}
 	if td.IsFloat {
 		size := td.FType.Size
 		switch member {
@@ -208,6 +250,17 @@ func (i *Interpreter) evalTypeMember(td Value, member string) (Value, error) {
 }
 
 func (v Value) String() string {
+	if v.IsArray {
+		s := "["
+		for i, elem := range v.ArrayData {
+			if i > 0 {
+				s += ", "
+			}
+			s += elem.String()
+		}
+		s += "]"
+		return s
+	}
 	if v.IsType {
 		return typeDescForVal(v)
 	}
@@ -230,6 +283,31 @@ func (v Value) String() string {
 		return intToStr(v.Data, v.IType, true)
 	}
 	return fmt.Sprintf("%s(%s)", typeDesc(v.IType, false), intToStr(v.Data, v.IType, false))
+}
+
+func typeDescForType(t ast.Type) string {
+	switch typ := t.(type) {
+	case ast.ArrayType:
+		return fmt.Sprintf("array{size: %d}<%s>", typ.Size, typeDescForType(typ.ElemType))
+	case ast.ListType:
+		s := "list"
+		if typ.HasMin || typ.HasMax {
+			s += "{"
+			if typ.HasMin {
+				s += fmt.Sprintf("min: %d", typ.MinSize)
+				if typ.HasMax {
+					s += ", "
+				}
+			}
+			if typ.HasMax {
+				s += fmt.Sprintf("max: %d", typ.MaxSize)
+			}
+			s += "}"
+		}
+		return s + "<" + typeDescForType(typ.ElemType) + ">"
+	default:
+		return typeDesc(typ, false)
+	}
 }
 
 func typeDescFromVar(it ast.IntegerType, ft ast.FloatType, bt ast.BoolType, isFloat, isBool bool) string {
@@ -265,6 +343,9 @@ func typeDescFromVar(it ast.IntegerType, ft ast.FloatType, bt ast.BoolType, isFl
 }
 
 func typeDescForVal(v Value) string {
+	if v.Type != nil {
+		return typeDescForType(v.Type)
+	}
 	return typeDescFromVar(v.IType, v.FType, v.BType, v.IsFloat, v.IsBool)
 }
 
@@ -304,42 +385,33 @@ func typeDesc(t interface{}, isBool bool) string {
 func canImplicitConvert(srcInt ast.IntegerType, srcFloat ast.FloatType, srcIsFloat bool,
 	dstInt ast.IntegerType, dstFloat ast.FloatType, dstIsFloat bool) bool {
 
-	// Nullability check: nullable cannot convert to non-nullable
 	srcNullable := srcIsFloat && srcFloat.Nullable || !srcIsFloat && srcInt.Nullable
 	dstNullable := dstIsFloat && dstFloat.Nullable || !dstIsFloat && dstInt.Nullable
 	if srcNullable && !dstNullable {
 		return false
 	}
 
-	// Float to float
 	if srcIsFloat && dstIsFloat {
 		return srcFloat.Size <= dstFloat.Size
 	}
 
-	// Integer to float
 	if !srcIsFloat && dstIsFloat {
-		// int8, uint8 -> float16
 		if srcInt.Size <= 8 {
 			return dstFloat.Size >= 16
 		}
-		// int16, uint16 -> float32
 		if srcInt.Size <= 16 {
 			return dstFloat.Size >= 32
 		}
-		// int32, uint32 -> float64
 		if srcInt.Size <= 32 {
 			return dstFloat.Size >= 64
 		}
-		// int64, uint64 -> no implicit float conversion
 		return false
 	}
 
-	// Float to integer - not allowed implicitly
 	if srcIsFloat && !dstIsFloat {
 		return false
 	}
 
-	// Integer to integer
 	if !srcIsFloat && !dstIsFloat {
 		if srcInt.Size == dstInt.Size && srcInt.Signed == dstInt.Signed {
 			return true
@@ -545,72 +617,7 @@ func (i *Interpreter) ExecuteStmt(stmt ast.Stmt) error {
 func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 	switch s := stmt.(type) {
 	case *ast.VarDecl:
-		val := Value{IType: s.IType, FType: s.FType, BType: s.BType, IsFloat: s.IsFloat, IsBool: s.IsBool}
-		if s.Expr != nil {
-			if lit, ok := s.Expr.(*ast.IntegerLit); ok && lit.Untyped && !s.IsFloat && !s.IsBool {
-				if err := checkIntFits(lit.Value, s.IType); err != nil {
-					return err
-				}
-			}
-			if lit, ok := s.Expr.(*ast.FloatLit); ok && lit.Untyped && s.IsFloat {
-				if err := checkFloatFits(lit.Value, s.FType); err != nil {
-					return err
-				}
-			}
-			rightVal, err := i.evalExpr(s.Expr)
-			if err != nil {
-				return err
-			}
-			if rightVal.Null {
-				if !s.IsBool && !s.IType.Nullable && !s.FType.Nullable || (s.IsBool && !s.BType.Nullable) {
-					return fmt.Errorf("cannot assign null to %s", typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
-				}
-				val.Null = true
-			} else {
-				if rightVal.IsBool {
-					if !s.IsBool {
-						return fmt.Errorf("cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
-					}
-					if rightVal.BType.Nullable && !s.BType.Nullable {
-						return fmt.Errorf("cannot assign nullable %s to non-nullable %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
-					}
-					val.BData = rightVal.BData
-				} else if rightVal.IsFloat {
-					if !s.IsFloat {
-						return fmt.Errorf("cannot assign %s to int variable", typeDescForVal(rightVal))
-					}
-					if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, true, s.IType, s.FType, true) {
-						return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, true, false))
-					}
-					val.FData = convertFloat(rightVal.FData, s.FType)
-				} else {
-					if s.IsBool {
-						return fmt.Errorf("cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
-					} else if s.IsFloat {
-						// Integer to float conversion
-						if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, ast.FloatType{}, false, ast.IntegerType{}, s.FType, true) {
-							return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(ast.IntegerType{}, s.FType, ast.BoolType{}, true, false))
-						}
-						val.FData = convertFloat(float64(rightVal.Data), s.FType)
-					} else {
-						// Integer to integer
-						if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, false, s.IType, s.FType, false) {
-							return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, ast.BoolType{}, false, false))
-						}
-						val.Data = convertInt(rightVal.Data, s.IType)
-					}
-				}
-			}
-		} else if s.IsBool {
-			if s.BType.Nullable {
-				val.Null = true
-			} else {
-				val.BData = false
-			}
-		} else if (s.IsFloat && s.FType.Nullable) || (!s.IsFloat && s.IType.Nullable) {
-			val.Null = true
-		}
-		i.env.Set(s.Name, val)
+		return i.execVarDecl(s)
 	case *ast.Assignment:
 		return i.executeAssignment(s)
 	case *ast.BlockStmt:
@@ -638,8 +645,8 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 		if val.Null {
 			return fmt.Errorf("cannot increment/decrement null")
 		}
-		if val.IsBool {
-			return fmt.Errorf("cannot increment/decrement bool")
+		if val.IsBool || val.IsArray {
+			return fmt.Errorf("cannot increment/decrement %s", typeDescForVal(val))
 		}
 		if s.Op == "++" {
 			if val.IsFloat {
@@ -670,6 +677,8 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 		}
 		if val.IsType {
 			fmt.Println(typeDescForVal(val))
+		} else if val.IsArray {
+			fmt.Println(val.String())
 		} else if val.Null {
 			fmt.Println("null")
 		} else if val.IsBool {
@@ -679,9 +688,310 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 		} else {
 			fmt.Println(intToStr(val.Data, val.IType, val.Untyped))
 		}
+	case *ast.ExprStmt:
+		_, err := i.evalExpr(s.Expr)
+		if err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("unknown statement type")
 	}
+	return nil
+}
+
+func (i *Interpreter) execVarDecl(s *ast.VarDecl) error {
+	// Handle array/list types
+	if at, ok := s.Type.(ast.ArrayType); ok {
+		return i.execArrayDecl(s, at)
+	}
+	if lt, ok := s.Type.(ast.ListType); ok {
+		return i.execListDecl(s, lt)
+	}
+
+	val := Value{IType: s.IType, FType: s.FType, BType: s.BType, IsFloat: s.IsFloat, IsBool: s.IsBool}
+	if s.Expr != nil {
+		if lit, ok := s.Expr.(*ast.IntegerLit); ok && lit.Untyped && !s.IsFloat && !s.IsBool {
+			if err := checkIntFits(lit.Value, s.IType); err != nil {
+				return err
+			}
+		}
+		if lit, ok := s.Expr.(*ast.FloatLit); ok && lit.Untyped && s.IsFloat {
+			if err := checkFloatFits(lit.Value, s.FType); err != nil {
+				return err
+			}
+		}
+		rightVal, err := i.evalExpr(s.Expr)
+		if err != nil {
+			return err
+		}
+		if rightVal.Null {
+			if !s.IsBool && !s.IType.Nullable && !s.FType.Nullable || (s.IsBool && !s.BType.Nullable) {
+				return fmt.Errorf("cannot assign null to %s", typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
+			}
+			val.Null = true
+		} else {
+			if rightVal.IsBool {
+				if !s.IsBool {
+					return fmt.Errorf("cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
+				}
+				if rightVal.BType.Nullable && !s.BType.Nullable {
+					return fmt.Errorf("cannot assign nullable %s to non-nullable %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
+				}
+				val.BData = rightVal.BData
+			} else if rightVal.IsFloat {
+				if !s.IsFloat {
+					return fmt.Errorf("cannot assign %s to int variable", typeDescForVal(rightVal))
+				}
+				if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, true, s.IType, s.FType, true) {
+					return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, true, false))
+				}
+				val.FData = convertFloat(rightVal.FData, s.FType)
+			} else {
+				if s.IsBool {
+					return fmt.Errorf("cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
+				} else if s.IsFloat {
+					if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, ast.FloatType{}, false, ast.IntegerType{}, s.FType, true) {
+						return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(ast.IntegerType{}, s.FType, ast.BoolType{}, true, false))
+					}
+					val.FData = convertFloat(float64(rightVal.Data), s.FType)
+				} else {
+					if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, false, s.IType, s.FType, false) {
+						return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, ast.BoolType{}, false, false))
+					}
+					val.Data = convertInt(rightVal.Data, s.IType)
+				}
+			}
+		}
+	} else if s.IsBool {
+		if s.BType.Nullable {
+			val.Null = true
+		} else {
+			val.BData = false
+		}
+	} else if (s.IsFloat && s.FType.Nullable) || (!s.IsFloat && s.IType.Nullable) {
+		val.Null = true
+	}
+	i.env.Set(s.Name, val)
+	return nil
+}
+
+func (i *Interpreter) execArrayDecl(s *ast.VarDecl, at ast.ArrayType) error {
+	if s.Expr != nil {
+		rightVal, err := i.evalExpr(s.Expr)
+		if err != nil {
+			return err
+		}
+		if !rightVal.IsArray {
+			return fmt.Errorf("cannot assign %s to array variable", typeDescForVal(rightVal))
+		}
+		effectiveSize := at.Size
+		if effectiveSize == 0 {
+			effectiveSize = len(rightVal.ArrayData)
+		}
+		if len(rightVal.ArrayData) != effectiveSize {
+			return fmt.Errorf("expected %d elements, got %d", effectiveSize, len(rightVal.ArrayData))
+		}
+		at.Size = effectiveSize
+		rightVal.Type = at
+		i.env.Set(s.Name, rightVal)
+		return nil
+	}
+	data := make([]Value, at.Size)
+	for idx := range data {
+		data[idx] = Value{Data: 0, Untyped: true}
+	}
+	val := Value{Type: at, IsArray: true, ArrayData: data}
+	i.env.Set(s.Name, val)
+	return nil
+}
+
+func (i *Interpreter) execListDecl(s *ast.VarDecl, lt ast.ListType) error {
+	if s.Expr != nil {
+		rightVal, err := i.evalExpr(s.Expr)
+		if err != nil {
+			return err
+		}
+		if !rightVal.IsArray {
+			return fmt.Errorf("cannot assign %s to list variable", typeDescForVal(rightVal))
+		}
+		if lt.HasMin && len(rightVal.ArrayData) < lt.MinSize {
+			return fmt.Errorf("expected at least %d elements, got %d", lt.MinSize, len(rightVal.ArrayData))
+		}
+		if lt.HasMax && len(rightVal.ArrayData) > lt.MaxSize {
+			return fmt.Errorf("expected at most %d elements, got %d", lt.MaxSize, len(rightVal.ArrayData))
+		}
+		rightVal.Type = lt
+		i.env.Set(s.Name, rightVal)
+		return nil
+	}
+	if lt.HasMin && lt.MinSize > 0 {
+		return fmt.Errorf("list requires at least %d elements, but no initializer given", lt.MinSize)
+	}
+	val := Value{Type: lt, IsArray: true, ArrayData: []Value{}}
+	i.env.Set(s.Name, val)
+	return nil
+}
+
+func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
+	if stmt.Index != nil {
+		return i.executeIndexedAssign(stmt)
+	}
+
+	env := i.env.LookupEnv(stmt.Name)
+	if env == nil {
+		return fmt.Errorf("undefined variable: %s", stmt.Name)
+	}
+	val, _ := env.Get(stmt.Name)
+
+	if val.IsArray {
+		return fmt.Errorf("cannot use operator %s on array/list variable", stmt.Op)
+	}
+
+	if stmt.Op == "=" {
+		if lit, ok := stmt.Expr.(*ast.IntegerLit); ok && lit.Untyped && !val.IsFloat && !val.IsBool {
+			if err := checkIntFits(lit.Value, val.IType); err != nil {
+				return err
+			}
+		}
+		if lit, ok := stmt.Expr.(*ast.FloatLit); ok && lit.Untyped && val.IsFloat {
+			if err := checkFloatFits(lit.Value, val.FType); err != nil {
+				return err
+			}
+		}
+	}
+
+	rightVal, err := i.evalExpr(stmt.Expr)
+	if err != nil {
+		return err
+	}
+
+	if rightVal.Null {
+		if !val.IsBool && !val.IType.Nullable && !val.FType.Nullable || (val.IsBool && !val.BType.Nullable) {
+			return fmt.Errorf("cannot assign null to %s", typeDescForVal(val))
+		}
+		val.Null = true
+		val.Data = 0
+		val.FData = 0
+		val.BData = false
+		env.Set(stmt.Name, val)
+		return nil
+	}
+
+	if val.Null && stmt.Op != "=" {
+		return fmt.Errorf("cannot use null variable in %s operation", stmt.Op)
+	}
+
+	var result int64
+	var fresult float64
+
+	if val.IsBool {
+		if !rightVal.IsBool {
+			return fmt.Errorf("cannot assign %s to %s", typeDescForVal(rightVal), typeDescForVal(val))
+		}
+		if rightVal.BType.Nullable && !val.BType.Nullable {
+			return fmt.Errorf("cannot assign nullable %s to non-nullable %s", typeDescForVal(rightVal), typeDescForVal(val))
+		}
+		switch stmt.Op {
+		case "=":
+			val.BData = rightVal.BData
+		default:
+			return fmt.Errorf("unknown operator: %s", stmt.Op)
+		}
+	} else if val.IsFloat && !rightVal.IsFloat {
+		if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, false, val.IType, val.FType, true) {
+			return fmt.Errorf("type mismatch: cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(val.IType, val.FType, ast.BoolType{}, true, false))
+		}
+		switch stmt.Op {
+		case "=":
+			fresult = float64(rightVal.Data)
+		case "+=":
+			fresult = val.FData + float64(rightVal.Data)
+		case "-=":
+			fresult = val.FData - float64(rightVal.Data)
+		case "*=":
+			fresult = val.FData * float64(rightVal.Data)
+		case "/=":
+			fresult = val.FData / float64(rightVal.Data)
+		default:
+			return fmt.Errorf("unknown operator: %s", stmt.Op)
+		}
+		val.FData = convertFloat(fresult, val.FType)
+	} else if !val.IsFloat && rightVal.IsFloat {
+		return fmt.Errorf("cannot assign %s to int variable", typeDescForVal(rightVal))
+	} else if val.IsFloat {
+		fresult = val.FData
+		switch stmt.Op {
+		case "=":
+			fresult = rightVal.FData
+		case "+=":
+			fresult = fresult + rightVal.FData
+		case "-=":
+			fresult = fresult - rightVal.FData
+		case "*=":
+			fresult = fresult * rightVal.FData
+		case "/=":
+			fresult = fresult / rightVal.FData
+		default:
+			return fmt.Errorf("unknown operator: %s", stmt.Op)
+		}
+		val.FData = convertFloat(fresult, val.FType)
+	} else {
+		result = val.Data
+		switch stmt.Op {
+		case "=":
+			result = rightVal.Data
+		case "+=":
+			result = result + rightVal.Data
+		case "-=":
+			result = result - rightVal.Data
+		case "*=":
+			result = result * rightVal.Data
+		case "/=":
+			if rightVal.Data == 0 {
+				return fmt.Errorf("division by zero")
+			}
+			result = result / rightVal.Data
+		default:
+			return fmt.Errorf("unknown operator: %s", stmt.Op)
+		}
+		val.Data = convertInt(result, val.IType)
+	}
+	val.Null = false
+	env.Set(stmt.Name, val)
+	return nil
+}
+
+func (i *Interpreter) executeIndexedAssign(stmt *ast.Assignment) error {
+	env := i.env.LookupEnv(stmt.Name)
+	if env == nil {
+		return fmt.Errorf("undefined variable: %s", stmt.Name)
+	}
+	val, _ := env.Get(stmt.Name)
+	if !val.IsArray {
+		return fmt.Errorf("cannot index non-array variable")
+	}
+	if stmt.Op != "=" {
+		return fmt.Errorf("operator %s not supported for indexed assignment", stmt.Op)
+	}
+
+	idxVal, err := i.evalExpr(stmt.Index)
+	if err != nil {
+		return err
+	}
+	if idxVal.Null {
+		return fmt.Errorf("index cannot be null")
+	}
+	idx := int(idxVal.Data)
+	if idx < 0 || idx >= len(val.ArrayData) {
+		return fmt.Errorf("index %d out of bounds for length %d", idx, len(val.ArrayData))
+	}
+
+	rightVal, err := i.evalExpr(stmt.Expr)
+	if err != nil {
+		return err
+	}
+	val.ArrayData[idx] = rightVal
+	env.Set(stmt.Name, val)
 	return nil
 }
 
@@ -805,138 +1115,13 @@ func (i *Interpreter) execWhile(s *ast.WhileStmt) error {
 	}
 }
 
-func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
-	env := i.env.LookupEnv(stmt.Name)
-	if env == nil {
-		return fmt.Errorf("undefined variable: %s", stmt.Name)
-	}
-	val, _ := env.Get(stmt.Name)
-
-	if stmt.Op == "=" {
-		if lit, ok := stmt.Expr.(*ast.IntegerLit); ok && lit.Untyped && !val.IsFloat && !val.IsBool {
-			if err := checkIntFits(lit.Value, val.IType); err != nil {
-				return err
-			}
-		}
-		if lit, ok := stmt.Expr.(*ast.FloatLit); ok && lit.Untyped && val.IsFloat {
-			if err := checkFloatFits(lit.Value, val.FType); err != nil {
-				return err
-			}
-		}
-	}
-
-	rightVal, err := i.evalExpr(stmt.Expr)
-	if err != nil {
-		return err
-	}
-
-	if rightVal.Null {
-		if !val.IsBool && !val.IType.Nullable && !val.FType.Nullable || (val.IsBool && !val.BType.Nullable) {
-			return fmt.Errorf("cannot assign null to %s", typeDescForVal(val))
-		}
-		val.Null = true
-		val.Data = 0
-		val.FData = 0
-		val.BData = false
-		env.Set(stmt.Name, val)
-		return nil
-	}
-
-	if val.Null && stmt.Op != "=" {
-		return fmt.Errorf("cannot use null variable in %s operation", stmt.Op)
-	}
-
-	var result int64
-	var fresult float64
-
-	if val.IsBool {
-		if !rightVal.IsBool {
-			return fmt.Errorf("cannot assign %s to %s", typeDescForVal(rightVal), typeDescForVal(val))
-		}
-		if rightVal.BType.Nullable && !val.BType.Nullable {
-			return fmt.Errorf("cannot assign nullable %s to non-nullable %s", typeDescForVal(rightVal), typeDescForVal(val))
-		}
-		switch stmt.Op {
-		case "=":
-			val.BData = rightVal.BData
-		default:
-			return fmt.Errorf("unknown operator: %s", stmt.Op)
-		}
-	} else if val.IsFloat && !rightVal.IsFloat {
-		// Integer to float assignment
-		if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, false, val.IType, val.FType, true) {
-			return fmt.Errorf("type mismatch: cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(val.IType, val.FType, ast.BoolType{}, true, false))
-		}
-		switch stmt.Op {
-		case "=":
-			fresult = float64(rightVal.Data)
-		case "+=":
-			fresult = val.FData + float64(rightVal.Data)
-		case "-=":
-			fresult = val.FData - float64(rightVal.Data)
-		case "*=":
-			fresult = val.FData * float64(rightVal.Data)
-		case "/=":
-			fresult = val.FData / float64(rightVal.Data)
-		default:
-			return fmt.Errorf("unknown operator: %s", stmt.Op)
-		}
-		val.FData = convertFloat(fresult, val.FType)
-	} else if !val.IsFloat && rightVal.IsFloat {
-		// Float to integer - not allowed implicitly
-		return fmt.Errorf("cannot assign %s to int variable", typeDescForVal(rightVal))
-	} else if val.IsFloat {
-		// Float to float
-		fresult = val.FData
-		switch stmt.Op {
-		case "=":
-			fresult = rightVal.FData
-		case "+=":
-			fresult = fresult + rightVal.FData
-		case "-=":
-			fresult = fresult - rightVal.FData
-		case "*=":
-			fresult = fresult * rightVal.FData
-		case "/=":
-			fresult = fresult / rightVal.FData
-		default:
-			return fmt.Errorf("unknown operator: %s", stmt.Op)
-		}
-		val.FData = convertFloat(fresult, val.FType)
-	} else {
-		// Integer to integer
-		result = val.Data
-		switch stmt.Op {
-		case "=":
-			result = rightVal.Data
-		case "+=":
-			result = result + rightVal.Data
-		case "-=":
-			result = result - rightVal.Data
-		case "*=":
-			result = result * rightVal.Data
-		case "/=":
-			if rightVal.Data == 0 {
-				return fmt.Errorf("division by zero")
-			}
-			result = result / rightVal.Data
-		default:
-			return fmt.Errorf("unknown operator: %s", stmt.Op)
-		}
-		val.Data = convertInt(result, val.IType)
-	}
-	val.Null = false
-	env.Set(stmt.Name, val)
-	return nil
-}
-
 func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 	switch e := expr.(type) {
 	case *ast.IntegerLit:
 		if e.Untyped {
 			return Value{Untyped: true, Data: e.Value}, nil
 		}
-		return Value{IType: e.IType, Data: e.Value, IsFloat: false}, nil
+		return Value{IType: e.IType, Data: e.Value}, nil
 	case *ast.FloatLit:
 		if e.Untyped {
 			return Value{Untyped: true, FData: e.Value, IsFloat: true}, nil
@@ -961,20 +1146,59 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 		return Value{Null: true}, nil
 	case *ast.TypeRef:
 		val := Value{IsType: true}
-		switch e.Kind {
-		case "float":
+		switch t := e.Type.(type) {
+		case ast.FloatType:
+			t.Nullable = false
+			val.Type = t
 			val.IsFloat = true
-			val.FType = e.FType
-			val.FType.Nullable = false
-		case "bool":
+			val.FType = t
+		case ast.BoolType:
+			t.Nullable = false
+			val.Type = t
 			val.IsBool = true
-			val.BType = e.BType
-			val.BType.Nullable = false
-		default:
-			val.IType = e.IType
-			val.IType.Nullable = false
+			val.BType = t
+		case ast.IntegerType:
+			t.Nullable = false
+			val.Type = t
+			val.IType = t
+		case ast.ArrayType:
+			val.Type = t
+			val.IsArray = true
+		case ast.ListType:
+			val.Type = t
+			val.IsArray = true
 		}
 		return val, nil
+	case *ast.ArrayLit:
+		var elements []Value
+		for _, el := range e.Elements {
+			ev, err := i.evalExpr(el)
+			if err != nil {
+				return Value{}, err
+			}
+			elements = append(elements, ev)
+		}
+		return Value{IsArray: true, ArrayData: elements}, nil
+	case *ast.IndexExpr:
+		obj, err := i.evalExpr(e.Object)
+		if err != nil {
+			return Value{}, err
+		}
+		if !obj.IsArray {
+			return Value{}, fmt.Errorf("cannot index non-array value")
+		}
+		idxVal, err := i.evalExpr(e.Index)
+		if err != nil {
+			return Value{}, err
+		}
+		if idxVal.Null {
+			return Value{}, fmt.Errorf("index cannot be null")
+		}
+		idx := int(idxVal.Data)
+		if idx < 0 || idx >= len(obj.ArrayData) {
+			return Value{}, fmt.Errorf("index %d out of bounds for length %d", idx, len(obj.ArrayData))
+		}
+		return obj.ArrayData[idx], nil
 	case *ast.MemberAccess:
 		obj, err := i.evalExpr(e.Object)
 		if err != nil {
@@ -986,9 +1210,95 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 		if obj.IsType {
 			return i.evalTypeMember(obj, e.Member)
 		}
+		if obj.IsArray {
+			result, err := i.evalArrayMember(&obj, e)
+			if err != nil {
+				return Value{}, err
+			}
+			if e.Member == "add" || e.Member == "remove" {
+				if ref, ok := e.Object.(*ast.VarRef); ok {
+					env := i.env.LookupEnv(ref.Name)
+					if env != nil {
+						env.Set(ref.Name, obj)
+					}
+				}
+			}
+			return result, nil
+		}
 		return Value{}, fmt.Errorf("value of type %s has no member %q", typeDescForVal(obj), e.Member)
 	default:
 		return Value{}, fmt.Errorf("unknown expression type")
+	}
+}
+
+func (i *Interpreter) evalArrayMember(obj *Value, e *ast.MemberAccess) (Value, error) {
+	switch e.Member {
+	case "length":
+		return Value{Data: int64(len(obj.ArrayData))}, nil
+	case "add":
+		if len(e.Args) == 0 || len(e.Args) > 2 {
+			return Value{}, fmt.Errorf("add requires 1 or 2 arguments")
+		}
+		val, err := i.evalExpr(e.Args[0])
+		if err != nil {
+			return Value{}, err
+		}
+		idx := len(obj.ArrayData)
+		if len(e.Args) == 2 {
+			idxVal, err := i.evalExpr(e.Args[1])
+			if err != nil {
+				return Value{}, err
+			}
+			if idxVal.Null {
+				return Value{}, fmt.Errorf("index cannot be null")
+			}
+			idx = int(idxVal.Data)
+		}
+		// Check bounds for list type
+		if lt, ok := obj.Type.(ast.ListType); ok {
+			if lt.HasMax && len(obj.ArrayData) >= lt.MaxSize {
+				return Value{}, fmt.Errorf("list is at maximum capacity (%d)", lt.MaxSize)
+			}
+		}
+		if idx < 0 || idx > len(obj.ArrayData) {
+			return Value{}, fmt.Errorf("index %d out of bounds for length %d", idx, len(obj.ArrayData))
+		}
+		// Insert at index
+		newData := make([]Value, len(obj.ArrayData)+1)
+		copy(newData, obj.ArrayData[:idx])
+		newData[idx] = val
+		copy(newData[idx+1:], obj.ArrayData[idx:])
+		obj.ArrayData = newData
+		return Value{Null: true}, nil
+	case "remove":
+		if len(e.Args) != 1 {
+			return Value{}, fmt.Errorf("remove requires 1 argument")
+		}
+		idxVal, err := i.evalExpr(e.Args[0])
+		if err != nil {
+			return Value{}, err
+		}
+		if idxVal.Null {
+			return Value{}, fmt.Errorf("index cannot be null")
+		}
+		idx := int(idxVal.Data)
+		if idx < 0 || idx >= len(obj.ArrayData) {
+			return Value{}, fmt.Errorf("index %d out of bounds for length %d", idx, len(obj.ArrayData))
+		}
+		// Check min bound for list type
+		if lt, ok := obj.Type.(ast.ListType); ok {
+			if lt.HasMin && len(obj.ArrayData) <= lt.MinSize {
+				return Value{}, fmt.Errorf("list is at minimum capacity (%d)", lt.MinSize)
+			}
+		}
+		removed := obj.ArrayData[idx]
+		newData := make([]Value, len(obj.ArrayData)-1)
+		copy(newData, obj.ArrayData[:idx])
+		copy(newData[idx:], obj.ArrayData[idx+1:])
+		obj.ArrayData = newData
+		return removed, nil
+	default:
+		return Value{}, fmt.Errorf("array/list has no member %q", e.Member)
 	}
 }
 

@@ -11,6 +11,8 @@ const (
 	TOK_BOOL      TokenType = "BOOL"
 	TOK_INT       TokenType = "INT"
 	TOK_FLOAT     TokenType = "FLOAT"
+	TOK_ARRAY     TokenType = "ARRAY"
+	TOK_LIST      TokenType = "LIST"
 	TOK_VAR       TokenType = "VAR"
 	TOK_PRINT     TokenType = "PRINT"
 	TOK_IDENT     TokenType = "IDENT"
@@ -22,6 +24,9 @@ const (
 	TOK_NULLABLE  TokenType = "NULLABLE"
 	TOK_TRUE      TokenType = "TRUE"
 	TOK_FALSE     TokenType = "FALSE"
+	TOK_AUTO      TokenType = "AUTO"
+	TOK_MIN       TokenType = "MIN"
+	TOK_MAX       TokenType = "MAX"
 
 	TOK_COLON       TokenType = ":"
 	TOK_SEMICOLON   TokenType = ";"
@@ -48,10 +53,12 @@ const (
 	TOK_OR          TokenType = "||"
 	TOK_NOT         TokenType = "!"
 
-	TOK_LBRACE TokenType = "{"
-	TOK_RBRACE TokenType = "}"
-	TOK_LPAREN TokenType = "("
-	TOK_RPAREN TokenType = ")"
+	TOK_LBRACKET TokenType = "["
+	TOK_RBRACKET TokenType = "]"
+	TOK_LBRACE   TokenType = "{"
+	TOK_RBRACE   TokenType = "}"
+	TOK_LPAREN   TokenType = "("
+	TOK_RPAREN   TokenType = ")"
 
 	TOK_IF    TokenType = "IF"
 	TOK_ELSE  TokenType = "ELSE"
@@ -103,6 +110,10 @@ func (l *Lexer) NextToken() Token {
 		return l.makeToken(TOK_SEMICOLON, 1)
 	case ',':
 		return l.makeToken(TOK_COMMA, 1)
+	case '[':
+		return l.makeToken(TOK_LBRACKET, 1)
+	case ']':
+		return l.makeToken(TOK_RBRACKET, 1)
 	case '{':
 		return l.makeToken(TOK_LBRACE, 1)
 	case '}':
@@ -217,7 +228,6 @@ func (l *Lexer) readNumber() Token {
 		}
 	}
 
-	// Decimal integer or float with optional underscores and scientific notation
 	for l.pos < len(l.input) {
 		ch := l.input[l.pos]
 		if ch == '_' || unicode.IsDigit(rune(ch)) {
@@ -414,6 +424,10 @@ func (l *Lexer) readIdentifier() Token {
 		return Token{TOK_INT, word, l.line}
 	case "float":
 		return Token{TOK_FLOAT, word, l.line}
+	case "array":
+		return Token{TOK_ARRAY, word, l.line}
+	case "list":
+		return Token{TOK_LIST, word, l.line}
 	case "print":
 		return Token{TOK_PRINT, word, l.line}
 	case "size":
@@ -428,6 +442,12 @@ func (l *Lexer) readIdentifier() Token {
 		return Token{TOK_TRUE, word, l.line}
 	case "false":
 		return Token{TOK_FALSE, word, l.line}
+	case "auto":
+		return Token{TOK_AUTO, word, l.line}
+	case "min":
+		return Token{TOK_MIN, word, l.line}
+	case "max":
+		return Token{TOK_MAX, word, l.line}
 	case "NaN":
 		return Token{TOK_FLOAT_LIT, word, l.line}
 	case "infinity":

@@ -1987,11 +1987,11 @@ func TestParseTypeRefInt(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *ast.TypeRef, got %T", stmt.Expr)
 	}
-	if tr.Kind != "int" {
-		t.Errorf("expected Kind 'int', got %q", tr.Kind)
+	if tr.Type.Kind() != "int" {
+		t.Errorf("expected Kind 'int', got %q", tr.Type.Kind())
 	}
-	if tr.IType.Size != 64 {
-		t.Errorf("expected Size 64, got %d", tr.IType.Size)
+	if tr.Type.(ast.IntegerType).Size != 64 {
+		t.Errorf("expected Size 64, got %d", tr.Type.(ast.IntegerType).Size)
 	}
 }
 
@@ -2010,11 +2010,11 @@ func TestParseTypeRefFloat(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *ast.TypeRef, got %T", stmt.Expr)
 	}
-	if tr.Kind != "float" {
-		t.Errorf("expected Kind 'float', got %q", tr.Kind)
+	if tr.Type.Kind() != "float" {
+		t.Errorf("expected Kind 'float', got %q", tr.Type.Kind())
 	}
-	if tr.FType.Size != 64 {
-		t.Errorf("expected Size 64, got %d", tr.FType.Size)
+	if tr.Type.(ast.FloatType).Size != 64 {
+		t.Errorf("expected Size 64, got %d", tr.Type.(ast.FloatType).Size)
 	}
 }
 
@@ -2033,8 +2033,8 @@ func TestParseTypeRefBool(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *ast.TypeRef, got %T", stmt.Expr)
 	}
-	if tr.Kind != "bool" {
-		t.Errorf("expected Kind 'bool', got %q", tr.Kind)
+	if tr.Type.Kind() != "bool" {
+		t.Errorf("expected Kind 'bool', got %q", tr.Type.Kind())
 	}
 }
 
@@ -2060,8 +2060,8 @@ func TestParseBoolSize(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected Object *ast.TypeRef, got %T", ma.Object)
 	}
-	if tr.Kind != "bool" {
-		t.Errorf("expected Kind 'bool', got %q", tr.Kind)
+	if tr.Type.Kind() != "bool" {
+		t.Errorf("expected Kind 'bool', got %q", tr.Type.Kind())
 	}
 }
 
@@ -2087,8 +2087,8 @@ func TestParseIntDotMin(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected Object *ast.TypeRef, got %T", ma.Object)
 	}
-	if tr.Kind != "int" {
-		t.Errorf("expected Kind 'int', got %q", tr.Kind)
+	if tr.Type.Kind() != "int" {
+		t.Errorf("expected Kind 'int', got %q", tr.Type.Kind())
 	}
 }
 
@@ -2114,11 +2114,11 @@ func TestParseTypeWithSizeDotMax(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected Object *ast.TypeRef, got %T", ma.Object)
 	}
-	if tr.Kind != "int" {
-		t.Errorf("expected Kind 'int', got %q", tr.Kind)
+	if tr.Type.Kind() != "int" {
+		t.Errorf("expected Kind 'int', got %q", tr.Type.Kind())
 	}
-	if tr.IType.Size != 8 {
-		t.Errorf("expected Size 8, got %d", tr.IType.Size)
+	if tr.Type.(ast.IntegerType).Size != 8 {
+		t.Errorf("expected Size 8, got %d", tr.Type.(ast.IntegerType).Size)
 	}
 }
 
@@ -3063,5 +3063,756 @@ func TestParseDoubleUnaryMinusWithSpace(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected error containing 'unary minus', got %v", p.Errors())
+	}
+}
+
+func TestParseArrayTypeDecl(t *testing.T) {
+	input := "var arr: array{size: 5}<int>;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	stmt, ok := program.Stmts[0].(*ast.VarDecl)
+	if !ok {
+		t.Fatalf("expected *ast.VarDecl, got %T", program.Stmts[0])
+	}
+	at, ok := stmt.Type.(ast.ArrayType)
+	if !ok {
+		t.Fatalf("expected ast.ArrayType, got %T", stmt.Type)
+	}
+	if at.Size != 5 {
+		t.Errorf("expected size 5, got %d", at.Size)
+	}
+	_, ok = at.ElemType.(ast.IntegerType)
+	if !ok {
+		t.Fatalf("expected int element type, got %T", at.ElemType)
+	}
+}
+
+func TestParseArrayTypeFloatElem(t *testing.T) {
+	input := "var arr: array{size: 3}<float>;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	at := stmt.Type.(ast.ArrayType)
+	if at.Size != 3 {
+		t.Errorf("expected size 3, got %d", at.Size)
+	}
+	_, ok := at.ElemType.(ast.FloatType)
+	if !ok {
+		t.Fatalf("expected float element type, got %T", at.ElemType)
+	}
+}
+
+func TestParseArrayTypeNoSize(t *testing.T) {
+	input := "var arr: array{}<int>;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	at := stmt.Type.(ast.ArrayType)
+	if at.Size != 0 {
+		t.Errorf("expected size 0, got %d", at.Size)
+	}
+}
+
+func TestParseArrayTypeMissingGT(t *testing.T) {
+	input := "var arr: array{size: 5}<int;"
+	l := lexer.New(input)
+	p := New(l)
+	_ = p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '>'")
+	}
+}
+
+func TestParseListTypeDecl(t *testing.T) {
+	input := "var lst: list<int>;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	lt, ok := stmt.Type.(ast.ListType)
+	if !ok {
+		t.Fatalf("expected ast.ListType, got %T", stmt.Type)
+	}
+	if lt.HasMin || lt.HasMax {
+		t.Errorf("expected no min/max bounds")
+	}
+	_, ok = lt.ElemType.(ast.IntegerType)
+	if !ok {
+		t.Fatalf("expected int element type, got %T", lt.ElemType)
+	}
+}
+
+func TestParseListTypeWithMinMax(t *testing.T) {
+	input := "var lst: list{min: 1, max: 10}<int>;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	lt := stmt.Type.(ast.ListType)
+	if !lt.HasMin {
+		t.Errorf("expected HasMin true")
+	}
+	if lt.MinSize != 1 {
+		t.Errorf("expected MinSize 1, got %d", lt.MinSize)
+	}
+	if !lt.HasMax {
+		t.Errorf("expected HasMax true")
+	}
+	if lt.MaxSize != 10 {
+		t.Errorf("expected MaxSize 10, got %d", lt.MaxSize)
+	}
+}
+
+func TestParseListTypeAutoBounds(t *testing.T) {
+	input := "var lst: list{min: auto, max: 10}<int>;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	lt := stmt.Type.(ast.ListType)
+	if lt.HasMin {
+		t.Errorf("expected HasMin false for auto")
+	}
+	if !lt.HasMax {
+		t.Errorf("expected HasMax true")
+	}
+	if lt.MaxSize != 10 {
+		t.Errorf("expected MaxSize 10, got %d", lt.MaxSize)
+	}
+}
+
+func TestParseListTypeOnlyMin(t *testing.T) {
+	input := "var lst: list{min: 3}<int>;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	lt := stmt.Type.(ast.ListType)
+	if !lt.HasMin || lt.MinSize != 3 {
+		t.Errorf("expected HasMin true, MinSize 3")
+	}
+	if lt.HasMax {
+		t.Errorf("expected HasMax false")
+	}
+}
+
+func TestParseListTypeMissingGT(t *testing.T) {
+	input := "var lst: list<int;"
+	l := lexer.New(input)
+	p := New(l)
+	_ = p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '>'")
+	}
+}
+
+func TestParseIndexedAssign(t *testing.T) {
+	input := "arr[0] = 42;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt, ok := program.Stmts[0].(*ast.Assignment)
+	if !ok {
+		t.Fatalf("expected *ast.Assignment, got %T", program.Stmts[0])
+	}
+	if stmt.Name != "arr" {
+		t.Errorf("expected name 'arr', got %q", stmt.Name)
+	}
+	if stmt.Op != "=" {
+		t.Errorf("expected op '=', got %q", stmt.Op)
+	}
+	if stmt.Index == nil {
+		t.Fatal("expected non-nil Index")
+	}
+	intLit, ok := stmt.Index.(*ast.IntegerLit)
+	if !ok {
+		t.Fatalf("expected *ast.IntegerLit index, got %T", stmt.Index)
+	}
+	if intLit.Value != 0 {
+		t.Errorf("expected index 0, got %d", intLit.Value)
+	}
+	valLit := stmt.Expr.(*ast.IntegerLit)
+	if valLit.Value != 42 {
+		t.Errorf("expected value 42, got %d", valLit.Value)
+	}
+}
+
+func TestParseIndexedAssignCompound(t *testing.T) {
+	input := "arr[0] += 5;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.Assignment)
+	if stmt.Op != "+=" {
+		t.Errorf("expected op '+=', got %q", stmt.Op)
+	}
+	if stmt.Index == nil {
+		t.Fatal("expected non-nil Index")
+	}
+}
+
+func TestParseIndexedAssignWithIdentIndex(t *testing.T) {
+	input := "arr[i] = val;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.Assignment)
+	if stmt.Name != "arr" {
+		t.Errorf("expected name 'arr', got %q", stmt.Name)
+	}
+	varRef, ok := stmt.Index.(*ast.VarRef)
+	if !ok {
+		t.Fatalf("expected *ast.VarRef index, got %T", stmt.Index)
+	}
+	if varRef.Name != "i" {
+		t.Errorf("expected index var 'i', got %q", varRef.Name)
+	}
+	valRef := stmt.Expr.(*ast.VarRef)
+	if valRef.Name != "val" {
+		t.Errorf("expected value var 'val', got %q", valRef.Name)
+	}
+}
+
+func TestParseArrayLit(t *testing.T) {
+	input := "print([1, 2, 3]);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	ps := program.Stmts[0].(*ast.PrintStmt)
+	al, ok := ps.Expr.(*ast.ArrayLit)
+	if !ok {
+		t.Fatalf("expected *ast.ArrayLit, got %T", ps.Expr)
+	}
+	if len(al.Elements) != 3 {
+		t.Fatalf("expected 3 elements, got %d", len(al.Elements))
+	}
+	e0 := al.Elements[0].(*ast.IntegerLit)
+	if e0.Value != 1 {
+		t.Errorf("expected 1, got %d", e0.Value)
+	}
+	e1 := al.Elements[1].(*ast.IntegerLit)
+	if e1.Value != 2 {
+		t.Errorf("expected 2, got %d", e1.Value)
+	}
+	e2 := al.Elements[2].(*ast.IntegerLit)
+	if e2.Value != 3 {
+		t.Errorf("expected 3, got %d", e2.Value)
+	}
+}
+
+func TestParseEmptyArrayLit(t *testing.T) {
+	input := "print([]);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	ps := program.Stmts[0].(*ast.PrintStmt)
+	al, ok := ps.Expr.(*ast.ArrayLit)
+	if !ok {
+		t.Fatalf("expected *ast.ArrayLit, got %T", ps.Expr)
+	}
+	if len(al.Elements) != 0 {
+		t.Errorf("expected 0 elements, got %d", len(al.Elements))
+	}
+}
+
+func TestParseIndexExprInPrint(t *testing.T) {
+	input := "print(arr[0]);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	ps := program.Stmts[0].(*ast.PrintStmt)
+	ie, ok := ps.Expr.(*ast.IndexExpr)
+	if !ok {
+		t.Fatalf("expected *ast.IndexExpr, got %T", ps.Expr)
+	}
+	varRef, ok := ie.Object.(*ast.VarRef)
+	if !ok || varRef.Name != "arr" {
+		t.Errorf("expected VarRef 'arr', got %T %+v", ie.Object, ie.Object)
+	}
+	intLit := ie.Index.(*ast.IntegerLit)
+	if intLit.Value != 0 {
+		t.Errorf("expected index 0, got %d", intLit.Value)
+	}
+}
+
+func TestParseIndexExprWithVarIndex(t *testing.T) {
+	input := "print(arr[i]);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	ps := program.Stmts[0].(*ast.PrintStmt)
+	ie := ps.Expr.(*ast.IndexExpr)
+	varRef := ie.Index.(*ast.VarRef)
+	if varRef.Name != "i" {
+		t.Errorf("expected index var 'i', got %q", varRef.Name)
+	}
+}
+
+func TestParseMemberAccessLength(t *testing.T) {
+	input := "print(arr.length);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	ps := program.Stmts[0].(*ast.PrintStmt)
+	ma, ok := ps.Expr.(*ast.MemberAccess)
+	if !ok {
+		t.Fatalf("expected *ast.MemberAccess, got %T", ps.Expr)
+	}
+	varRef := ma.Object.(*ast.VarRef)
+	if varRef.Name != "arr" {
+		t.Errorf("expected VarRef 'arr', got %q", varRef.Name)
+	}
+	if ma.Member != "length" {
+		t.Errorf("expected member 'length', got %q", ma.Member)
+	}
+	if len(ma.Args) != 0 {
+		t.Errorf("expected 0 args, got %d", len(ma.Args))
+	}
+}
+
+func TestParseMemberCallAdd(t *testing.T) {
+	input := "a.add(4);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	es := program.Stmts[0].(*ast.ExprStmt)
+	ma, ok := es.Expr.(*ast.MemberAccess)
+	if !ok {
+		t.Fatalf("expected *ast.MemberAccess, got %T", es.Expr)
+	}
+	varRef := ma.Object.(*ast.VarRef)
+	if varRef.Name != "a" {
+		t.Errorf("expected VarRef 'a', got %q", varRef.Name)
+	}
+	if ma.Member != "add" {
+		t.Errorf("expected member 'add', got %q", ma.Member)
+	}
+	if len(ma.Args) != 1 {
+		t.Fatalf("expected 1 arg, got %d", len(ma.Args))
+	}
+	intLit := ma.Args[0].(*ast.IntegerLit)
+	if intLit.Value != 4 {
+		t.Errorf("expected arg 4, got %d", intLit.Value)
+	}
+}
+
+func TestParseMemberCallRemove(t *testing.T) {
+	input := "a.remove(0);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	es := program.Stmts[0].(*ast.ExprStmt)
+	ma := es.Expr.(*ast.MemberAccess)
+	if ma.Member != "remove" {
+		t.Errorf("expected member 'remove', got %q", ma.Member)
+	}
+	if len(ma.Args) != 1 {
+		t.Fatalf("expected 1 arg, got %d", len(ma.Args))
+	}
+}
+
+func TestParseTypeRefArray(t *testing.T) {
+	input := "print(array{size: 5}<int>);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	ps := program.Stmts[0].(*ast.PrintStmt)
+	tr, ok := ps.Expr.(*ast.TypeRef)
+	if !ok {
+		t.Fatalf("expected *ast.TypeRef, got %T", ps.Expr)
+	}
+	if !tr.IsType {
+		t.Errorf("expected IsType true")
+	}
+	at, ok := tr.Type.(ast.ArrayType)
+	if !ok {
+		t.Fatalf("expected ast.ArrayType, got %T", tr.Type)
+	}
+	if at.Size != 5 {
+		t.Errorf("expected size 5, got %d", at.Size)
+	}
+}
+
+func TestParseTypeRefList(t *testing.T) {
+	input := "print(list{min: 1, max: 10}<int>);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	ps := program.Stmts[0].(*ast.PrintStmt)
+	tr := ps.Expr.(*ast.TypeRef)
+	lt := tr.Type.(ast.ListType)
+	if !lt.HasMin || lt.MinSize != 1 {
+		t.Errorf("expected HasMin, MinSize 1")
+	}
+	if !lt.HasMax || lt.MaxSize != 10 {
+		t.Errorf("expected HasMax, MaxSize 10")
+	}
+}
+
+func TestParseTypeRefListNoBounds(t *testing.T) {
+	input := "print(list<int>);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	ps := program.Stmts[0].(*ast.PrintStmt)
+	tr := ps.Expr.(*ast.TypeRef)
+	lt := tr.Type.(ast.ListType)
+	if lt.HasMin || lt.HasMax {
+		t.Errorf("expected no bounds")
+	}
+}
+
+// ---- Coverage edge cases for uncovered branches ----
+
+func TestParseStmtMemberAccessNoSemicolon(t *testing.T) {
+	input := "a.add(4)"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing semicolon after member access call")
+	}
+}
+
+func TestParseTypeParamsInvalidKey(t *testing.T) {
+	input := "var x: int{invalid_key: 42};"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid type param key")
+	}
+}
+
+func TestParseTypeParamsUnexpectedParam(t *testing.T) {
+	input := "var x: int{size: bogus};"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid integer param value")
+	}
+}
+
+func TestParseTypeParamsOptionalParam(t *testing.T) {
+	input := "var x: int{signed: wrong};"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid signed value")
+	}
+}
+
+func TestParseTypeParamsInvalidKeyForContext(t *testing.T) {
+	input := "var x: int{min: 1};"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid key in context")
+	}
+}
+
+func TestParseTypeParamsInvalidIntegerValue(t *testing.T) {
+	input := "var x: int{size: 99999999999999999999};"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid integer")
+	}
+}
+
+func TestParseTypeParamsMissingColon(t *testing.T) {
+	input := "var x: int{size 42};"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing colon")
+	}
+}
+
+func TestForceTypeNotNullableFloat(t *testing.T) {
+	result := forceTypeNotNullable(ast.FloatType{Size: 32, Nullable: true})
+	ft, ok := result.(ast.FloatType)
+	if !ok {
+		t.Fatalf("expected FloatType")
+	}
+	if ft.Nullable {
+		t.Errorf("expected nullable false")
+	}
+	if ft.Size != 32 {
+		t.Errorf("expected size 32, got %d", ft.Size)
+	}
+}
+
+func TestForceTypeNotNullableArrayType(t *testing.T) {
+	result := forceTypeNotNullable(ast.ArrayType{ElemType: ast.IntegerType{Size: 64, Signed: true}, Size: 3})
+	_, ok := result.(ast.ArrayType)
+	if !ok {
+		t.Fatalf("expected ArrayType passthrough")
+	}
+}
+
+func TestForceTypeNotNullableBool(t *testing.T) {
+	result := forceTypeNotNullable(ast.BoolType{Nullable: true})
+	bt, ok := result.(ast.BoolType)
+	if !ok {
+		t.Fatalf("expected BoolType")
+	}
+	if bt.Nullable {
+		t.Errorf("expected nullable false")
+	}
+}
+
+func TestParseArrayTypeMissingLT(t *testing.T) {
+	input := "var a: array{size: 5}int;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '<' in array type")
+	}
+}
+
+func TestParseListTypeMissingLT(t *testing.T) {
+	input := "var a: list int;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '<' in list type")
+	}
+}
+
+func TestParseIndexedAssignMissingRBracket(t *testing.T) {
+	input := "arr[0 = 42;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ']'")
+	}
+}
+
+func TestParseIndexedAssignNotAssignOp(t *testing.T) {
+	input := "arr[0] == 42;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for non-assignment operator")
+	}
+}
+
+func TestParseIndexedAssignMissingSemicolon(t *testing.T) {
+	input := "arr[0] = 42"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing semicolon")
+	}
+}
+
+func TestParsePostfixNonMemberToken(t *testing.T) {
+	input := "a.42;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for non-member token after dot")
+	}
+}
+
+func TestParseIndexExprMissingRBracket(t *testing.T) {
+	input := "print(arr[0);"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ']' in index expression")
+	}
+}
+
+func TestParseArrayLitMissingRBracket(t *testing.T) {
+	input := "print([1, 2);"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ']' in array literal")
+	}
+}
+
+func TestParsePostfixMultipleArgs(t *testing.T) {
+	input := "a.add(1, 2, 3);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	es := program.Stmts[0].(*ast.ExprStmt)
+	ma := es.Expr.(*ast.MemberAccess)
+	if len(ma.Args) != 3 {
+		t.Errorf("expected 3 args, got %d", len(ma.Args))
+	}
+}
+
+func TestParseMemberCallMissingRParen(t *testing.T) {
+	input := "a.add(4;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ')' in member call")
+	}
+}
+
+func TestParseArrayBracketSyntax(t *testing.T) {
+	input := "var a: array[5]<int>;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	at := stmt.Type.(ast.ArrayType)
+	if at.Size != 5 {
+		t.Errorf("expected size 5, got %d", at.Size)
+	}
+}
+
+func TestParseArrayBracketSyntaxFloatElem(t *testing.T) {
+	input := "var a: array[3]<float>;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	at := stmt.Type.(ast.ArrayType)
+	if at.Size != 3 {
+		t.Errorf("expected size 3, got %d", at.Size)
+	}
+	_, ok := at.ElemType.(ast.FloatType)
+	if !ok {
+		t.Errorf("expected float element type")
+	}
+}
+
+func TestParseArrayNoSize(t *testing.T) {
+	input := "var a: array<int>;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	at := stmt.Type.(ast.ArrayType)
+	if at.Size != 0 {
+		t.Errorf("expected size 0, got %d", at.Size)
+	}
+}
+
+func TestParseArrayBracketEmpty(t *testing.T) {
+	input := "var a: array[]<int>;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for empty brackets")
+	}
+}
+
+func TestParseArrayBracketNonInt(t *testing.T) {
+	input := "var a: array[abc]<int>;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for non-integer in brackets")
+	}
+}
+
+func TestParseArrayBracketInvalidInt(t *testing.T) {
+	input := "var a: array[999999999999999999999]<int>;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid integer in brackets")
 	}
 }

@@ -1,7 +1,6 @@
 package ast
 
-type Node interface {
-}
+type Node interface{}
 
 type Expr interface {
 	Node
@@ -10,6 +9,16 @@ type Expr interface {
 type Stmt interface {
 	Node
 }
+
+type Type interface {
+	Kind() string
+}
+
+func (IntegerType) Kind() string { return "int" }
+func (FloatType) Kind() string   { return "float" }
+func (BoolType) Kind() string    { return "bool" }
+func (ArrayType) Kind() string   { return "array" }
+func (ListType) Kind() string    { return "list" }
 
 type IntegerType struct {
 	Size     int
@@ -24,6 +33,19 @@ type BoolType struct {
 type FloatType struct {
 	Size     int
 	Nullable bool
+}
+
+type ArrayType struct {
+	ElemType Type
+	Size     int
+}
+
+type ListType struct {
+	ElemType Type
+	HasMin   bool
+	MinSize  int
+	HasMax   bool
+	MaxSize  int
 }
 
 type IntegerLit struct {
@@ -44,8 +66,7 @@ type BoolLit struct {
 	Untyped bool
 }
 
-type NullLit struct {
-}
+type NullLit struct{}
 
 type VarRef struct {
 	Name string
@@ -62,21 +83,29 @@ type BinaryExpr struct {
 	Right Expr
 }
 
+type IndexExpr struct {
+	Object Expr
+	Index  Expr
+}
+
+type ArrayLit struct {
+	Elements []Expr
+}
+
 type MemberAccess struct {
 	Object Expr
 	Member string
+	Args   []Expr
 }
 
 type TypeRef struct {
-	Kind   string // "int", "float", "bool"
-	IType  IntegerType
-	FType  FloatType
-	BType  BoolType
+	Type   Type
 	IsType bool
 }
 
 type VarDecl struct {
 	Name    string
+	Type    Type
 	IType   IntegerType
 	FType   FloatType
 	BType   BoolType
@@ -86,12 +115,17 @@ type VarDecl struct {
 }
 
 type Assignment struct {
-	Name string
-	Op   string
-	Expr Expr
+	Name  string
+	Index Expr
+	Op    string
+	Expr  Expr
 }
 
 type PrintStmt struct {
+	Expr Expr
+}
+
+type ExprStmt struct {
 	Expr Expr
 }
 
@@ -102,7 +136,7 @@ type BlockStmt struct {
 type IfStmt struct {
 	Condition Expr
 	Then      *BlockStmt
-	Else      Stmt // *BlockStmt (else) or *IfStmt (else if)
+	Else      Stmt
 }
 
 type ForStmt struct {
@@ -123,7 +157,7 @@ type SkipStmt struct{}
 
 type IncDecStmt struct {
 	Name string
-	Op   string // "++" or "--"
+	Op   string
 }
 
 type Program struct {

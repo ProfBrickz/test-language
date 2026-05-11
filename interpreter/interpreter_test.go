@@ -4162,7 +4162,7 @@ func TestNegIntMin(t *testing.T) {
 func TestInt16MinMax(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 16, Signed: true}},
+		Object: &ast.TypeRef{Type: ast.IntegerType{Size: 16, Signed: true}},
 		Member: "min",
 	}
 	val, err := i.evalExpr(expr)
@@ -4174,7 +4174,7 @@ func TestInt16MinMax(t *testing.T) {
 	}
 
 	expr2 := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 16, Signed: true}},
+		Object: &ast.TypeRef{Type: ast.IntegerType{Size: 16, Signed: true}},
 		Member: "max",
 	}
 	val2, err2 := i.evalExpr(expr2)
@@ -4189,7 +4189,7 @@ func TestInt16MinMax(t *testing.T) {
 func TestInt32MinMax(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 32, Signed: true}},
+		Object: &ast.TypeRef{Type: ast.IntegerType{Size: 32, Signed: true}},
 		Member: "min",
 	}
 	val, err := i.evalExpr(expr)
@@ -4201,7 +4201,7 @@ func TestInt32MinMax(t *testing.T) {
 	}
 
 	expr2 := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 32, Signed: true}},
+		Object: &ast.TypeRef{Type: ast.IntegerType{Size: 32, Signed: true}},
 		Member: "max",
 	}
 	val2, err2 := i.evalExpr(expr2)
@@ -4216,7 +4216,7 @@ func TestInt32MinMax(t *testing.T) {
 func TestUint16MinMax(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 16, Signed: false}},
+		Object: &ast.TypeRef{Type: ast.IntegerType{Size: 16, Signed: false}},
 		Member: "min",
 	}
 	val, err := i.evalExpr(expr)
@@ -4228,7 +4228,7 @@ func TestUint16MinMax(t *testing.T) {
 	}
 
 	expr2 := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 16, Signed: false}},
+		Object: &ast.TypeRef{Type: ast.IntegerType{Size: 16, Signed: false}},
 		Member: "max",
 	}
 	val2, err2 := i.evalExpr(expr2)
@@ -4243,7 +4243,7 @@ func TestUint16MinMax(t *testing.T) {
 func TestUint32MinMax(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 32, Signed: false}},
+		Object: &ast.TypeRef{Type: ast.IntegerType{Size: 32, Signed: false}},
 		Member: "max",
 	}
 	val, err := i.evalExpr(expr)
@@ -4258,7 +4258,7 @@ func TestUint32MinMax(t *testing.T) {
 func TestUint64MinMax(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 64, Signed: false}},
+		Object: &ast.TypeRef{Type: ast.IntegerType{Size: 64, Signed: false}},
 		Member: "min",
 	}
 	val, err := i.evalExpr(expr)
@@ -4273,7 +4273,7 @@ func TestUint64MinMax(t *testing.T) {
 func TestFloat16Properties(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 16}},
 		Member: "max",
 	}
 	val, err := i.evalExpr(expr)
@@ -4285,7 +4285,7 @@ func TestFloat16Properties(t *testing.T) {
 	}
 
 	expr2 := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 16}},
 		Member: "min_exponent",
 	}
 	val2, err2 := i.evalExpr(expr2)
@@ -4297,7 +4297,7 @@ func TestFloat16Properties(t *testing.T) {
 	}
 
 	expr3 := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 16}},
 		Member: "max_exponent",
 	}
 	val3, err3 := i.evalExpr(expr3)
@@ -4309,7 +4309,7 @@ func TestFloat16Properties(t *testing.T) {
 	}
 
 	expr4 := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 16}},
 		Member: "size",
 	}
 	val4, err4 := i.evalExpr(expr4)
@@ -4321,7 +4321,7 @@ func TestFloat16Properties(t *testing.T) {
 	}
 
 	expr5 := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 16}},
 		Member: "min_subnormal",
 	}
 	val5, err5 := i.evalExpr(expr5)
@@ -4333,7 +4333,7 @@ func TestFloat16Properties(t *testing.T) {
 	}
 
 	expr6 := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 16}},
 		Member: "min_normal",
 	}
 	val6, err6 := i.evalExpr(expr6)
@@ -4345,7 +4345,7 @@ func TestFloat16Properties(t *testing.T) {
 	}
 
 	expr7 := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 16}},
 		Member: "precision",
 	}
 	val7, err7 := i.evalExpr(expr7)
@@ -4357,7 +4357,7 @@ func TestFloat16Properties(t *testing.T) {
 	}
 
 	expr8 := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 16}},
 		Member: "min_exponent",
 	}
 	val8, err8 := i.evalExpr(expr8)
@@ -4369,7 +4369,7 @@ func TestFloat16Properties(t *testing.T) {
 	}
 
 	expr9 := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 16}},
 		Member: "max_exponent",
 	}
 	val9, err9 := i.evalExpr(expr9)
@@ -4381,7 +4381,7 @@ func TestFloat16Properties(t *testing.T) {
 	}
 
 	expr10 := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 16}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 16}},
 		Member: "size",
 	}
 	val10, err10 := i.evalExpr(expr10)
@@ -4396,7 +4396,7 @@ func TestFloat16Properties(t *testing.T) {
 func TestFloat32MinSubnormal(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 32}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 32}},
 		Member: "min_subnormal",
 	}
 	val, err := i.evalExpr(expr)
@@ -4411,7 +4411,7 @@ func TestFloat32MinSubnormal(t *testing.T) {
 func TestFloat32MinNormal(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 32}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 32}},
 		Member: "min_normal",
 	}
 	val, err := i.evalExpr(expr)
@@ -4426,7 +4426,7 @@ func TestFloat32MinNormal(t *testing.T) {
 func TestIntSize(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 8, Signed: true}},
+		Object: &ast.TypeRef{Type: ast.IntegerType{Size: 8, Signed: true}},
 		Member: "size",
 	}
 	val, err := i.evalExpr(expr)
@@ -4438,7 +4438,7 @@ func TestIntSize(t *testing.T) {
 	}
 
 	expr2 := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 32, Signed: false}},
+		Object: &ast.TypeRef{Type: ast.IntegerType{Size: 32, Signed: false}},
 		Member: "size",
 	}
 	val2, err2 := i.evalExpr(expr2)
@@ -4452,7 +4452,7 @@ func TestIntSize(t *testing.T) {
 
 func TestBoolTypeRef(t *testing.T) {
 	i := New()
-	expr := &ast.TypeRef{Kind: "bool", BType: ast.BoolType{Nullable: false}}
+	expr := &ast.TypeRef{Type: ast.BoolType{Nullable: false}}
 	val, err := i.evalExpr(expr)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -4465,7 +4465,7 @@ func TestBoolTypeRef(t *testing.T) {
 func TestBoolTypeMemberType(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "bool", BType: ast.BoolType{Nullable: false}},
+		Object: &ast.TypeRef{Type: ast.BoolType{Nullable: false}},
 		Member: "type",
 	}
 	val, err := i.evalExpr(expr)
@@ -4480,7 +4480,7 @@ func TestBoolTypeMemberType(t *testing.T) {
 func TestBoolSize(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "bool", BType: ast.BoolType{Nullable: false}},
+		Object: &ast.TypeRef{Type: ast.BoolType{Nullable: false}},
 		Member: "size",
 	}
 	val, err := i.evalExpr(expr)
@@ -4562,7 +4562,7 @@ print(a.type.min);
 func TestFloatPrecisionDirect(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 64}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 64}},
 		Member: "precision",
 	}
 	val, err := i.evalExpr(expr)
@@ -4577,7 +4577,7 @@ func TestFloatPrecisionDirect(t *testing.T) {
 func TestFloatMinExponentDirect(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 64}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 64}},
 		Member: "min_exponent",
 	}
 	val, err := i.evalExpr(expr)
@@ -4592,7 +4592,7 @@ func TestFloatMinExponentDirect(t *testing.T) {
 func TestFloatMaxExponentDirect(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 64}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 64}},
 		Member: "max_exponent",
 	}
 	val, err := i.evalExpr(expr)
@@ -4607,7 +4607,7 @@ func TestFloatMaxExponentDirect(t *testing.T) {
 func TestFloatSizeDirect(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 64}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 64}},
 		Member: "size",
 	}
 	val, err := i.evalExpr(expr)
@@ -4622,7 +4622,7 @@ func TestFloatSizeDirect(t *testing.T) {
 func TestFloatMemberNotFound(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "float", FType: ast.FloatType{Size: 64}},
+		Object: &ast.TypeRef{Type: ast.FloatType{Size: 64}},
 		Member: "bogus",
 	}
 	_, err := i.evalExpr(expr)
@@ -4634,7 +4634,7 @@ func TestFloatMemberNotFound(t *testing.T) {
 func TestUint64Max(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 64, Signed: false}},
+		Object: &ast.TypeRef{Type: ast.IntegerType{Size: 64, Signed: false}},
 		Member: "max",
 	}
 	val, err := i.evalExpr(expr)
@@ -4719,7 +4719,7 @@ func TestMemberAccessUndefinedVar(t *testing.T) {
 func TestBoolTypeMemberError(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "bool", BType: ast.BoolType{Nullable: false}},
+		Object: &ast.TypeRef{Type: ast.BoolType{Nullable: false}},
 		Member: "nonexistent",
 	}
 	_, err := i.evalExpr(expr)
@@ -4731,7 +4731,7 @@ func TestBoolTypeMemberError(t *testing.T) {
 func TestTypeMemberError(t *testing.T) {
 	i := New()
 	expr := &ast.MemberAccess{
-		Object: &ast.TypeRef{Kind: "int", IType: ast.IntegerType{Size: 64, Signed: true}},
+		Object: &ast.TypeRef{Type: ast.IntegerType{Size: 64, Signed: true}},
 		Member: "nonexistent",
 	}
 	_, err := i.evalExpr(expr)
@@ -7987,5 +7987,1526 @@ i--;
 	err := interp.Run(program)
 	if err == nil {
 		t.Errorf("expected overflow error")
+	}
+}
+
+func TestArrayDeclAndPrint(t *testing.T) {
+	input := `
+var a: array{size: 3}<int> = [1, 2, 3];
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "[1, 2, 3]" {
+		t.Errorf("expected '[1, 2, 3]', got %q", output)
+	}
+}
+
+func TestArrayDeclWithoutInit(t *testing.T) {
+	input := `
+var a: array{size: 3}<int>;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	// Array without init is zero-filled
+	if output != "[0, 0, 0]" {
+		t.Errorf("expected '[0, 0, 0]', got %q", output)
+	}
+}
+
+func TestArraySizeMismatch(t *testing.T) {
+	input := `
+var a: array{size: 3}<int> = [1, 2];
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected size mismatch error")
+	}
+}
+
+func TestArrayIndexAccess(t *testing.T) {
+	input := `
+var a: array{size: 3}<int> = [10, 20, 30];
+print(a[1]);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "20" {
+		t.Errorf("expected '20', got %q", output)
+	}
+}
+
+func TestArrayIndexOutOfBounds(t *testing.T) {
+	input := `
+var a: array{size: 3}<int> = [1, 2, 3];
+print(a[5]);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected out of bounds error")
+	}
+}
+
+func TestArrayIndexedAssign(t *testing.T) {
+	input := `
+var a: array{size: 3}<int> = [1, 2, 3];
+a[1] = 99;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "[1, 99, 3]" {
+		t.Errorf("expected '[1, 99, 3]', got %q", output)
+	}
+}
+
+func TestArrayIndexedAssignOutOfBounds(t *testing.T) {
+	input := `
+var a: array{size: 2}<int> = [1, 2];
+a[5] = 99;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected out of bounds error on assignment")
+	}
+}
+
+func TestArrayLength(t *testing.T) {
+	input := `
+var a: array{size: 5}<int> = [1, 2, 3, 4, 5];
+print(a.length);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "5" {
+		t.Errorf("expected '5', got %q", output)
+	}
+}
+
+func TestListDeclAndPrint(t *testing.T) {
+	input := `
+var a: list<int> = [1, 2, 3];
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "[1, 2, 3]" {
+		t.Errorf("expected '[1, 2, 3]', got %q", output)
+	}
+}
+
+func TestListDeclEmpty(t *testing.T) {
+	input := `
+var a: list<int>;
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "[]" {
+		t.Errorf("expected '[]', got %q", output)
+	}
+}
+
+func TestListAdd(t *testing.T) {
+	input := `
+var a: list<int>;
+a.add(42);
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "[42]" {
+		t.Errorf("expected '[42]', got %q", output)
+	}
+}
+
+func TestListAddAtIndex(t *testing.T) {
+	input := `
+var a: list<int> = [1, 3];
+a.add(2, 1);
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "[1, 2, 3]" {
+		t.Errorf("expected '[1, 2, 3]', got %q", output)
+	}
+}
+
+func TestListRemove(t *testing.T) {
+	input := `
+var a: list<int> = [1, 2, 3];
+a.remove(1);
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "[1, 3]" {
+		t.Errorf("expected '[1, 3]', got %q", output)
+	}
+}
+
+func TestListLength(t *testing.T) {
+	input := `
+var a: list<int> = [1, 2, 3, 4];
+print(a.length);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "4" {
+		t.Errorf("expected '4', got %q", output)
+	}
+}
+
+func TestListWithMinMax(t *testing.T) {
+	input := `
+var a: list{min: 1, max: 5}<int> = [1, 2, 3];
+print(a.length);
+a.add(4);
+print(a.length);
+a.add(5);
+print(a.length);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "3\n4\n5" {
+		t.Errorf("expected '3\\n4\\n5', got %q", output)
+	}
+}
+
+func TestListAddBeyondMax(t *testing.T) {
+	input := `
+var a: list{min: 1, max: 2}<int> = [1, 2];
+a.add(3);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for exceeding max capacity")
+	}
+}
+
+func TestListRemoveBelowMin(t *testing.T) {
+	input := `
+var a: list{min: 2, max: 5}<int> = [1, 2];
+a.remove(0);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for going below min capacity")
+	}
+}
+
+func TestListRemoveReturnsElement(t *testing.T) {
+	input := `
+var a: list<int> = [1, 2, 3];
+var x: int{size: 64} = a.remove(1);
+print(x);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "2" {
+		t.Errorf("expected '2', got %q", output)
+	}
+}
+
+func TestArrayLiteralExpr(t *testing.T) {
+	input := `
+print([1, 2, 3]);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "[1, 2, 3]" {
+		t.Errorf("expected '[1, 2, 3]', got %q", output)
+	}
+}
+
+func TestEmptyArrayLiteral(t *testing.T) {
+	input := `
+print([]);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "[]" {
+		t.Errorf("expected '[]', got %q", output)
+	}
+}
+
+func TestArrayTypeDesc(t *testing.T) {
+	ft := ast.FloatType{Size: 32}
+	at := ast.ArrayType{ElemType: ft, Size: 5}
+	result := typeDescForType(at)
+	if result != "array{size: 5}<32-bit float>" {
+		t.Errorf("expected 'array{size: 5}<32-bit float>', got %q", result)
+	}
+}
+
+func TestListTypeDesc(t *testing.T) {
+	result := typeDescForType(ast.ListType{ElemType: ast.IntegerType{Size: 64, Signed: true}})
+	if result != "list<64-bit signed int>" {
+		t.Errorf("expected 'list<64-bit signed int>', got %q", result)
+	}
+}
+
+func TestListTypeDescWithMinMax(t *testing.T) {
+	result := typeDescForType(ast.ListType{
+		ElemType: ast.IntegerType{Size: 32, Signed: true},
+		HasMin:   true, MinSize: 1,
+		HasMax: true, MaxSize: 10,
+	})
+	if result != "list{min: 1, max: 10}<32-bit signed int>" {
+		t.Errorf("expected 'list{min: 1, max: 10}<32-bit signed int>', got %q", result)
+	}
+}
+
+func TestArrayTypeDisplay(t *testing.T) {
+	input := "print(array{size: 3}<int>);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "array{size: 3}<64-bit signed int>" {
+		t.Errorf("expected 'array{size: 3}<64-bit signed int>', got %q", output)
+	}
+}
+
+func TestListTypeDisplay(t *testing.T) {
+	input := "print(list<int>);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "list<64-bit signed int>" {
+		t.Errorf("expected 'list<64-bit signed int>', got %q", output)
+	}
+}
+
+func TestArrayMemberNotFound(t *testing.T) {
+	i := New()
+	i.env.Set("a", Value{
+		IsArray:   true,
+		ArrayData: []Value{{Data: 1}},
+	})
+	expr := &ast.MemberAccess{
+		Object: &ast.VarRef{Name: "a"},
+		Member: "nonexistent",
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for nonexistent array member")
+	}
+}
+
+func TestTypeRefArrayEval(t *testing.T) {
+	i := New()
+	at := ast.ArrayType{ElemType: ast.IntegerType{Size: 64, Signed: true}, Size: 4}
+	expr := &ast.TypeRef{Type: at, IsType: true}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsType || !val.IsArray {
+		t.Errorf("expected IsType and IsArray")
+	}
+	if _, ok := val.Type.(ast.ArrayType); !ok {
+		t.Errorf("expected ArrayType, got %T", val.Type)
+	}
+}
+
+func TestTypeRefListEval(t *testing.T) {
+	i := New()
+	lt := ast.ListType{ElemType: ast.IntegerType{Size: 64, Signed: true}}
+	expr := &ast.TypeRef{Type: lt, IsType: true}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsType || !val.IsArray {
+		t.Errorf("expected IsType and IsArray")
+	}
+	if _, ok := val.Type.(ast.ListType); !ok {
+		t.Errorf("expected ListType, got %T", val.Type)
+	}
+}
+
+func TestExprStmtMethodCall(t *testing.T) {
+	input := `
+var a: list<int> = [1, 2, 3];
+a.add(4);
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "[1, 2, 3, 4]" {
+		t.Errorf("expected '[1, 2, 3, 4]', got %q", output)
+	}
+}
+
+func TestArrayTypeEvalTypeMember(t *testing.T) {
+	i := New()
+	at := ast.ArrayType{ElemType: ast.IntegerType{Size: 32, Signed: true}, Size: 5}
+	td := Value{IsType: true, IsArray: true, Type: at}
+	val, err := i.evalTypeMember(td, "size")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != 5 {
+		t.Errorf("expected 5, got %d", val.Data)
+	}
+
+	val2, err2 := i.evalTypeMember(td, "length")
+	if err2 != nil {
+		t.Fatalf("unexpected error: %v", err2)
+	}
+	if val2.Data != 5 {
+		t.Errorf("expected 5, got %d", val2.Data)
+	}
+}
+
+func TestArrayTypeEvalMemberNotFound(t *testing.T) {
+	i := New()
+	at := ast.ArrayType{ElemType: ast.IntegerType{Size: 32, Signed: true}, Size: 3}
+	td := Value{IsType: true, IsArray: true, Type: at}
+	_, err := i.evalTypeMember(td, "bogus")
+	if err == nil {
+		t.Errorf("expected error for nonexistent array type member")
+	}
+}
+
+func TestVarDotTypeOnArray(t *testing.T) {
+	input := `
+var a: array{size: 4}<int> = [1, 2, 3, 4];
+print(a.type);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "array{size: 4}<64-bit signed int>" {
+		t.Errorf("expected 'array{size: 4}<64-bit signed int>', got %q", output)
+	}
+}
+
+func TestAssignNonArrayToArrayVar(t *testing.T) {
+	input := `
+var a: array{size: 2}<int> = 42;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error assigning non-array to array variable")
+	}
+}
+
+func TestAssignNonArrayToListVar(t *testing.T) {
+	input := `
+var a: list<int> = 42;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error assigning non-array to list variable")
+	}
+}
+
+func TestListMinInitializer(t *testing.T) {
+	input := `
+var a: list{min: 3, max: 10}<int> = [1, 2];
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for list below min size")
+	}
+}
+
+func TestListMaxInitializer(t *testing.T) {
+	input := `
+var a: list{min: 1, max: 3}<int> = [1, 2, 3, 4];
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for list above max size")
+	}
+}
+
+func TestListDeclRequiresInitWithMin(t *testing.T) {
+	input := `
+var a: list{min: 1, max: 5}<int>;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for list with min but no initializer")
+	}
+}
+
+// ---- Coverage edge cases for interpreter ----
+
+func TestEvalTypeMemberListTypeLength(t *testing.T) {
+	i := New()
+	lt := ast.ListType{ElemType: ast.IntegerType{Size: 64, Signed: true}}
+	td := Value{IsType: true, IsArray: true, Type: lt}
+	_, err := i.evalTypeMember(td, "length")
+	if err == nil {
+		t.Errorf("expected error for ListType length member")
+	}
+}
+
+func TestEvalTypeMemberListTypeSize(t *testing.T) {
+	i := New()
+	lt := ast.ListType{ElemType: ast.IntegerType{Size: 64, Signed: true}}
+	td := Value{IsType: true, IsArray: true, Type: lt}
+	_, err := i.evalTypeMember(td, "size")
+	if err == nil {
+		t.Errorf("expected error for ListType size member")
+	}
+}
+
+func TestEvalTypeMemberFloat(t *testing.T) {
+	i := New()
+	ft := ast.FloatType{Size: 64}
+	td := Value{IsType: true, IsFloat: true, FType: ft}
+	val, err := i.evalTypeMember(td, "precision")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != 15 {
+		t.Errorf("expected precision 15, got %d", val.Data)
+	}
+}
+
+func TestEvalTypeMemberBool(t *testing.T) {
+	i := New()
+	bt := ast.BoolType{}
+	td := Value{IsType: true, IsBool: true, BType: bt}
+	val, err := i.evalTypeMember(td, "size")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != 8 {
+		t.Errorf("expected size 8, got %d", val.Data)
+	}
+}
+
+func TestExecArrayDeclInitExprEvalError(t *testing.T) {
+	input := `
+var a: array{size: 2}<int> = [undefined_ref];
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for undefined var in initializer")
+	}
+}
+
+func TestExecListDeclInitExprEvalError(t *testing.T) {
+	input := `
+var a: list<int> = [undefined_ref];
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for undefined var in initializer")
+	}
+}
+
+func TestExecListDeclAssignNonList(t *testing.T) {
+	input := `
+var a: list<int> = 42;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error assigning non-list to list variable")
+	}
+}
+
+func TestExecListDeclMinBoundErrorOnInit(t *testing.T) {
+	input := `
+var a: list{min: 3}<int> = [1];
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for not enough elements")
+	}
+}
+
+func TestExecListDeclMaxBoundErrorOnInit(t *testing.T) {
+	input := `
+var a: list{max: 2}<int> = [1, 2, 3];
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for too many elements")
+	}
+}
+
+func TestExecuteAssignmentOnArrayVar(t *testing.T) {
+	input := `
+var a: array{size: 2}<int> = [1, 2];
+a = [3, 4];
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for reassigning array variable")
+	}
+}
+
+func TestExecuteIndexedAssignUndefinedVar(t *testing.T) {
+	input := `
+unknown[0] = 1;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for undefined variable")
+	}
+}
+
+func TestExecuteIndexedAssignNonArray(t *testing.T) {
+	input := `
+var x: int = 42;
+x[0] = 1;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for indexing non-array")
+	}
+}
+
+func TestExecuteIndexedAssignWrongOp(t *testing.T) {
+	input := `
+var a: array{size: 2}<int> = [1, 2];
+a[0] += 1;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for += on indexed assign")
+	}
+}
+
+func TestExecuteIndexedAssignNullIndex(t *testing.T) {
+	i := New()
+	i.env.Set("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
+	err := i.ExecuteStmt(&ast.Assignment{
+		Name:  "a",
+		Index: &ast.NullLit{},
+		Op:    "=",
+		Expr:  &ast.IntegerLit{Value: 42, Untyped: true},
+	})
+	if err == nil {
+		t.Errorf("expected error for null index")
+	}
+}
+
+func TestExecuteIndexedAssignOutOfBounds(t *testing.T) {
+	i := New()
+	i.env.Set("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
+	err := i.ExecuteStmt(&ast.Assignment{
+		Name:  "a",
+		Index: &ast.IntegerLit{Value: 5, Untyped: true},
+		Op:    "=",
+		Expr:  &ast.IntegerLit{Value: 42, Untyped: true},
+	})
+	if err == nil {
+		t.Errorf("expected error for out of bounds index")
+	}
+}
+
+func TestExecuteIndexedAssignExprError(t *testing.T) {
+	i := New()
+	i.env.Set("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
+	err := i.ExecuteStmt(&ast.Assignment{
+		Name:  "a",
+		Index: &ast.IntegerLit{Value: 0, Untyped: true},
+		Op:    "=",
+		Expr:  &ast.VarRef{Name: "undefined"},
+	})
+	if err == nil {
+		t.Errorf("expected error for undefined var in rhs")
+	}
+}
+
+func TestEvalExprArrayLitError(t *testing.T) {
+	i := New()
+	_, err := i.evalExpr(&ast.ArrayLit{
+		Elements: []ast.Expr{&ast.VarRef{Name: "undefined"}},
+	})
+	if err == nil {
+		t.Errorf("expected error for undefined var in array literal")
+	}
+}
+
+func TestEvalExprIndexExprNonArray(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{Data: 42, Untyped: true})
+	_, err := i.evalExpr(&ast.IndexExpr{
+		Object: &ast.VarRef{Name: "x"},
+		Index:  &ast.IntegerLit{Value: 0, Untyped: true},
+	})
+	if err == nil {
+		t.Errorf("expected error for indexing non-array")
+	}
+}
+
+func TestEvalExprIndexExprNullIndex(t *testing.T) {
+	i := New()
+	i.env.Set("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
+	_, err := i.evalExpr(&ast.IndexExpr{
+		Object: &ast.VarRef{Name: "a"},
+		Index:  &ast.NullLit{},
+	})
+	if err == nil {
+		t.Errorf("expected error for null index")
+	}
+}
+
+func TestEvalExprIndexExprOutOfBounds(t *testing.T) {
+	i := New()
+	i.env.Set("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
+	_, err := i.evalExpr(&ast.IndexExpr{
+		Object: &ast.VarRef{Name: "a"},
+		Index:  &ast.IntegerLit{Value: 5, Untyped: true},
+	})
+	if err == nil {
+		t.Errorf("expected error for out of bounds index")
+	}
+}
+
+func TestEvalExprIndexExprEvalObjectError(t *testing.T) {
+	i := New()
+	_, err := i.evalExpr(&ast.IndexExpr{
+		Object: &ast.VarRef{Name: "undefined"},
+		Index:  &ast.IntegerLit{Value: 0, Untyped: true},
+	})
+	if err == nil {
+		t.Errorf("expected error for undefined var")
+	}
+}
+
+func TestEvalExprIndexExprEvalIndexError(t *testing.T) {
+	i := New()
+	i.env.Set("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
+	_, err := i.evalExpr(&ast.IndexExpr{
+		Object: &ast.VarRef{Name: "a"},
+		Index:  &ast.VarRef{Name: "undefined"},
+	})
+	if err == nil {
+		t.Errorf("expected error for undefined var in index")
+	}
+}
+
+func TestEvalArrayMemberAddWrongArgs(t *testing.T) {
+	i := New()
+	obj := Value{IsArray: true, ArrayData: []Value{}}
+	_, err := i.evalArrayMember(&obj, &ast.MemberAccess{Member: "add", Args: []ast.Expr{}})
+	if err == nil {
+		t.Errorf("expected error for add with no args")
+	}
+	_, err = i.evalArrayMember(&obj, &ast.MemberAccess{Member: "add", Args: []ast.Expr{
+		&ast.IntegerLit{Value: 1, Untyped: true},
+		&ast.IntegerLit{Value: 2, Untyped: true},
+		&ast.IntegerLit{Value: 3, Untyped: true},
+	}})
+	if err == nil {
+		t.Errorf("expected error for add with >2 args")
+	}
+}
+
+func TestEvalArrayMemberAddEvalValueError(t *testing.T) {
+	i := New()
+	obj := Value{IsArray: true, ArrayData: []Value{}}
+	_, err := i.evalArrayMember(&obj, &ast.MemberAccess{Member: "add", Args: []ast.Expr{
+		&ast.VarRef{Name: "undefined"},
+	}})
+	if err == nil {
+		t.Errorf("expected error for undefined var in add value")
+	}
+}
+
+func TestEvalArrayMemberAddEvalIndexError(t *testing.T) {
+	i := New()
+	obj := Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}}
+	_, err := i.evalArrayMember(&obj, &ast.MemberAccess{Member: "add", Args: []ast.Expr{
+		&ast.IntegerLit{Value: 2, Untyped: true},
+		&ast.VarRef{Name: "undefined"},
+	}})
+	if err == nil {
+		t.Errorf("expected error for undefined var in add index")
+	}
+}
+
+func TestEvalArrayMemberAddNullIndex(t *testing.T) {
+	i := New()
+	obj := Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}}
+	_, err := i.evalArrayMember(&obj, &ast.MemberAccess{Member: "add", Args: []ast.Expr{
+		&ast.IntegerLit{Value: 2, Untyped: true},
+		&ast.NullLit{},
+	}})
+	if err == nil {
+		t.Errorf("expected error for null index in add")
+	}
+}
+
+func TestEvalArrayMemberAddOutOfBounds(t *testing.T) {
+	i := New()
+	obj := Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}}
+	_, err := i.evalArrayMember(&obj, &ast.MemberAccess{Member: "add", Args: []ast.Expr{
+		&ast.IntegerLit{Value: 2, Untyped: true},
+		&ast.IntegerLit{Value: 5, Untyped: true},
+	}})
+	if err == nil {
+		t.Errorf("expected error for out of bounds index in add")
+	}
+}
+
+func TestEvalArrayMemberRemoveWrongArgs(t *testing.T) {
+	i := New()
+	obj := Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}}
+	_, err := i.evalArrayMember(&obj, &ast.MemberAccess{Member: "remove", Args: []ast.Expr{}})
+	if err == nil {
+		t.Errorf("expected error for remove with no args")
+	}
+}
+
+func TestEvalArrayMemberRemoveEvalIndexError(t *testing.T) {
+	i := New()
+	obj := Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}}
+	_, err := i.evalArrayMember(&obj, &ast.MemberAccess{Member: "remove", Args: []ast.Expr{
+		&ast.VarRef{Name: "undefined"},
+	}})
+	if err == nil {
+		t.Errorf("expected error for undefined var in remove index")
+	}
+}
+
+func TestEvalArrayMemberRemoveNullIndex(t *testing.T) {
+	i := New()
+	obj := Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}}
+	_, err := i.evalArrayMember(&obj, &ast.MemberAccess{Member: "remove", Args: []ast.Expr{
+		&ast.NullLit{},
+	}})
+	if err == nil {
+		t.Errorf("expected error for null index in remove")
+	}
+}
+
+func TestEvalArrayMemberRemoveOutOfBounds(t *testing.T) {
+	i := New()
+	obj := Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}}
+	_, err := i.evalArrayMember(&obj, &ast.MemberAccess{Member: "remove", Args: []ast.Expr{
+		&ast.IntegerLit{Value: 5, Untyped: true},
+	}})
+	if err == nil {
+		t.Errorf("expected error for out of bounds index in remove")
+	}
+}
+
+func TestArraySizeMismatchTooMany(t *testing.T) {
+	input := `
+var a: array{size: 2}<int> = [1, 2, 3];
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for size mismatch (too many)")
+	}
+}
+
+func TestAssignOpOnArrayVar(t *testing.T) {
+	input := `
+var a: array{size: 2}<int> = [1, 2];
+a += 1;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for += on array variable")
+	}
+}
+
+func TestEvalTypeMemberDefaultNotFound(t *testing.T) {
+	i := New()
+	it := ast.IntegerType{Size: 64, Signed: true}
+	td := Value{IsType: true, IType: it}
+	_, err := i.evalTypeMember(td, "nonexistent")
+	if err == nil {
+		t.Errorf("expected error for nonexistent type member")
+	}
+}
+
+func TestEvalTypeMemberFloatNotFound(t *testing.T) {
+	i := New()
+	ft := ast.FloatType{Size: 64}
+	td := Value{IsType: true, IsFloat: true, FType: ft}
+	_, err := i.evalTypeMember(td, "nonexistent")
+	if err == nil {
+		t.Errorf("expected error for nonexistent float type member")
+	}
+}
+
+func TestEvalTypeMemberBoolNotFound(t *testing.T) {
+	i := New()
+	bt := ast.BoolType{}
+	td := Value{IsType: true, IsBool: true, BType: bt}
+	_, err := i.evalTypeMember(td, "nonexistent")
+	if err == nil {
+		t.Errorf("expected error for nonexistent bool type member")
+	}
+}
+
+func TestEvalMemberAccessNonArrayNonType(t *testing.T) {
+	i := New()
+	i.env.Set("x", Value{Data: 42, Untyped: true})
+	_, err := i.evalExpr(&ast.MemberAccess{
+		Object: &ast.VarRef{Name: "x"},
+		Member: "foo",
+	})
+	if err == nil {
+		t.Errorf("expected error for accessing member on int")
+	}
+}
+
+func TestEvalArrayMemberListAddBeyondMax(t *testing.T) {
+	i := New()
+	obj := Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}, {Data: 2, Untyped: true}}, Type: ast.ListType{ElemType: ast.IntegerType{Size: 64, Signed: true}, HasMax: true, MaxSize: 2}}
+	_, err := i.evalArrayMember(&obj, &ast.MemberAccess{Member: "add", Args: []ast.Expr{
+		&ast.IntegerLit{Value: 3, Untyped: true},
+	}})
+	if err == nil {
+		t.Errorf("expected error for adding beyond max")
+	}
+}
+
+func TestEvalArrayMemberListRemoveBelowMin(t *testing.T) {
+	i := New()
+	obj := Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}, Type: ast.ListType{ElemType: ast.IntegerType{Size: 64, Signed: true}, HasMin: true, MinSize: 1}}
+	_, err := i.evalArrayMember(&obj, &ast.MemberAccess{Member: "remove", Args: []ast.Expr{
+		&ast.IntegerLit{Value: 0, Untyped: true},
+	}})
+	if err == nil {
+		t.Errorf("expected error for removing below min")
+	}
+}
+
+func TestExecuteIndexedAssignIndexEvalError(t *testing.T) {
+	i := New()
+	i.env.Set("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
+	err := i.ExecuteStmt(&ast.Assignment{
+		Name:  "a",
+		Index: &ast.VarRef{Name: "undefined"},
+		Op:    "=",
+		Expr:  &ast.IntegerLit{Value: 42, Untyped: true},
+	})
+	if err == nil {
+		t.Errorf("expected error for undefined var in index")
+	}
+}
+
+func TestArraySizeInference(t *testing.T) {
+	input := `
+var a: array<int> = [1, 2, 3];
+print(a.length);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "3" {
+		t.Errorf("expected '3', got %q", output)
+	}
+}
+
+func TestArraySizeInferencePrint(t *testing.T) {
+	input := `
+var a: array<int> = [1, 2, 3];
+print(a);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "[1, 2, 3]" {
+		t.Errorf("expected '[1, 2, 3]', got %q", output)
+	}
+}
+
+func TestArrayBracketSyntaxRuntime(t *testing.T) {
+	input := `
+var a: array[3]<int> = [10, 20, 30];
+print(a[1]);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "20" {
+		t.Errorf("expected '20', got %q", output)
+	}
+}
+
+func TestArrayElemTypeMember(t *testing.T) {
+	input := "print(array{size: 5}<int>.elem_type);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "64-bit signed int" {
+		t.Errorf("expected '64-bit signed int', got %q", output)
+	}
+}
+
+func TestArrayElemTypeMemberFloat(t *testing.T) {
+	input := "print(array{size: 3}<float>.elem_type);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "64-bit float" {
+		t.Errorf("expected '64-bit float', got %q", output)
+	}
+}
+
+func TestArrayElemTypeChainedMember(t *testing.T) {
+	input := "print(array{size: 5}<int>.elem_type.size);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "64" {
+		t.Errorf("expected '64', got %q", output)
+	}
+}
+
+func TestArrayElemTypeMemberBool(t *testing.T) {
+	input := "print(array{size: 3}<bool>.elem_type);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "bool" {
+		t.Errorf("expected 'bool', got %q", output)
+	}
+}
+
+func TestArrayElemTypeNestedArray(t *testing.T) {
+	input := "print(array{size: 3}<array{size: 2}<int>>.elem_type);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "array{size: 2}<64-bit signed int>" {
+		t.Errorf("expected 'array{size: 2}<...>', got %q", output)
+	}
+}
+
+func TestArrayElemTypeNestedList(t *testing.T) {
+	input := "print(array{size: 3}<list<int>>.elem_type);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "list<64-bit signed int>" {
+		t.Errorf("expected 'list<...>', got %q", output)
+	}
+}
+
+func TestArrayElemTypeOnListType(t *testing.T) {
+	i := New()
+	lt := ast.ListType{ElemType: ast.IntegerType{Size: 64, Signed: true}}
+	td := Value{IsType: true, IsArray: true, Type: lt}
+	_, err := i.evalTypeMember(td, "elem_type")
+	if err == nil {
+		t.Errorf("expected error for elem_type on ListType")
+	}
+}
+
+func TestArrayBracketSyntaxTypeDisplay(t *testing.T) {
+	input := "print(array[4]<int>);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "array{size: 4}<64-bit signed int>" {
+		t.Errorf("expected 'array{size: 4}<...>', got %q", output)
 	}
 }
