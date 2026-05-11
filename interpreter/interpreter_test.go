@@ -8679,6 +8679,22 @@ print(typeof(a));
 	}
 }
 
+func TestTypeOfOperandError(t *testing.T) {
+	input := "print(typeof(undefinedVar));"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for undefined variable")
+	}
+}
+
 func TestAssignNonArrayToArrayVar(t *testing.T) {
 	input := `
 var a: array{size: 2}<int> = 42;

@@ -2146,6 +2146,61 @@ func TestParseTypeOf(t *testing.T) {
 	}
 }
 
+func TestParseTypeOfStmt(t *testing.T) {
+	input := "typeof(x);"
+	l := lexer.New(input)
+	p := New(l)
+	stmt, errs, _ := p.ParseSingleStmt()
+	if len(errs) > 0 {
+		t.Fatalf("unexpected errors: %v", errs)
+	}
+	es, ok := stmt.(*ast.ExprStmt)
+	if !ok {
+		t.Fatalf("expected *ast.ExprStmt, got %T", stmt)
+	}
+	te, ok := es.Expr.(*ast.TypeOfExpr)
+	if !ok {
+		t.Fatalf("expected *ast.TypeOfExpr, got %T", es.Expr)
+	}
+	vr, ok := te.Expr.(*ast.VarRef)
+	if !ok {
+		t.Fatalf("expected *ast.VarRef, got %T", te.Expr)
+	}
+	if vr.Name != "x" {
+		t.Errorf("expected Name 'x', got %q", vr.Name)
+	}
+}
+
+func TestParseTypeOfStmtMissingSemi(t *testing.T) {
+	input := "typeof(x)"
+	l := lexer.New(input)
+	p := New(l)
+	_, errs, _ := p.ParseSingleStmt()
+	if len(errs) == 0 {
+		t.Errorf("expected error for missing semicolon")
+	}
+}
+
+func TestParseTypeOfMissingLParen(t *testing.T) {
+	input := "typeof x;"
+	l := lexer.New(input)
+	p := New(l)
+	_ = p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '(' after typeof")
+	}
+}
+
+func TestParseTypeOfMissingRParen(t *testing.T) {
+	input := "typeof(x;"
+	l := lexer.New(input)
+	p := New(l)
+	_ = p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ')'")
+	}
+}
+
 func TestParseEquality(t *testing.T) {
 	input := "print(1 == 2);"
 	l := lexer.New(input)
