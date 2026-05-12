@@ -19,6 +19,7 @@ func (FloatType) Kind() string   { return "float" }
 func (BoolType) Kind() string    { return "bool" }
 func (ArrayType) Kind() string   { return "array" }
 func (ListType) Kind() string    { return "list" }
+func (StringType) Kind() string  { return "string" }
 
 type IntegerType struct {
 	Size     int
@@ -48,6 +49,14 @@ type ListType struct {
 	MaxSize  int
 }
 
+type StringType struct {
+	Size    int
+	HasMin  bool
+	MinSize int
+	HasMax  bool
+	MaxSize int
+}
+
 type IntegerLit struct {
 	Value   int64
 	IType   IntegerType
@@ -63,6 +72,12 @@ type FloatLit struct {
 type BoolLit struct {
 	Value   bool
 	BType   BoolType
+	Untyped bool
+}
+
+type StringLit struct {
+	Value   string
+	SType   StringType
 	Untyped bool
 }
 
@@ -108,14 +123,16 @@ type TypeRef struct {
 }
 
 type VarDecl struct {
-	Name    string
-	Type    Type
-	IType   IntegerType
-	FType   FloatType
-	BType   BoolType
-	Expr    Expr
-	IsFloat bool
-	IsBool  bool
+	Name     string
+	Type     Type
+	IType    IntegerType
+	FType    FloatType
+	BType    BoolType
+	SType    StringType
+	Expr     Expr
+	IsFloat  bool
+	IsBool   bool
+	IsString bool
 }
 
 type Assignment struct {

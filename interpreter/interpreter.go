@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"unicode/utf8"
 
 	"github.com/x448/float16"
 
@@ -11,20 +12,23 @@ import (
 )
 
 type Value struct {
-	Type      ast.Type
-	IType     ast.IntegerType
-	FType     ast.FloatType
-	BType     ast.BoolType
-	Data      int64
-	FData     float64
-	BData     bool
-	ArrayData []Value
-	Untyped   bool
-	IsFloat   bool
-	IsBool    bool
-	IsArray   bool
-	Null      bool
-	IsType    bool
+	Type       ast.Type
+	IType      ast.IntegerType
+	FType      ast.FloatType
+	BType      ast.BoolType
+	SType      ast.StringType
+	Data       int64
+	FData      float64
+	BData      bool
+	StringData string
+	ArrayData  []Value
+	Untyped    bool
+	IsFloat    bool
+	IsBool     bool
+	IsArray    bool
+	IsString   bool
+	Null       bool
+	IsType     bool
 }
 
 func intToStr(data int64, itype ast.IntegerType, untyped bool) string {
@@ -159,6 +163,9 @@ func valueToTypeDesc(val Value) Value {
 	if val.IsArray {
 		td.Type = val.Type
 		td.IsArray = true
+	} else if val.IsString {
+		td.IsString = true
+		td.SType = val.SType
 	} else if val.IsFloat {
 		td.IsFloat = true
 		td.FType = val.FType
@@ -175,6 +182,14 @@ func valueToTypeDesc(val Value) Value {
 }
 
 func (i *Interpreter) evalTypeMember(td Value, member string) (Value, error) {
+	if td.IsString {
+		switch member {
+		case "size":
+			return Value{Data: int64(td.SType.Size)}, nil
+		default:
+			return Value{}, fmt.Errorf("type string has no member %q", member)
+		}
+	}
 	if td.IsArray {
 		switch member {
 		case "length":
@@ -267,6 +282,9 @@ func (v Value) String() string {
 	if v.Null {
 		return "null"
 	}
+	if v.IsString {
+		return v.StringData
+	}
 	if v.IsBool {
 		if v.Untyped {
 			return fmt.Sprintf("%t", v.BData)
@@ -305,6 +323,24 @@ func typeDescForType(t ast.Type) string {
 			s += "}"
 		}
 		return s + "<" + typeDescForType(typ.ElemType) + ">"
+	case ast.StringType:
+		s := "string"
+		if typ.Size > 0 {
+			s += fmt.Sprintf("{size: %d}", typ.Size)
+		} else if typ.HasMin || typ.HasMax {
+			s += "{"
+			if typ.HasMin {
+				s += fmt.Sprintf("min: %d", typ.MinSize)
+				if typ.HasMax {
+					s += ", "
+				}
+			}
+			if typ.HasMax {
+				s += fmt.Sprintf("max: %d", typ.MaxSize)
+			}
+			s += "}"
+		}
+		return s
 	default:
 		return typeDesc(typ, false)
 	}
@@ -679,6 +715,8 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 			fmt.Println(typeDescForVal(val))
 		} else if val.IsArray {
 			fmt.Println(val.String())
+		} else if val.IsString {
+			fmt.Println(val.StringData)
 		} else if val.Null {
 			fmt.Println("null")
 		} else if val.IsBool {
@@ -700,12 +738,15 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 }
 
 func (i *Interpreter) execVarDecl(s *ast.VarDecl) error {
-	// Handle array/list types
+	// Handle array/list/string types
 	if at, ok := s.Type.(ast.ArrayType); ok {
 		return i.execArrayDecl(s, at)
 	}
 	if lt, ok := s.Type.(ast.ListType); ok {
 		return i.execListDecl(s, lt)
+	}
+	if st, ok := s.Type.(ast.StringType); ok {
+		return i.execStringDecl(s, st)
 	}
 
 	val := Value{IType: s.IType, FType: s.FType, BType: s.BType, IsFloat: s.IsFloat, IsBool: s.IsBool}
@@ -832,6 +873,43 @@ func (i *Interpreter) execListDecl(s *ast.VarDecl, lt ast.ListType) error {
 	return nil
 }
 
+func (i *Interpreter) execStringDecl(s *ast.VarDecl, st ast.StringType) error {
+	if s.Expr != nil {
+		rightVal, err := i.evalExpr(s.Expr)
+		if err != nil {
+			return err
+		}
+		if !rightVal.IsString {
+			return fmt.Errorf("cannot assign %s to string variable", typeDescForVal(rightVal))
+		}
+		runeCount := utf8.RuneCountInString(rightVal.StringData)
+		if st.Size > 0 && runeCount != st.Size {
+			return fmt.Errorf("expected %d characters, got %d", st.Size, runeCount)
+		}
+		if st.HasMin && runeCount < st.MinSize {
+			return fmt.Errorf("expected at least %d characters, got %d", st.MinSize, runeCount)
+		}
+		if st.HasMax && runeCount > st.MaxSize {
+			return fmt.Errorf("expected at most %d characters, got %d", st.MaxSize, runeCount)
+		}
+		rightVal.Type = st
+		rightVal.SType = st
+		i.env.Set(s.Name, rightVal)
+		return nil
+	}
+	if st.Size > 0 {
+		val := Value{IsString: true, Type: st, SType: st, StringData: string(make([]byte, st.Size))}
+		i.env.Set(s.Name, val)
+		return nil
+	}
+	if st.HasMin && st.MinSize > 0 {
+		return fmt.Errorf("string requires at least %d characters, but no initializer given", st.MinSize)
+	}
+	val := Value{IsString: true, Type: st, SType: st, StringData: ""}
+	i.env.Set(s.Name, val)
+	return nil
+}
+
 func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 	if stmt.Index != nil {
 		return i.executeIndexedAssign(stmt)
@@ -842,6 +920,35 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 		return fmt.Errorf("undefined variable: %s", stmt.Name)
 	}
 	val, _ := env.Get(stmt.Name)
+
+	if val.IsString {
+		if stmt.Op != "=" {
+			return fmt.Errorf("cannot use operator %s on string variable", stmt.Op)
+		}
+		rightVal, err := i.evalExpr(stmt.Expr)
+		if err != nil {
+			return err
+		}
+		if !rightVal.IsString {
+			return fmt.Errorf("cannot assign %s to string", typeDescForVal(rightVal))
+		}
+		runeCount := utf8.RuneCountInString(rightVal.StringData)
+		if st, ok := val.Type.(ast.StringType); ok {
+			if st.Size > 0 && runeCount != st.Size {
+				return fmt.Errorf("expected %d characters, got %d", st.Size, runeCount)
+			}
+			if st.HasMin && runeCount < st.MinSize {
+				return fmt.Errorf("expected at least %d characters, got %d", st.MinSize, runeCount)
+			}
+			if st.HasMax && runeCount > st.MaxSize {
+				return fmt.Errorf("expected at most %d characters, got %d", st.MaxSize, runeCount)
+			}
+		}
+		val.StringData = rightVal.StringData
+		val.Null = false
+		env.Set(stmt.Name, val)
+		return nil
+	}
 
 	if val.IsArray {
 		return fmt.Errorf("cannot use operator %s on array/list variable", stmt.Op)
@@ -967,6 +1074,34 @@ func (i *Interpreter) executeIndexedAssign(stmt *ast.Assignment) error {
 		return fmt.Errorf("undefined variable: %s", stmt.Name)
 	}
 	val, _ := env.Get(stmt.Name)
+	if val.IsString {
+		if stmt.Op != "=" {
+			return fmt.Errorf("operator %s not supported for string indexed assignment", stmt.Op)
+		}
+		idxVal, err := i.evalExpr(stmt.Index)
+		if err != nil {
+			return err
+		}
+		if idxVal.Null {
+			return fmt.Errorf("index cannot be null")
+		}
+		idx := int(idxVal.Data)
+		runes := []rune(val.StringData)
+		if idx < 0 || idx >= len(runes) {
+			return fmt.Errorf("index %d out of bounds for length %d", idx, len(runes))
+		}
+		rightVal, err := i.evalExpr(stmt.Expr)
+		if err != nil {
+			return err
+		}
+		if !rightVal.IsString || utf8.RuneCountInString(rightVal.StringData) != 1 {
+			return fmt.Errorf("string index assignment requires a single character string")
+		}
+		runes[idx] = []rune(rightVal.StringData)[0]
+		val.StringData = string(runes)
+		env.Set(stmt.Name, val)
+		return nil
+	}
 	if !val.IsArray {
 		return fmt.Errorf("cannot index non-array variable")
 	}
@@ -1117,6 +1252,11 @@ func (i *Interpreter) execWhile(s *ast.WhileStmt) error {
 
 func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 	switch e := expr.(type) {
+	case *ast.StringLit:
+		if e.Untyped {
+			return Value{IsString: true, Untyped: true, StringData: e.Value}, nil
+		}
+		return Value{IsString: true, SType: e.SType, StringData: e.Value}, nil
 	case *ast.IntegerLit:
 		if e.Untyped {
 			return Value{Untyped: true, Data: e.Value}, nil
@@ -1167,6 +1307,10 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 		case ast.ListType:
 			val.Type = t
 			val.IsArray = true
+		case ast.StringType:
+			val.Type = t
+			val.IsString = true
+			val.SType = t
 		}
 		return val, nil
 	case *ast.ArrayLit:
@@ -1190,9 +1334,6 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 		if err != nil {
 			return Value{}, err
 		}
-		if !obj.IsArray {
-			return Value{}, fmt.Errorf("cannot index non-array value")
-		}
 		idxVal, err := i.evalExpr(e.Index)
 		if err != nil {
 			return Value{}, err
@@ -1201,6 +1342,16 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 			return Value{}, fmt.Errorf("index cannot be null")
 		}
 		idx := int(idxVal.Data)
+		if obj.IsString {
+			runes := []rune(obj.StringData)
+			if idx < 0 || idx >= len(runes) {
+				return Value{}, fmt.Errorf("index %d out of bounds for length %d", idx, len(runes))
+			}
+			return Value{IsString: true, StringData: string(runes[idx])}, nil
+		}
+		if !obj.IsArray {
+			return Value{}, fmt.Errorf("cannot index non-array value")
+		}
 		if idx < 0 || idx >= len(obj.ArrayData) {
 			return Value{}, fmt.Errorf("index %d out of bounds for length %d", idx, len(obj.ArrayData))
 		}
@@ -1215,6 +1366,21 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 		}
 		if obj.IsArray {
 			result, err := i.evalArrayMember(&obj, e)
+			if err != nil {
+				return Value{}, err
+			}
+			if e.Member == "add" || e.Member == "remove" {
+				if ref, ok := e.Object.(*ast.VarRef); ok {
+					env := i.env.LookupEnv(ref.Name)
+					if env != nil {
+						env.Set(ref.Name, obj)
+					}
+				}
+			}
+			return result, nil
+		}
+		if obj.IsString {
+			result, err := i.evalStringMember(&obj, e)
 			if err != nil {
 				return Value{}, err
 			}
@@ -1305,6 +1471,103 @@ func (i *Interpreter) evalArrayMember(obj *Value, e *ast.MemberAccess) (Value, e
 	}
 }
 
+func (i *Interpreter) evalStringMember(obj *Value, e *ast.MemberAccess) (Value, error) {
+	switch e.Member {
+	case "length":
+		runeCount := utf8.RuneCountInString(obj.StringData)
+		return Value{Data: int64(runeCount)}, nil
+	case "concat":
+		if len(e.Args) != 1 {
+			return Value{}, fmt.Errorf("concat requires 1 argument")
+		}
+		val, err := i.evalExpr(e.Args[0])
+		if err != nil {
+			return Value{}, err
+		}
+		if !val.IsString {
+			return Value{}, fmt.Errorf("cannot concat %s to string", typeDescForVal(val))
+		}
+		return Value{IsString: true, StringData: obj.StringData + val.StringData}, nil
+	case "add":
+		if len(e.Args) == 0 || len(e.Args) > 2 {
+			return Value{}, fmt.Errorf("add requires 1 or 2 arguments")
+		}
+		if st, ok := obj.Type.(ast.StringType); ok {
+			if st.Size > 0 {
+				return Value{}, fmt.Errorf("cannot add to fixed-size string")
+			}
+		}
+		val, err := i.evalExpr(e.Args[0])
+		if err != nil {
+			return Value{}, err
+		}
+		if !val.IsString || utf8.RuneCountInString(val.StringData) != 1 {
+			return Value{}, fmt.Errorf("add requires a single character string")
+		}
+		runes := []rune(obj.StringData)
+		idx := len(runes)
+		if len(e.Args) == 2 {
+			idxVal, err := i.evalExpr(e.Args[1])
+			if err != nil {
+				return Value{}, err
+			}
+			if idxVal.Null {
+				return Value{}, fmt.Errorf("index cannot be null")
+			}
+			idx = int(idxVal.Data)
+		}
+		// Check max bound for dynamic string type
+		if st, ok := obj.Type.(ast.StringType); ok {
+			if st.HasMax && len(runes) >= st.MaxSize {
+				return Value{}, fmt.Errorf("string is at maximum capacity (%d)", st.MaxSize)
+			}
+		}
+		if idx < 0 || idx > len(runes) {
+			return Value{}, fmt.Errorf("index %d out of bounds for length %d", idx, len(runes))
+		}
+		newRunes := make([]rune, 0, len(runes)+1)
+		newRunes = append(newRunes, runes[:idx]...)
+		newRunes = append(newRunes, []rune(val.StringData)...)
+		newRunes = append(newRunes, runes[idx:]...)
+		obj.StringData = string(newRunes)
+		return Value{Null: true}, nil
+	case "remove":
+		if len(e.Args) != 1 {
+			return Value{}, fmt.Errorf("remove requires 1 argument")
+		}
+		if st, ok := obj.Type.(ast.StringType); ok {
+			if st.Size > 0 {
+				return Value{}, fmt.Errorf("cannot remove from fixed-size string")
+			}
+		}
+		idxVal, err := i.evalExpr(e.Args[0])
+		if err != nil {
+			return Value{}, err
+		}
+		if idxVal.Null {
+			return Value{}, fmt.Errorf("index cannot be null")
+		}
+		idx := int(idxVal.Data)
+		runes := []rune(obj.StringData)
+		if idx < 0 || idx >= len(runes) {
+			return Value{}, fmt.Errorf("index %d out of bounds for length %d", idx, len(runes))
+		}
+		if st, ok := obj.Type.(ast.StringType); ok {
+			if st.HasMin && len(runes) <= st.MinSize {
+				return Value{}, fmt.Errorf("string is at minimum capacity (%d)", st.MinSize)
+			}
+		}
+		removed := string(runes[idx])
+		newRunes := make([]rune, 0, len(runes)-1)
+		newRunes = append(newRunes, runes[:idx]...)
+		newRunes = append(newRunes, runes[idx+1:]...)
+		obj.StringData = string(newRunes)
+		return Value{IsString: true, StringData: removed}, nil
+	default:
+		return Value{}, fmt.Errorf("string has no member %q", e.Member)
+	}
+}
+
 func (i *Interpreter) evalUnary(expr *ast.UnaryExpr) (Value, error) {
 	right, err := i.evalExpr(expr.Right)
 	if err != nil {
@@ -1347,6 +1610,14 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 
 	if left.Null || right.Null {
 		return Value{Null: true}, nil
+	}
+
+	// String concatenation
+	if expr.Op == "+" && (left.IsString || right.IsString) {
+		if !left.IsString || !right.IsString {
+			return Value{}, fmt.Errorf("cannot concatenate %s and %s", typeDescForVal(left), typeDescForVal(right))
+		}
+		return Value{IsString: true, StringData: left.StringData + right.StringData}, nil
 	}
 
 	isFloat := left.IsFloat || right.IsFloat
@@ -1501,6 +1772,14 @@ func (i *Interpreter) evalEquality(left, right Value, op string) (Value, error) 
 			return Value{Untyped: true, BData: false, IsBool: true}, nil
 		}
 		return Value{Untyped: true, BData: true, IsBool: true}, nil
+	}
+
+	if left.IsString && right.IsString {
+		eq := left.StringData == right.StringData
+		if op == "!=" {
+			eq = !eq
+		}
+		return Value{Untyped: true, BData: eq, IsBool: true}, nil
 	}
 
 	if left.IsBool != right.IsBool && (left.IsBool || right.IsBool) {

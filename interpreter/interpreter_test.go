@@ -9537,3 +9537,1270 @@ func TestArrayBracketSyntaxTypeDisplay(t *testing.T) {
 		t.Errorf("expected 'array{size: 4}<...>', got %q", output)
 	}
 }
+
+func TestStringDeclAndPrint(t *testing.T) {
+	input := `
+var s: string = "hello";
+print(s);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "hello" {
+		t.Errorf("expected 'hello', got %q", output)
+	}
+}
+
+func TestStringLitPrint(t *testing.T) {
+	input := `print("hello world");`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "hello world" {
+		t.Errorf("expected 'hello world', got %q", output)
+	}
+}
+
+func TestStringFixedSize(t *testing.T) {
+	input := `
+var s: string{size: 5} = "hello";
+print(s);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "hello" {
+		t.Errorf("expected 'hello', got %q", output)
+	}
+}
+
+func TestStringFixedSizeWrongLength(t *testing.T) {
+	input := `
+var s: string{size: 5} = "hello!";
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for wrong string length")
+	}
+}
+
+func TestStringFixedSizeInitWithoutValue(t *testing.T) {
+	input := `
+var s: string{size: 5};
+print(s);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if len(output) != 5 {
+		t.Errorf("expected 5 null chars, got %d chars", len(output))
+	}
+}
+
+func TestStringConcatOperator(t *testing.T) {
+	input := `
+var a: string = "hello";
+var b: string = " world";
+print(a + b);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "hello world" {
+		t.Errorf("expected 'hello world', got %q", output)
+	}
+}
+
+func TestStringConcatMethod(t *testing.T) {
+	input := `
+var a: string = "hello";
+print(a.concat(" world"));
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "hello world" {
+		t.Errorf("expected 'hello world', got %q", output)
+	}
+}
+
+func TestStringIndex(t *testing.T) {
+	input := `
+var s: string = "hello";
+print(s[0]);
+print(s[4]);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "h\no" {
+		t.Errorf("expected 'h\\no', got %q", output)
+	}
+}
+
+func TestStringIndexOutOfBounds(t *testing.T) {
+	input := `
+var s: string = "hi";
+print(s[5]);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected out of bounds error")
+	}
+}
+
+func TestStringIndexAssign(t *testing.T) {
+	input := `
+var s: string = "hello";
+s[0] = "H";
+print(s);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "Hello" {
+		t.Errorf("expected 'Hello', got %q", output)
+	}
+}
+
+func TestStringLength(t *testing.T) {
+	input := `
+var s: string = "hello";
+print(s.length);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "5" {
+		t.Errorf("expected '5', got %q", output)
+	}
+}
+
+func TestStringEquality(t *testing.T) {
+	input := `
+var a: string = "hello";
+var b: string = "hello";
+var c: string = "world";
+print(a == b);
+print(a == c);
+print(a != c);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true\nfalse\ntrue" {
+		t.Errorf("expected 'true\\nfalse\\ntrue', got %q", output)
+	}
+}
+
+func TestStringAddRemove(t *testing.T) {
+	input := `
+var s: string = "he";
+s.add("l");
+s.add("l");
+s.add("o");
+print(s);
+s.remove(4);
+print(s);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "hello\nhell" {
+		t.Errorf("expected 'hello\\nhell', got %q", output)
+	}
+}
+
+func TestStringAddToFixedFails(t *testing.T) {
+	input := `
+var s: string{size: 5} = "hello";
+s.add("!");
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for add to fixed-size string")
+	}
+}
+
+func TestStringRemoveFromFixedFails(t *testing.T) {
+	input := `
+var s: string{size: 5} = "hello";
+s.remove(0);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for remove from fixed-size string")
+	}
+}
+
+func TestStringTypeRefPrint(t *testing.T) {
+	input := `print(string);`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "string" {
+		t.Errorf("expected 'string', got %q", output)
+	}
+}
+
+func TestStringTypeRefWithSize(t *testing.T) {
+	input := `print(string{size: 10});`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "string{size: 10}" {
+		t.Errorf("expected 'string{size: 10}', got %q", output)
+	}
+}
+
+func TestStringEscapeSequences(t *testing.T) {
+	input := "print(\"hello\\nworld\");"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "hello\nworld" {
+		t.Errorf("expected 'hello\\nworld', got %q", output)
+	}
+}
+
+func TestStringAssignment(t *testing.T) {
+	input := `
+var s: string = "hello";
+s = "world";
+print(s);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "world" {
+		t.Errorf("expected 'world', got %q", output)
+	}
+}
+
+func TestStringAddAtIndex(t *testing.T) {
+	input := `
+var s: string = "hllo";
+s.add("e", 1);
+print(s);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "hello" {
+		t.Errorf("expected 'hello', got %q", output)
+	}
+}
+
+func TestStringDynamicBounds(t *testing.T) {
+	input := `
+var s: string{min: 1, max: 5} = "hi";
+print(s.length);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "2" {
+		t.Errorf("expected '2', got %q", output)
+	}
+}
+
+func TestStringUTF8(t *testing.T) {
+	input := `
+var s: string = "héllo";
+print(s.length);
+print(s[1]);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "5\né" {
+		t.Errorf("expected '5\\né', got %q", output)
+	}
+}
+
+// ---- String coverage tests ----
+
+func TestTypeofStringLiteral(t *testing.T) {
+	i := New()
+	expr := &ast.TypeOfExpr{Expr: &ast.StringLit{Value: "hello", Untyped: true}}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsString {
+		t.Errorf("expected IsString to be true")
+	}
+}
+
+func TestStringTypeMemberAccess(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Type: ast.StringType{}},
+		Member: "size",
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != 0 {
+		t.Errorf("expected 0, got %d", val.Data)
+	}
+}
+
+func TestStringTypeMemberUnknown(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.TypeRef{Type: ast.StringType{}},
+		Member: "foo",
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for unknown string type member")
+	}
+}
+
+func TestValueStringForStringInArray(t *testing.T) {
+	v := Value{
+		IsArray:   true,
+		ArrayData: []Value{{IsString: true, StringData: "hello"}, {IsString: true, StringData: "world"}},
+	}
+	result := v.String()
+	if result != "[hello, world]" {
+		t.Errorf("expected '[hello, world]', got %q", result)
+	}
+}
+
+func TestTypeDescForTypeStringSize(t *testing.T) {
+	v := Value{Type: ast.StringType{Size: 5}, IsType: true, IsString: true}
+	result := typeDescForVal(v)
+	if !strings.Contains(result, "string{size: 5}") {
+		t.Errorf("expected 'string{size: 5}', got %q", result)
+	}
+}
+
+func TestTypeDescForTypeStringHasMin(t *testing.T) {
+	v := Value{Type: ast.StringType{HasMin: true, MinSize: 3}, IsType: true, IsString: true}
+	result := typeDescForVal(v)
+	if !strings.Contains(result, "string{min: 3}") {
+		t.Errorf("expected 'string{min: 3}', got %q", result)
+	}
+}
+
+func TestTypeDescForTypeStringHasMax(t *testing.T) {
+	v := Value{Type: ast.StringType{HasMax: true, MaxSize: 10}, IsType: true, IsString: true}
+	result := typeDescForVal(v)
+	if !strings.Contains(result, "string{max: 10}") {
+		t.Errorf("expected 'string{max: 10}', got %q", result)
+	}
+}
+
+func TestTypeDescForTypeStringHasMinMax(t *testing.T) {
+	v := Value{Type: ast.StringType{HasMin: true, MinSize: 3, HasMax: true, MaxSize: 10}, IsType: true, IsString: true}
+	result := typeDescForVal(v)
+	if !strings.Contains(result, "string{min: 3, max: 10}") {
+		t.Errorf("expected 'string{min: 3, max: 10}', got %q", result)
+	}
+}
+
+func TestEvalTypedStringLit(t *testing.T) {
+	i := New()
+	expr := &ast.StringLit{Value: "hello", SType: ast.StringType{Size: 5}, Untyped: false}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsString {
+		t.Errorf("expected IsString to be true")
+	}
+	if val.Untyped {
+		t.Errorf("expected Untyped to be false")
+	}
+	if val.SType.Size != 5 {
+		t.Errorf("expected Size 5, got %d", val.SType.Size)
+	}
+}
+
+func TestExecStringDeclDefaultEmpty(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:  "s",
+		Type:  ast.StringType{},
+		SType: ast.StringType{},
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, ok := i.env.Get("s")
+	if !ok {
+		t.Fatal("expected variable s to exist")
+	}
+	if !val.IsString {
+		t.Errorf("expected IsString to be true")
+	}
+}
+
+func TestExecStringDeclFixedSizeNoInit(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:  "s",
+		Type:  ast.StringType{Size: 5},
+		SType: ast.StringType{Size: 5},
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, ok := i.env.Get("s")
+	if !ok {
+		t.Fatal("expected variable s to exist")
+	}
+	if !val.IsString {
+		t.Errorf("expected IsString to be true")
+	}
+}
+
+func TestExecStringDeclWrongTypeError(t *testing.T) {
+	i := New()
+	err := i.execStringDecl(&ast.VarDecl{
+		Name:  "s",
+		SType: ast.StringType{},
+		Expr:  &ast.IntegerLit{Value: 5, Untyped: true},
+	}, ast.StringType{})
+	if err == nil {
+		t.Errorf("expected error assigning int to string")
+	}
+}
+
+func TestExecStringDeclExprEvalError(t *testing.T) {
+	i := New()
+	err := i.execStringDecl(&ast.VarDecl{
+		Name:  "s",
+		SType: ast.StringType{},
+		Expr:  &ast.PrintStmt{},
+	}, ast.StringType{})
+	if err == nil {
+		t.Errorf("expected eval error")
+	}
+}
+
+func TestExecStringDeclSizeMismatchError(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:  "s",
+		Type:  ast.StringType{Size: 5},
+		SType: ast.StringType{Size: 5},
+		Expr:  &ast.StringLit{Value: "hello!", Untyped: true},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected size mismatch error")
+	}
+}
+
+func TestExecStringDeclHasMinError(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:  "s",
+		Type:  ast.StringType{HasMin: true, MinSize: 3},
+		SType: ast.StringType{HasMin: true, MinSize: 3},
+		Expr:  &ast.StringLit{Value: "ab", Untyped: true},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected min size error")
+	}
+}
+
+func TestExecStringDeclHasMaxError(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:  "s",
+		Type:  ast.StringType{HasMax: true, MaxSize: 2},
+		SType: ast.StringType{HasMax: true, MaxSize: 2},
+		Expr:  &ast.StringLit{Value: "abc", Untyped: true},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected max size error")
+	}
+}
+
+func TestExecStringDeclMinNoInitError(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:  "s",
+		Type:  ast.StringType{HasMin: true, MinSize: 3},
+		SType: ast.StringType{HasMin: true, MinSize: 3},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error for missing initializer with min constraint")
+	}
+}
+
+func TestExecStringDeclSuccess(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:  "s",
+		Type:  ast.StringType{Size: 5},
+		SType: ast.StringType{Size: 5},
+		Expr:  &ast.StringLit{Value: "hello", Untyped: true},
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, ok := i.env.Get("s")
+	if !ok {
+		t.Fatal("expected variable s to exist")
+	}
+	if val.StringData != "hello" {
+		t.Errorf("expected 'hello', got %q", val.StringData)
+	}
+}
+
+func TestExecuteAssignmentStringOpNotEqualError(t *testing.T) {
+	i := New()
+	env := NewEnv()
+	env.Set("s", Value{IsString: true, StringData: "hello"})
+	i.env = env
+	stmt := &ast.Assignment{
+		Name: "s",
+		Op:   "+=",
+		Expr: &ast.StringLit{Value: "world", Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected error for operator on string")
+	}
+}
+
+func TestExecuteAssignmentStringWrongTypeError(t *testing.T) {
+	i := New()
+	env := NewEnv()
+	env.Set("s", Value{IsString: true, StringData: "hello", Type: ast.StringType{}, SType: ast.StringType{}})
+	i.env = env
+	stmt := &ast.Assignment{
+		Name: "s",
+		Op:   "=",
+		Expr: &ast.IntegerLit{Value: 5, Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected error assigning int to string")
+	}
+}
+
+func TestExecuteAssignmentStringSizeMismatchError(t *testing.T) {
+	i := New()
+	env := NewEnv()
+	env.Set("s", Value{
+		IsString: true, StringData: "hello",
+		Type: ast.StringType{Size: 5}, SType: ast.StringType{Size: 5},
+	})
+	i.env = env
+	stmt := &ast.Assignment{
+		Name: "s",
+		Op:   "=",
+		Expr: &ast.StringLit{Value: "hello!", Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected size mismatch error")
+	}
+}
+
+func TestExecuteAssignmentStringHasMinError(t *testing.T) {
+	i := New()
+	env := NewEnv()
+	env.Set("s", Value{
+		IsString: true, StringData: "hello",
+		Type: ast.StringType{HasMin: true, MinSize: 3}, SType: ast.StringType{HasMin: true, MinSize: 3},
+	})
+	i.env = env
+	stmt := &ast.Assignment{
+		Name: "s",
+		Op:   "=",
+		Expr: &ast.StringLit{Value: "ab", Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected min size error")
+	}
+}
+
+func TestExecuteAssignmentStringHasMaxError(t *testing.T) {
+	i := New()
+	env := NewEnv()
+	env.Set("s", Value{
+		IsString: true, StringData: "hi",
+		Type: ast.StringType{HasMax: true, MaxSize: 2}, SType: ast.StringType{HasMax: true, MaxSize: 2},
+	})
+	i.env = env
+	stmt := &ast.Assignment{
+		Name: "s",
+		Op:   "=",
+		Expr: &ast.StringLit{Value: "abc", Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected max size error")
+	}
+}
+
+func TestExecuteAssignmentStringSuccess(t *testing.T) {
+	i := New()
+	env := NewEnv()
+	env.Set("s", Value{IsString: true, StringData: "hello", Type: ast.StringType{}, SType: ast.StringType{}})
+	i.env = env
+	stmt := &ast.Assignment{
+		Name: "s",
+		Op:   "=",
+		Expr: &ast.StringLit{Value: "world", Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("s")
+	if val.StringData != "world" {
+		t.Errorf("expected 'world', got %q", val.StringData)
+	}
+}
+
+func TestExecuteAssignmentStringEvalExprError(t *testing.T) {
+	i := New()
+	env := NewEnv()
+	env.Set("s", Value{IsString: true, StringData: "hello", Type: ast.StringType{}, SType: ast.StringType{}})
+	i.env = env
+	stmt := &ast.Assignment{
+		Name: "s",
+		Op:   "=",
+		Expr: &ast.PrintStmt{},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected eval error")
+	}
+}
+
+func TestExecuteIndexedAssignStringOpNotEqualError(t *testing.T) {
+	i := New()
+	env := NewEnv()
+	env.Set("s", Value{IsString: true, StringData: "hello"})
+	i.env = env
+	stmt := &ast.Assignment{
+		Name:  "s",
+		Op:    "+=",
+		Index: &ast.IntegerLit{Value: 0},
+		Expr:  &ast.StringLit{Value: "A", Untyped: true},
+	}
+	err := i.executeIndexedAssign(stmt)
+	if err == nil {
+		t.Errorf("expected error for += on string index")
+	}
+}
+
+func TestExecuteIndexedAssignStringIndexEvalError(t *testing.T) {
+	i := New()
+	env := NewEnv()
+	env.Set("s", Value{IsString: true, StringData: "hello"})
+	i.env = env
+	stmt := &ast.Assignment{
+		Name:  "s",
+		Op:    "=",
+		Index: &ast.PrintStmt{},
+		Expr:  &ast.StringLit{Value: "A", Untyped: true},
+	}
+	err := i.executeIndexedAssign(stmt)
+	if err == nil {
+		t.Errorf("expected index eval error")
+	}
+}
+
+func TestExecuteIndexedAssignStringNullIndexError(t *testing.T) {
+	i := New()
+	env := NewEnv()
+	env.Set("s", Value{IsString: true, StringData: "hello"})
+	i.env = env
+	stmt := &ast.Assignment{
+		Name:  "s",
+		Op:    "=",
+		Index: &ast.NullLit{},
+		Expr:  &ast.StringLit{Value: "A", Untyped: true},
+	}
+	err := i.executeIndexedAssign(stmt)
+	if err == nil {
+		t.Errorf("expected null index error")
+	}
+}
+
+func TestExecuteIndexedAssignStringOutOfBoundsError(t *testing.T) {
+	i := New()
+	env := NewEnv()
+	env.Set("s", Value{IsString: true, StringData: "hello"})
+	i.env = env
+	stmt := &ast.Assignment{
+		Name:  "s",
+		Op:    "=",
+		Index: &ast.IntegerLit{Value: 10},
+		Expr:  &ast.StringLit{Value: "A", Untyped: true},
+	}
+	err := i.executeIndexedAssign(stmt)
+	if err == nil {
+		t.Errorf("expected out of bounds error")
+	}
+}
+
+func TestExecuteIndexedAssignStringRightValEvalError(t *testing.T) {
+	i := New()
+	env := NewEnv()
+	env.Set("s", Value{IsString: true, StringData: "hello"})
+	i.env = env
+	stmt := &ast.Assignment{
+		Name:  "s",
+		Op:    "=",
+		Index: &ast.IntegerLit{Value: 0},
+		Expr:  &ast.PrintStmt{},
+	}
+	err := i.executeIndexedAssign(stmt)
+	if err == nil {
+		t.Errorf("expected right value eval error")
+	}
+}
+
+func TestExecuteIndexedAssignStringNotSingleCharError(t *testing.T) {
+	i := New()
+	env := NewEnv()
+	env.Set("s", Value{IsString: true, StringData: "hello"})
+	i.env = env
+	stmt := &ast.Assignment{
+		Name:  "s",
+		Op:    "=",
+		Index: &ast.IntegerLit{Value: 0},
+		Expr:  &ast.StringLit{Value: "AB", Untyped: true},
+	}
+	err := i.executeIndexedAssign(stmt)
+	if err == nil {
+		t.Errorf("expected error for multi-char assignment")
+	}
+}
+
+func TestExecuteIndexedAssignStringSuccess(t *testing.T) {
+	i := New()
+	env := NewEnv()
+	env.Set("s", Value{IsString: true, StringData: "hello"})
+	i.env = env
+	stmt := &ast.Assignment{
+		Name:  "s",
+		Op:    "=",
+		Index: &ast.IntegerLit{Value: 0},
+		Expr:  &ast.StringLit{Value: "H", Untyped: true},
+	}
+	err := i.executeIndexedAssign(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("s")
+	if val.StringData != "Hello" {
+		t.Errorf("expected 'Hello', got %q", val.StringData)
+	}
+}
+
+func TestEvalStringMemberConcatArgCountError(t *testing.T) {
+	i := New()
+	// string.concat() with no args
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "concat",
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for concat with no args")
+	}
+}
+
+func TestEvalStringMemberConcatNonStringError(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "concat",
+		Args:   []ast.Expr{&ast.IntegerLit{Value: 5, Untyped: true}},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for concat with non-string")
+	}
+}
+
+func TestEvalStringMemberConcatSuccess(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "concat",
+		Args:   []ast.Expr{&ast.StringLit{Value: " world", Untyped: true}},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.StringData != "hello world" {
+		t.Errorf("expected 'hello world', got %q", val.StringData)
+	}
+}
+
+func TestEvalStringMemberAddArgCountError(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "add",
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for add with no args")
+	}
+}
+
+func TestEvalStringMemberAddArgEvalError(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "add",
+		Args:   []ast.Expr{&ast.PrintStmt{}},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for add with bad arg")
+	}
+}
+
+func TestEvalStringMemberAddNotSingleCharError(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "add",
+		Args:   []ast.Expr{&ast.StringLit{Value: "AB", Untyped: true}},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for add with multi-char")
+	}
+}
+
+func TestEvalStringMemberAddSuccess(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "add",
+		Args:   []ast.Expr{&ast.StringLit{Value: "!", Untyped: true}},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.Null {
+		t.Errorf("expected null return from add")
+	}
+}
+
+func TestEvalStringMemberAddWithIndexSuccess(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "add",
+		Args:   []ast.Expr{&ast.StringLit{Value: "!", Untyped: true}, &ast.IntegerLit{Value: 0}},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.Null {
+		t.Errorf("expected null return from add")
+	}
+}
+
+func TestEvalStringMemberAddSecondArgEvalError(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "add",
+		Args:   []ast.Expr{&ast.StringLit{Value: "!", Untyped: true}, &ast.PrintStmt{}},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for add with bad second arg")
+	}
+}
+
+func TestEvalStringMemberAddNullIndexError(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "add",
+		Args:   []ast.Expr{&ast.StringLit{Value: "!", Untyped: true}, &ast.NullLit{}},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for null index")
+	}
+}
+
+func TestEvalStringMemberAddMaxCapacityError(t *testing.T) {
+	i := New()
+	// Use a string with HasMax constraint to trigger max capacity check
+	sval := Value{IsString: true, StringData: "hello", Type: ast.StringType{HasMax: true, MaxSize: 5}}
+	expr := &ast.MemberAccess{
+		Member: "add",
+		Args:   []ast.Expr{&ast.StringLit{Value: "!", Untyped: true}},
+	}
+	_, err := i.evalStringMember(&sval, expr)
+	if err == nil {
+		t.Errorf("expected max capacity error")
+	}
+}
+
+func TestEvalStringMemberAddBoundsError(t *testing.T) {
+	i := New()
+	sval := Value{IsString: true, StringData: "hello"}
+	expr := &ast.MemberAccess{
+		Member: "add",
+		Args:   []ast.Expr{&ast.StringLit{Value: "!", Untyped: true}, &ast.IntegerLit{Value: 10}},
+	}
+	_, err := i.evalStringMember(&sval, expr)
+	if err == nil {
+		t.Errorf("expected bounds error")
+	}
+}
+
+func TestEvalStringMemberRemoveArgCountError(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "remove",
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for remove with no args")
+	}
+}
+
+func TestEvalStringMemberRemoveArgEvalError(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "remove",
+		Args:   []ast.Expr{&ast.PrintStmt{}},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for remove with bad arg")
+	}
+}
+
+func TestEvalStringMemberRemoveNullIndexError(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "remove",
+		Args:   []ast.Expr{&ast.NullLit{}},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for remove null index")
+	}
+}
+
+func TestEvalStringMemberRemoveBoundsError(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "remove",
+		Args:   []ast.Expr{&ast.IntegerLit{Value: 10}},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected bounds error")
+	}
+}
+
+func TestEvalStringMemberRemoveMinCapacityError(t *testing.T) {
+	i := New()
+	sval := Value{IsString: true, StringData: "hello", Type: ast.StringType{HasMin: true, MinSize: 5}}
+	expr := &ast.MemberAccess{
+		Member: "remove",
+		Args:   []ast.Expr{&ast.IntegerLit{Value: 0}},
+	}
+	_, err := i.evalStringMember(&sval, expr)
+	if err == nil {
+		t.Errorf("expected min capacity error")
+	}
+}
+
+func TestEvalStringMemberRemoveSuccess(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "remove",
+		Args:   []ast.Expr{&ast.IntegerLit{Value: 0}},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.StringData != "h" {
+		t.Errorf("expected removed char 'h', got %q", val.StringData)
+	}
+}
+
+func TestEvalStringMemberAddFixedSizeError(t *testing.T) {
+	i := New()
+	sval := Value{IsString: true, StringData: "hello", Type: ast.StringType{Size: 5}}
+	expr := &ast.MemberAccess{
+		Member: "add",
+		Args:   []ast.Expr{&ast.StringLit{Value: "!", Untyped: true}},
+	}
+	_, err := i.evalStringMember(&sval, expr)
+	if err == nil {
+		t.Errorf("expected error for add on fixed-size string")
+	}
+}
+
+func TestEvalStringMemberRemoveFixedSizeError(t *testing.T) {
+	i := New()
+	sval := Value{IsString: true, StringData: "hello", Type: ast.StringType{Size: 5}}
+	expr := &ast.MemberAccess{
+		Member: "remove",
+		Args:   []ast.Expr{&ast.IntegerLit{Value: 0}},
+	}
+	_, err := i.evalStringMember(&sval, expr)
+	if err == nil {
+		t.Errorf("expected error for remove on fixed-size string")
+	}
+}
+
+func TestEvalStringMemberUnknown(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "unknown",
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for unknown member")
+	}
+}
+
+func TestEvalStringMemberConcatEvalError(t *testing.T) {
+	i := New()
+	expr := &ast.MemberAccess{
+		Object: &ast.StringLit{Value: "hello", Untyped: true},
+		Member: "concat",
+		Args:   []ast.Expr{&ast.PrintStmt{}},
+	}
+	_, err := i.evalExpr(expr)
+	if err == nil {
+		t.Errorf("expected error for concat with bad arg")
+	}
+}
+
+func TestEvalBinaryStringConcatTypeMismatchError(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.StringLit{Value: "hello", Untyped: true},
+		Op:    "+",
+		Right: &ast.IntegerLit{Value: 5, Untyped: true},
+	}
+	_, err := i.evalBinary(expr)
+	if err == nil {
+		t.Errorf("expected type mismatch error for concat")
+	}
+}
+
+func TestEvalStringMemberAddSuccessVarRef(t *testing.T) {
+	i := New()
+	env := NewEnv()
+	env.Set("s", Value{IsString: true, StringData: "hello"})
+	i.env = env
+	expr := &ast.MemberAccess{
+		Object: &ast.VarRef{Name: "s"},
+		Member: "add",
+		Args:   []ast.Expr{&ast.StringLit{Value: "!", Untyped: true}},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.Null {
+		t.Errorf("expected null return")
+	}
+	result, _ := i.env.Get("s")
+	if result.StringData != "hello!" {
+		t.Errorf("expected 'hello!', got %q", result.StringData)
+	}
+}
+
+func TestEvalStringMemberRemoveSuccessVarRef(t *testing.T) {
+	i := New()
+	env := NewEnv()
+	env.Set("s", Value{IsString: true, StringData: "hello"})
+	i.env = env
+	expr := &ast.MemberAccess{
+		Object: &ast.VarRef{Name: "s"},
+		Member: "remove",
+		Args:   []ast.Expr{&ast.IntegerLit{Value: 0}},
+	}
+	val, err := i.evalExpr(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.StringData != "h" {
+		t.Errorf("expected 'h', got %q", val.StringData)
+	}
+	result, _ := i.env.Get("s")
+	if result.StringData != "ello" {
+		t.Errorf("expected 'ello', got %q", result.StringData)
+	}
+}

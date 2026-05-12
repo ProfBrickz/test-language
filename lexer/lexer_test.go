@@ -739,6 +739,269 @@ func TestPrefixOnlyLiterals(t *testing.T) {
 	}
 }
 
+func TestStringKeyword(t *testing.T) {
+	input := "string"
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_STRING {
+		t.Errorf("expected STRING, got %s", tok.Type)
+	}
+}
+
+func TestStringLiteral(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedType TokenType
+		expectedLit  string
+	}{
+		{`"hello"`, TOK_STRING_LIT, "hello"},
+		{`""`, TOK_STRING_LIT, ""},
+		{`"a b c"`, TOK_STRING_LIT, "a b c"},
+		{`"hello\nworld"`, TOK_STRING_LIT, "hello\nworld"},
+		{`"tab\there"`, TOK_STRING_LIT, "tab\there"},
+		{`"quote\"here"`, TOK_STRING_LIT, `quote"here`},
+		{`"back\\slash"`, TOK_STRING_LIT, "back\\slash"},
+		{`"null\0char"`, TOK_STRING_LIT, "null\x00char"},
+		{`"hex\x41"`, TOK_STRING_LIT, "hexA"},
+		{`"unicode\u0041"`, TOK_STRING_LIT, "unicodeA"},
+	}
+
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("input %q: expected %s, got %s", tt.input, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLit {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.expectedLit, tok.Literal)
+		}
+	}
+}
+
+func TestStringLiteralInExpression(t *testing.T) {
+	input := `print("hello");`
+	l := New(input)
+	tests := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{TOK_PRINT, "print"},
+		{TOK_LPAREN, "("},
+		{TOK_STRING_LIT, "hello"},
+		{TOK_RPAREN, ")"},
+		{TOK_SEMICOLON, ";"},
+		{TOK_EOF, ""},
+	}
+	for i, tt := range tests {
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("test[%d] - expected %s, got %s", i, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLiteral {
+			t.Errorf("test[%d] - expected literal %q, got %q", i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}
+
+func TestUnterminatedString(t *testing.T) {
+	input := `"hello`
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_STRING_LIT {
+		t.Errorf("expected STRING_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "hello" {
+		t.Errorf("expected 'hello', got %q", tok.Literal)
+	}
+}
+
+func TestStringEscapeBackslashAtEnd(t *testing.T) {
+	input := `"hello\`
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_STRING_LIT {
+		t.Errorf("expected STRING_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "hello" {
+		t.Errorf("expected 'hello', got %q", tok.Literal)
+	}
+}
+
+func TestStringEscapeSingleQuote(t *testing.T) {
+	tests := []struct {
+		input       string
+		expectedLit string
+	}{
+		{`"\'"`, "'"},
+	}
+	for _, tt := range tests {
+		l := New(tt.input)
+		tok := l.NextToken()
+		if tok.Type != TOK_STRING_LIT {
+			t.Errorf("input %q: expected STRING_LIT, got %s", tt.input, tok.Type)
+		}
+		if tok.Literal != tt.expectedLit {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.expectedLit, tok.Literal)
+		}
+	}
+}
+
+func TestStringEscapeCarriageReturn(t *testing.T) {
+	input := `"hello\rworld"`
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_STRING_LIT {
+		t.Errorf("expected STRING_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "hello\rworld" {
+		t.Errorf("expected 'hello\\rworld', got %q", tok.Literal)
+	}
+}
+
+func TestStringEscapeHexAtEnd(t *testing.T) {
+	input := `"abc\x`
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_STRING_LIT {
+		t.Errorf("expected STRING_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "abcx" {
+		t.Errorf("expected 'abcx', got %q", tok.Literal)
+	}
+}
+
+func TestStringEscapeHexInvalid(t *testing.T) {
+	input := `"abc\xGG"`
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_STRING_LIT {
+		t.Errorf("expected STRING_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "abcxG" {
+		t.Errorf("expected 'abcxG', got %q", tok.Literal)
+	}
+}
+
+func TestStringEscape8DigitUnicode(t *testing.T) {
+	input := `"\U00000041"`
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_STRING_LIT {
+		t.Errorf("expected STRING_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "A" {
+		t.Errorf("expected 'A', got %q", tok.Literal)
+	}
+}
+
+func TestStringEscapeUnrecognized(t *testing.T) {
+	input := `"hello\qworld"`
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_STRING_LIT {
+		t.Errorf("expected STRING_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "hello\\qworld" {
+		t.Errorf("expected 'hello\\\\qworld', got %q", tok.Literal)
+	}
+}
+
+func TestStringEscapeHexLowerCase(t *testing.T) {
+	input := `"\x4a"`
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_STRING_LIT {
+		t.Errorf("expected STRING_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "J" {
+		t.Errorf("expected 'J', got %q", tok.Literal)
+	}
+}
+
+func TestStringEscapeUnicodeWithLowerHex(t *testing.T) {
+	input := `"\u0061"`
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_STRING_LIT {
+		t.Errorf("expected STRING_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "a" {
+		t.Errorf("expected 'a', got %q", tok.Literal)
+	}
+}
+
+func TestReadHexDigitsEOF(t *testing.T) {
+	input := `"\uAB`
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_STRING_LIT {
+		t.Errorf("expected STRING_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "\u00ab" {
+		t.Errorf("expected '\u00ab', got %q", tok.Literal)
+	}
+}
+
+func TestReadHexDigitsInvalid(t *testing.T) {
+	input := `"\uABGG"`
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_STRING_LIT {
+		t.Errorf("expected STRING_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "\u00abGG" {
+		t.Errorf("expected '\\u00abGG', got %q", tok.Literal)
+	}
+}
+
+func TestHexValLowercase(t *testing.T) {
+	input := `"\xaf"`
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_STRING_LIT {
+		t.Errorf("expected STRING_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "\xaf" {
+		t.Errorf("expected '\\xaf', got %q", tok.Literal)
+	}
+}
+
+func TestHexValUppercase(t *testing.T) {
+	input := `"\xAF"`
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_STRING_LIT {
+		t.Errorf("expected STRING_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "\xaf" {
+		t.Errorf("expected '\\xaf', got %q", tok.Literal)
+	}
+}
+
+func TestHexValDefault(t *testing.T) {
+	input := `"\xG0"`
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_STRING_LIT {
+		t.Errorf("expected STRING_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "x0" {
+		t.Errorf("expected 'x0', got %q", tok.Literal)
+	}
+}
+
+func TestStringEscapeUnicodeWithUpperHexDigits(t *testing.T) {
+	input := `"\u00AF"`
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_STRING_LIT {
+		t.Errorf("expected STRING_LIT, got %s", tok.Type)
+	}
+	if tok.Literal != "\u00af" {
+		t.Errorf("expected '\\u00af', got %q", tok.Literal)
+	}
+}
+
 func TestCaseVariantFloatKeywords(t *testing.T) {
 	tests := []struct {
 		input        string

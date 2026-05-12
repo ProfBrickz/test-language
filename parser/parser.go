@@ -112,6 +112,8 @@ func (p *Parser) parseType() ast.Type {
 		return p.parseArrayType()
 	case lexer.TOK_LIST:
 		return p.parseListType()
+	case lexer.TOK_STRING:
+		return p.parseStringType()
 	default:
 		p.addError("expected type, got %s", p.curToken.Type)
 		return ast.IntegerType{Size: 64, Signed: true, Nullable: true}
@@ -289,6 +291,34 @@ func (p *Parser) parseListType() ast.ListType {
 	return lt
 }
 
+func (p *Parser) parseStringType() ast.StringType {
+	p.nextToken()
+
+	params := p.parseTypeParams(map[string]bool{"size": true, "min": true, "max": true})
+
+	st := ast.StringType{}
+
+	if v, ok := params["size"]; ok {
+		if s, ok := v.(int); ok {
+			st.Size = s
+		}
+	}
+	if v, ok := params["min"]; ok {
+		if s, ok := v.(int); ok {
+			st.HasMin = true
+			st.MinSize = s
+		}
+	}
+	if v, ok := params["max"]; ok {
+		if s, ok := v.(int); ok {
+			st.HasMax = true
+			st.MaxSize = s
+		}
+	}
+
+	return st
+}
+
 func (p *Parser) parseFloatType() ast.FloatType {
 	fType := ast.FloatType{Size: 64, Nullable: true}
 
@@ -374,8 +404,10 @@ func (p *Parser) parseVarDecl() *ast.VarDecl {
 	var iType ast.IntegerType
 	var fType ast.FloatType
 	var bType ast.BoolType
+	var sType ast.StringType
 	isFloat := false
 	isBool := false
+	isString := false
 
 	switch typ := t.(type) {
 	case ast.IntegerType:
@@ -386,6 +418,9 @@ func (p *Parser) parseVarDecl() *ast.VarDecl {
 	case ast.BoolType:
 		bType = typ
 		isBool = true
+	case ast.StringType:
+		sType = typ
+		isString = true
 	}
 
 	var expr ast.Expr
@@ -399,7 +434,7 @@ func (p *Parser) parseVarDecl() *ast.VarDecl {
 		return nil
 	}
 
-	return &ast.VarDecl{Name: name, Type: t, IType: iType, FType: fType, BType: bType, Expr: expr, IsFloat: isFloat, IsBool: isBool}
+	return &ast.VarDecl{Name: name, Type: t, IType: iType, FType: fType, BType: bType, SType: sType, Expr: expr, IsFloat: isFloat, IsBool: isBool, IsString: isString}
 }
 
 func (p *Parser) parseAssignment() *ast.Assignment {
@@ -939,6 +974,10 @@ func (p *Parser) parsePrimary() ast.Expr {
 	case lexer.TOK_NULL:
 		p.nextToken()
 		return &ast.NullLit{}
+	case lexer.TOK_STRING_LIT:
+		lit := p.curToken.Literal
+		p.nextToken()
+		return &ast.StringLit{Value: lit, Untyped: true}
 	case lexer.TOK_LBRACKET:
 		return p.parseArrayLit()
 	case lexer.TOK_INT:
@@ -955,6 +994,9 @@ func (p *Parser) parsePrimary() ast.Expr {
 		return &ast.TypeRef{Type: t, IsType: true}
 	case lexer.TOK_LIST:
 		t := p.parseListType()
+		return &ast.TypeRef{Type: t, IsType: true}
+	case lexer.TOK_STRING:
+		t := p.parseStringType()
 		return &ast.TypeRef{Type: t, IsType: true}
 	case lexer.TOK_TYPEOF:
 		if p.peekToken.Type != lexer.TOK_LPAREN {

@@ -3,31 +3,34 @@ package lexer
 import (
 	"fmt"
 	"unicode"
+	"unicode/utf8"
 )
 
 type TokenType string
 
 const (
-	TOK_BOOL      TokenType = "BOOL"
-	TOK_INT       TokenType = "INT"
-	TOK_FLOAT     TokenType = "FLOAT"
-	TOK_ARRAY     TokenType = "ARRAY"
-	TOK_LIST      TokenType = "LIST"
-	TOK_VAR       TokenType = "VAR"
-	TOK_PRINT     TokenType = "PRINT"
-	TOK_TYPEOF    TokenType = "TYPEOF"
-	TOK_IDENT     TokenType = "IDENT"
-	TOK_INT_LIT   TokenType = "INT_LIT"
-	TOK_FLOAT_LIT TokenType = "FLOAT_LIT"
-	TOK_SIZE      TokenType = "SIZE"
-	TOK_SIGNED    TokenType = "SIGNED"
-	TOK_NULL      TokenType = "NULL"
-	TOK_NULLABLE  TokenType = "NULLABLE"
-	TOK_TRUE      TokenType = "TRUE"
-	TOK_FALSE     TokenType = "FALSE"
-	TOK_AUTO      TokenType = "AUTO"
-	TOK_MIN       TokenType = "MIN"
-	TOK_MAX       TokenType = "MAX"
+	TOK_BOOL       TokenType = "BOOL"
+	TOK_INT        TokenType = "INT"
+	TOK_FLOAT      TokenType = "FLOAT"
+	TOK_ARRAY      TokenType = "ARRAY"
+	TOK_LIST       TokenType = "LIST"
+	TOK_VAR        TokenType = "VAR"
+	TOK_PRINT      TokenType = "PRINT"
+	TOK_TYPEOF     TokenType = "TYPEOF"
+	TOK_IDENT      TokenType = "IDENT"
+	TOK_INT_LIT    TokenType = "INT_LIT"
+	TOK_FLOAT_LIT  TokenType = "FLOAT_LIT"
+	TOK_SIZE       TokenType = "SIZE"
+	TOK_SIGNED     TokenType = "SIGNED"
+	TOK_NULL       TokenType = "NULL"
+	TOK_NULLABLE   TokenType = "NULLABLE"
+	TOK_TRUE       TokenType = "TRUE"
+	TOK_FALSE      TokenType = "FALSE"
+	TOK_AUTO       TokenType = "AUTO"
+	TOK_MIN        TokenType = "MIN"
+	TOK_MAX        TokenType = "MAX"
+	TOK_STRING     TokenType = "STRING"
+	TOK_STRING_LIT TokenType = "STRING_LIT"
 
 	TOK_COLON       TokenType = ":"
 	TOK_SEMICOLON   TokenType = ";"
@@ -179,6 +182,8 @@ func (l *Lexer) NextToken() Token {
 			return l.makeToken(TOK_OR, 2)
 		}
 		return l.makeToken(TOK_INT_LIT, 1)
+	case '"':
+		return l.readString()
 	case '.':
 		if l.pos+1 < len(l.input) && unicode.IsDigit(rune(l.input[l.pos+1])) {
 			return l.readFloatAfterDot()
@@ -451,6 +456,8 @@ func (l *Lexer) readIdentifier() Token {
 		return Token{TOK_MAX, word, l.line}
 	case "typeof":
 		return Token{TOK_TYPEOF, word, l.line}
+	case "string":
+		return Token{TOK_STRING, word, l.line}
 	case "NaN":
 		return Token{TOK_FLOAT_LIT, word, l.line}
 	case "infinity":
@@ -458,6 +465,114 @@ func (l *Lexer) readIdentifier() Token {
 	default:
 		return Token{TOK_IDENT, word, l.line}
 	}
+}
+
+func (l *Lexer) readString() Token {
+	l.pos++ // skip opening "
+	var result []byte
+	for {
+		if l.pos >= len(l.input) {
+			return Token{TOK_STRING_LIT, string(result), l.line}
+		}
+		ch := l.input[l.pos]
+		if ch == '"' {
+			l.pos++ // skip closing "
+			return Token{TOK_STRING_LIT, string(result), l.line}
+		}
+		if ch == '\\' {
+			l.pos++
+			if l.pos >= len(l.input) {
+				return Token{TOK_STRING_LIT, string(result), l.line}
+			}
+			ech := l.input[l.pos]
+			switch ech {
+			case 'n':
+				result = append(result, '\n')
+			case 't':
+				result = append(result, '\t')
+			case '\\':
+				result = append(result, '\\')
+			case '"':
+				result = append(result, '"')
+			case '\'':
+				result = append(result, '\'')
+			case 'r':
+				result = append(result, '\r')
+			case '0':
+				result = append(result, 0)
+			case 'x':
+				l.pos++
+				if l.pos+1 >= len(l.input) {
+					result = append(result, 'x')
+					continue
+				}
+				hi := hexVal(l.input[l.pos])
+				lo := hexVal(l.input[l.pos+1])
+				if hi >= 0 && lo >= 0 {
+					result = append(result, byte(hi<<4|lo))
+					l.pos++
+				} else {
+					result = append(result, 'x')
+				}
+			case 'u':
+				l.pos++
+				code, ok := readHexDigits(l, 4)
+				if ok {
+					result = appendRune(result, rune(code))
+				}
+				continue
+			case 'U':
+				l.pos++
+				code, ok := readHexDigits(l, 8)
+				if ok {
+					result = appendRune(result, rune(code))
+				}
+				continue
+			default:
+				result = append(result, '\\')
+				result = append(result, ech)
+			}
+			l.pos++
+		} else {
+			result = append(result, ch)
+			l.pos++
+		}
+	}
+}
+
+func readHexDigits(l *Lexer, count int) (uint32, bool) {
+	var val uint32
+	for i := 0; i < count; i++ {
+		if l.pos >= len(l.input) {
+			return val, i > 0
+		}
+		d := hexVal(l.input[l.pos])
+		if d < 0 {
+			return val, i > 0
+		}
+		val = val<<4 | uint32(d)
+		l.pos++
+	}
+	return val, true
+}
+
+func hexVal(ch byte) int {
+	switch {
+	case ch >= '0' && ch <= '9':
+		return int(ch - '0')
+	case ch >= 'a' && ch <= 'f':
+		return int(ch - 'a' + 10)
+	case ch >= 'A' && ch <= 'F':
+		return int(ch - 'A' + 10)
+	default:
+		return -1
+	}
+}
+
+func appendRune(buf []byte, r rune) []byte {
+	var tmp [utf8.UTFMax]byte
+	n := utf8.EncodeRune(tmp[:], r)
+	return append(buf, tmp[:n]...)
 }
 
 func (l *Lexer) peekNext() byte {

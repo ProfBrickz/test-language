@@ -12,6 +12,7 @@ func TestTypeKind(t *testing.T) {
 		{BoolType{}, "bool"},
 		{ArrayType{}, "array"},
 		{ListType{}, "list"},
+		{StringType{}, "string"},
 	}
 
 	for _, tt := range tests {

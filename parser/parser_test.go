@@ -3868,3 +3868,177 @@ func TestParseArrayBracketInvalidInt(t *testing.T) {
 		t.Errorf("expected error for invalid integer in brackets")
 	}
 }
+
+func TestParseStringTypeFixed(t *testing.T) {
+	input := `var s: string{size: 5} = "hello";`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+
+	stmt, ok := program.Stmts[0].(*ast.VarDecl)
+	if !ok {
+		t.Fatalf("expected *ast.VarDecl, got %T", program.Stmts[0])
+	}
+
+	if !stmt.IsString {
+		t.Fatalf("expected IsString to be true")
+	}
+
+	st, ok := stmt.Type.(ast.StringType)
+	if !ok {
+		t.Fatalf("expected StringType, got %T", stmt.Type)
+	}
+
+	if st.Size != 5 {
+		t.Errorf("expected size 5, got %d", st.Size)
+	}
+
+	if stmt.Expr == nil {
+		t.Fatalf("expected expression, got nil")
+	}
+
+	strLit, ok := stmt.Expr.(*ast.StringLit)
+	if !ok {
+		t.Fatalf("expected *ast.StringLit, got %T", stmt.Expr)
+	}
+
+	if strLit.Value != "hello" {
+		t.Errorf("expected value 'hello', got %q", strLit.Value)
+	}
+}
+
+func TestParseStringTypeDynamic(t *testing.T) {
+	input := `var s: string{min: 1, max: 10} = "hello";`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	st, ok := stmt.Type.(ast.StringType)
+	if !ok {
+		t.Fatalf("expected StringType, got %T", stmt.Type)
+	}
+
+	if !st.HasMin || st.MinSize != 1 {
+		t.Errorf("expected min: 1, got min: %v (hasMin: %v)", st.MinSize, st.HasMin)
+	}
+	if !st.HasMax || st.MaxSize != 10 {
+		t.Errorf("expected max: 10, got max: %v (hasMax: %v)", st.MaxSize, st.HasMax)
+	}
+}
+
+func TestParseStringTypeBasic(t *testing.T) {
+	input := `var s: string = "hello";`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	if !stmt.IsString {
+		t.Fatalf("expected IsString to be true")
+	}
+
+	_, ok := stmt.Type.(ast.StringType)
+	if !ok {
+		t.Fatalf("expected StringType, got %T", stmt.Type)
+	}
+}
+
+func TestParseStringLit(t *testing.T) {
+	input := `print("hello world");`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	strLit, ok := stmt.Expr.(*ast.StringLit)
+	if !ok {
+		t.Fatalf("expected *ast.StringLit, got %T", stmt.Expr)
+	}
+
+	if strLit.Value != "hello world" {
+		t.Errorf("expected 'hello world', got %q", strLit.Value)
+	}
+
+	if !strLit.Untyped {
+		t.Errorf("expected untyped true")
+	}
+}
+
+func TestParseStringTypeRef(t *testing.T) {
+	input := `print(string);`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	tr, ok := stmt.Expr.(*ast.TypeRef)
+	if !ok {
+		t.Fatalf("expected *ast.TypeRef, got %T", stmt.Expr)
+	}
+
+	if tr.Type.Kind() != "string" {
+		t.Errorf("expected Kind 'string', got %q", tr.Type.Kind())
+	}
+}
+
+func TestParseStringDeclWithoutInit(t *testing.T) {
+	input := `var s: string;`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	if !stmt.IsString {
+		t.Fatalf("expected IsString to be true")
+	}
+
+	if stmt.Expr != nil {
+		t.Errorf("expected nil expression")
+	}
+}
+
+func TestParseStringDeclFixedWithoutInit(t *testing.T) {
+	input := `var s: string{size: 5};`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	stmt := program.Stmts[0].(*ast.VarDecl)
+	st := stmt.Type.(ast.StringType)
+	if st.Size != 5 {
+		t.Errorf("expected size 5, got %d", st.Size)
+	}
+}
