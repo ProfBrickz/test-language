@@ -30,7 +30,7 @@ func captureOutput(f func()) string {
 func TestVarDeclAndPrint(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 42;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -53,7 +53,7 @@ func TestAssignment(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 10;
 x = 20;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -76,7 +76,7 @@ func TestCompoundAssignment(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 10;
 x += 5;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -99,7 +99,7 @@ func TestBinaryExpr(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 10;
 var y: int{size: 32, signed: true, nullable: false} = 20;
-print(x + y);
+print((x + y).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -121,7 +121,7 @@ print(x + y);
 func TestNullAssign(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: true} = null;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -143,7 +143,7 @@ print(x);
 func TestTypeMismatch(t *testing.T) {
 	input := `
 var x: int{size: 8, signed: true, nullable: false} = 1000;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -246,9 +246,9 @@ func TestValueString(t *testing.T) {
 	}{
 		{Value{Null: true}, "null"},
 		{Value{Untyped: true, Data: 42}, "42"},
-		{Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 10, IsFloat: false}, "32-bit signed int(10)"},
-		{Value{IType: ast.IntegerType{Size: 16, Signed: false}, Data: 5, IsFloat: false}, "16-bit unsigned int(5)"},
-		{Value{FType: ast.FloatType{Size: 32}, FData: 3.14, IsFloat: true}, "32-bit float(3.14)"},
+		{Value{IType: ast.IntegerType{Size: 32, Signed: true, Nullable: false}, Data: 10, IsFloat: false}, "non-nullable 32-bit signed int(10)"},
+		{Value{IType: ast.IntegerType{Size: 16, Signed: false, Nullable: false}, Data: 5, IsFloat: false}, "non-nullable 16-bit unsigned int(5)"},
+		{Value{FType: ast.FloatType{Size: 32, Nullable: false}, FData: 3.14, IsFloat: true}, "non-nullable 32-bit float(3.14)"},
 		{Value{Untyped: true, FData: 2.5, IsFloat: true}, "2.5"},
 	}
 
@@ -267,11 +267,11 @@ func TestTypeDesc(t *testing.T) {
 		isFloat  bool
 		expected string
 	}{
-		{ast.IntegerType{Size: 32, Signed: true, Nullable: false}, ast.FloatType{}, false, "32-bit signed int"},
+		{ast.IntegerType{Size: 32, Signed: true, Nullable: false}, ast.FloatType{}, false, "non-nullable 32-bit signed int"},
 		{ast.IntegerType{Size: 16, Signed: false, Nullable: true}, ast.FloatType{}, false, "nullable 16-bit unsigned int"},
 		{ast.IntegerType{Size: 64, Signed: true, Nullable: true}, ast.FloatType{}, false, "nullable 64-bit signed int"},
-		{ast.IntegerType{}, ast.FloatType{Size: 32}, true, "32-bit float"},
-		{ast.IntegerType{}, ast.FloatType{Size: 64}, true, "64-bit float"},
+		{ast.IntegerType{}, ast.FloatType{Size: 32, Nullable: false}, true, "non-nullable 32-bit float"},
+		{ast.IntegerType{}, ast.FloatType{Size: 64, Nullable: false}, true, "non-nullable 64-bit float"},
 	}
 
 	for _, tt := range tests {
@@ -468,7 +468,7 @@ func TestAssignmentWithVarRef(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 10;
 var y: int{size: 32, signed: true, nullable: false} = x;
-print(y);
+print((y).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -491,7 +491,7 @@ func TestTypeConversionOnAssign(t *testing.T) {
 	input := `
 var x: int{size: 8, signed: true, nullable: false} = 10;
 var y: int{size: 32, signed: true, nullable: false} = x;
-print(y);
+print((y).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -514,7 +514,7 @@ func TestExecuteAssignmentWithLiteralOverflow(t *testing.T) {
 	input := `
 var x: int{size: 8, signed: true, nullable: false} = 10;
 x = 200;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -532,7 +532,7 @@ func TestExecuteAssignmentWithVarRefAndConversion(t *testing.T) {
 var x: int{size: 16, signed: true, nullable: false} = 1000;
 var y: int{size: 32, signed: true, nullable: false} = 0;
 y = x;
-print(y);
+print((y).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -606,7 +606,7 @@ func TestExecuteAssignmentNullAssign(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: true} = 10;
 x = null;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -689,7 +689,7 @@ func TestExecuteAssignmentWithLiteral(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 10;
 x = 20;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -712,7 +712,7 @@ func TestExecuteAssignmentWithUntypedExpr(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 10;
 x = x + 5;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -824,7 +824,7 @@ func TestExecuteAssignmentWithTypeMismatch(t *testing.T) {
 var x: int{size: 8, signed: true, nullable: false} = 10;
 var y: int{size: 32, signed: true, nullable: false} = 1000;
 x = y;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -923,7 +923,7 @@ func TestExecuteAssignmentSubtraction(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 10;
 x -= 5;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -946,7 +946,7 @@ func TestExecuteAssignmentMultiplication(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 10;
 x *= 5;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -969,7 +969,7 @@ func TestExecuteAssignmentDivision(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 10;
 x /= 2;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1052,7 +1052,7 @@ func TestExecuteAssignmentWithNullLiteral(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: true} = 10;
 x = null;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1101,7 +1101,7 @@ func TestExecuteAssignmentWithExprError(t *testing.T) {
 func TestFloatVarDecl(t *testing.T) {
 	input := `
 var a: float{size: 32} = 3.14;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1123,7 +1123,7 @@ print(a);
 func TestFloat16VarDecl(t *testing.T) {
 	input := `
 var a: float{size: 16} = 3.14;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1145,7 +1145,7 @@ print(a);
 func TestFloat64VarDecl(t *testing.T) {
 	input := `
 var a: float{size: 64} = 3.14;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1168,7 +1168,7 @@ func TestIntToFloatConversion(t *testing.T) {
 	input := `
 var a: int{size: 32} = 42;
 var b: float{size: 64} = a;
-print(b);
+print((b).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1191,7 +1191,7 @@ func TestFloatToFloatConversion(t *testing.T) {
 	input := `
 var a: float{size: 16} = 1.5;
 var b: float{size: 32} = a;
-print(b);
+print((b).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1214,7 +1214,7 @@ func TestFloatToFloatUpConversion(t *testing.T) {
 	input := `
 var a: float{size: 32} = 1.5;
 var b: float{size: 64} = a;
-print(b);
+print((b).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1237,7 +1237,7 @@ func TestFloatAssignment(t *testing.T) {
 	input := `
 var a: float{size: 32} = 1.5;
 a = 2.5;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1260,7 +1260,7 @@ func TestFloatBinaryExpr(t *testing.T) {
 	input := `
 var a: float{size: 32} = 1.5;
 var b: float{size: 32} = 2.5;
-print(a + b);
+print((a + b).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1282,7 +1282,7 @@ print(a + b);
 func TestFloatNullAssign(t *testing.T) {
 	input := `
 var a: float{size: 32, nullable: true} = null;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1351,7 +1351,7 @@ func TestEvalFloatLit(t *testing.T) {
 }
 
 func TestDotLeadingFloat(t *testing.T) {
-	input := "print(.1);"
+	input := "print((.1).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -1371,7 +1371,7 @@ func TestDotLeadingFloat(t *testing.T) {
 }
 
 func TestDotLeadingFloatNeg(t *testing.T) {
-	input := "print(-.5);"
+	input := "print((-.5).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -1391,7 +1391,7 @@ func TestDotLeadingFloatNeg(t *testing.T) {
 }
 
 func TestDotLeadingFloatAdd(t *testing.T) {
-	input := "print(.15 + .1);"
+	input := "print((.15 + .1).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -1411,7 +1411,7 @@ func TestDotLeadingFloatAdd(t *testing.T) {
 }
 
 func TestDotLeadingFloatExp(t *testing.T) {
-	input := "print(.1e2);"
+	input := "print((.1e2).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -1453,7 +1453,7 @@ func TestFloatCompoundAssignmentAdd(t *testing.T) {
 	input := `
 var a: float{size: 32} = 1.5;
 a += 2.5;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1476,7 +1476,7 @@ func TestFloatCompoundAssignmentSub(t *testing.T) {
 	input := `
 var a: float{size: 32} = 5.5;
 a -= 2.0;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1499,7 +1499,7 @@ func TestFloatCompoundAssignmentMul(t *testing.T) {
 	input := `
 var a: float{size: 32} = 2.0;
 a *= 3.5;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1522,7 +1522,7 @@ func TestFloatCompoundAssignmentDiv(t *testing.T) {
 	input := `
 var a: float{size: 32} = 10.0;
 a /= 2.0;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1544,7 +1544,7 @@ print(a);
 func TestNaNLiteral(t *testing.T) {
 	input := `
 var a: float{size: 64} = NaN;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1569,7 +1569,7 @@ print(a);
 func TestInfinityLiteral(t *testing.T) {
 	input := `
 var a: float{size: 64} = infinity;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1594,7 +1594,7 @@ print(a);
 func TestNegInfinityLiteral(t *testing.T) {
 	input := `
 var a: float{size: 64} = -infinity;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1620,7 +1620,7 @@ func TestFloatDivisionByZero(t *testing.T) {
 	input := `
 var a: float{size: 32} = 10.0;
 a /= 0.0;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1706,7 +1706,7 @@ func TestMixedIntFloatExpr(t *testing.T) {
 	input := `
 var a: int{size: 32} = 10;
 var b: float{size: 32} = 2.5;
-print(a + b);
+print((a + b).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1729,7 +1729,7 @@ func TestMixedFloatIntExpr(t *testing.T) {
 	input := `
 var a: float{size: 32} = 2.5;
 var b: int{size: 32} = 10;
-print(a + b);
+print((a + b).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1752,7 +1752,7 @@ func TestIntToFloatCompoundAssignment(t *testing.T) {
 	input := `
 var a: float{size: 32} = 2.5;
 a += 3;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1775,7 +1775,7 @@ func TestFloatOverflowDetection(t *testing.T) {
 	input := `
 var a: float{size: 16} = 65504.0;
 a += 1.0;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1796,7 +1796,7 @@ print(a);
 func TestFloatAssignmentOverflow(t *testing.T) {
 	input := `
 var a: float{size: 16} = 70000.0;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1813,7 +1813,7 @@ func TestNullableFloatAssignment(t *testing.T) {
 	input := `
 var a: float{size: 32, nullable: true} = null;
 a = 3.14;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1836,7 +1836,7 @@ func TestNullableFloatCompoundAssignment(t *testing.T) {
 	input := `
 var a: float{size: 32, nullable: true} = 1.5;
 a += 2.5;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -1958,7 +1958,7 @@ func TestRunMultipleStatements(t *testing.T) {
 	input := `
 var x: int{size: 32} = 10;
 var y: int{size: 32} = 20;
-print(x + y);
+print((x + y).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -2859,7 +2859,7 @@ func TestExecuteAssignmentFloatOverflowCoverage(t *testing.T) {
 func TestScientificNotationLiteral(t *testing.T) {
 	input := `
 var a: float{size: 64} = 1e20;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -2883,7 +2883,7 @@ print(a);
 func TestUnderscoreIntegerLiteral(t *testing.T) {
 	input := `
 var x: int{size: 64} = 100_000;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -2907,7 +2907,7 @@ print(x);
 func TestBinaryLiteralInInterp(t *testing.T) {
 	input := `
 var x: int{size: 64} = 0b1010;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -2931,7 +2931,7 @@ print(x);
 func TestOctalLiteralInInterp(t *testing.T) {
 	input := `
 var x: int{size: 64} = 0o777;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -2955,7 +2955,7 @@ print(x);
 func TestHexLiteralInInterp(t *testing.T) {
 	input := `
 var x: int{size: 64} = 0xFF;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -2979,7 +2979,7 @@ print(x);
 func TestUnsignedInt8Overflow(t *testing.T) {
 	input := `
 var x: int{size: 8, signed: false} = 256;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -2998,7 +2998,7 @@ print(x);
 func TestUnsignedInt16Overflow(t *testing.T) {
 	input := `
 var x: int{size: 16, signed: false} = 65536;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -3017,7 +3017,7 @@ print(x);
 func TestUnsignedInt32Overflow(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: false} = 4294967296;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -3037,7 +3037,7 @@ func TestUnsignedIntUnderflowSub(t *testing.T) {
 	input := `
 var x: int{size: 8, signed: false} = 0;
 x = x - 1;
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -3061,7 +3061,7 @@ print(x);
 func TestPrefixedHexFloatEval(t *testing.T) {
 	input := `
 var a: float{size: 64} = 0xf.f;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -3085,7 +3085,7 @@ print(a);
 func TestPrefixedBinFloatEval(t *testing.T) {
 	input := `
 var a: float{size: 64} = 0b1.01;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -3109,7 +3109,7 @@ print(a);
 func TestPrefixedOctFloatEval(t *testing.T) {
 	input := `
 var a: float{size: 64} = 0o7.7;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -3133,7 +3133,7 @@ print(a);
 func TestPrefixedHexFloatNoIntPartEval(t *testing.T) {
 	input := `
 var a: float{size: 64} = 0x.1;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -3275,7 +3275,7 @@ func TestConvertIntAllSizes(t *testing.T) {
 
 func TestBoolVarDeclTrue(t *testing.T) {
 	input := `var x: bool = true;
-print(x);`
+print((x).toString());`
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -3294,7 +3294,7 @@ print(x);`
 
 func TestBoolVarDeclFalse(t *testing.T) {
 	input := `var x: bool = false;
-print(x);`
+print((x).toString());`
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -3313,7 +3313,7 @@ print(x);`
 
 func TestBoolVarDeclDefaultFalse(t *testing.T) {
 	input := `var x: bool{nullable: false};
-print(x);`
+print((x).toString());`
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -3332,7 +3332,7 @@ print(x);`
 
 func TestBoolVarDeclNullableDefaultNull(t *testing.T) {
 	input := `var x: bool;
-print(x);`
+print((x).toString());`
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -3351,7 +3351,7 @@ print(x);`
 
 func TestBoolVarDeclAssignNull(t *testing.T) {
 	input := `var x: bool{nullable: true} = null;
-print(x);`
+print((x).toString());`
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -3413,7 +3413,7 @@ b = a;`
 func TestBoolAssignment(t *testing.T) {
 	input := `var x: bool{nullable: false} = true;
 x = false;
-print(x);`
+print((x).toString());`
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -3446,7 +3446,7 @@ x += false;`
 
 func TestBoolAssignNoIntToBoolConversion(t *testing.T) {
 	input := `var x: bool{nullable: false} = 42;
-print(x);`
+print((x).toString());`
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -3459,8 +3459,8 @@ print(x);`
 }
 
 func TestPrintBoolLiteral(t *testing.T) {
-	input := `print(true);
-print(false);`
+	input := `print((true).toString());
+print((false).toString());`
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -3483,7 +3483,7 @@ func TestBoolValueString(t *testing.T) {
 		val      Value
 		expected string
 	}{
-		{Value{BType: ast.BoolType{}, BData: true, IsBool: true}, "bool(true)"},
+		{Value{BType: ast.BoolType{Nullable: false}, BData: true, IsBool: true}, "non-nullable bool(true)"},
 		{Value{BType: ast.BoolType{Nullable: true}, BData: false, IsBool: true}, "nullable bool(false)"},
 		{Value{Untyped: true, BData: true, IsBool: true}, "true"},
 		{Value{Untyped: true, BData: false, IsBool: true}, "false"},
@@ -3499,7 +3499,7 @@ func TestBoolValueString(t *testing.T) {
 
 func TestBoolNullableAssignTrue(t *testing.T) {
 	input := `var x: bool{nullable: true} = true;
-print(x);`
+print((x).toString());`
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -3519,7 +3519,7 @@ print(x);`
 func TestBoolVarRefAssign(t *testing.T) {
 	input := `var a: bool{nullable: false} = true;
 var b: bool{nullable: false} = a;
-print(b);`
+print((b).toString());`
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -3592,7 +3592,7 @@ func TestBoolDeclWithExprError(t *testing.T) {
 func TestBoolAssignToNonNullableFromNonNullable(t *testing.T) {
 	input := `var a: bool{nullable: false} = true;
 var b: bool{nullable: false} = a;
-print(b);`
+print((b).toString());`
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -3737,7 +3737,7 @@ a = 70000.0;
 }
 
 func TestPrintTypeRefInt(t *testing.T) {
-	input := "print(int);"
+	input := "print((int).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -3753,13 +3753,13 @@ func TestPrintTypeRefInt(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
-	if output != "64-bit signed int" {
-		t.Errorf("expected '64-bit signed int', got %q", output)
+	if output != "nullable 64-bit signed int" {
+		t.Errorf("expected 'nullable 64-bit signed int', got %q", output)
 	}
 }
 
 func TestPrintTypeRefFloat(t *testing.T) {
-	input := "print(float);"
+	input := "print((float).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -3775,13 +3775,13 @@ func TestPrintTypeRefFloat(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
-	if output != "64-bit float" {
-		t.Errorf("expected '64-bit float', got %q", output)
+	if output != "nullable 64-bit float" {
+		t.Errorf("expected 'nullable 64-bit float', got %q", output)
 	}
 }
 
 func TestPrintTypeRefBool(t *testing.T) {
-	input := "print(bool);"
+	input := "print((bool).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -3797,15 +3797,15 @@ func TestPrintTypeRefBool(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
-	if output != "bool" {
-		t.Errorf("expected 'bool', got %q", output)
+	if output != "nullable bool" {
+		t.Errorf("expected 'nullable bool', got %q", output)
 	}
 }
 
 func TestIntMinMaxDefault(t *testing.T) {
 	input := `
-print(int.min);
-print(int.max);
+print((int.min).toString());
+print((int.max).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -3833,8 +3833,8 @@ print(int.max);
 
 func TestInt8MinMax(t *testing.T) {
 	input := `
-print(int{size: 8}.min);
-print(int{size: 8}.max);
+print((int{size: 8}.min).toString());
+print((int{size: 8}.max).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -3862,8 +3862,8 @@ print(int{size: 8}.max);
 
 func TestUint8MinMax(t *testing.T) {
 	input := `
-print(int{size: 8, signed: false}.min);
-print(int{size: 8, signed: false}.max);
+print((int{size: 8, signed: false}.min).toString());
+print((int{size: 8, signed: false}.max).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -3891,8 +3891,8 @@ print(int{size: 8, signed: false}.max);
 
 func TestFloatMinMax(t *testing.T) {
 	input := `
-print(float.min);
-print(float.max);
+print((float.min).toString());
+print((float.max).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -3920,8 +3920,8 @@ print(float.max);
 
 func TestFloatMinSubnormalMinNormal(t *testing.T) {
 	input := `
-print(float.min_subnormal);
-print(float.min_normal);
+print((float.min_subnormal).toString());
+print((float.min_normal).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -3949,10 +3949,10 @@ print(float.min_normal);
 
 func TestFloatPrecisionExponentSize(t *testing.T) {
 	input := `
-print(float.precision);
-print(float.min_exponent);
-print(float.max_exponent);
-print(float.size);
+print((float.precision).toString());
+print((float.min_exponent).toString());
+print((float.max_exponent).toString());
+print((float.size).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -3986,14 +3986,14 @@ print(float.size);
 
 func TestFloat32Properties(t *testing.T) {
 	input := `
-print(float{size: 32}.min);
-print(float{size: 32}.max);
-print(float{size: 32}.min_subnormal);
-print(float{size: 32}.min_normal);
-print(float{size: 32}.precision);
-print(float{size: 32}.min_exponent);
-print(float{size: 32}.max_exponent);
-print(float{size: 32}.size);
+print((float{size: 32}.min).toString());
+print((float{size: 32}.max).toString());
+print((float{size: 32}.min_subnormal).toString());
+print((float{size: 32}.min_normal).toString());
+print((float{size: 32}.precision).toString());
+print((float{size: 32}.min_exponent).toString());
+print((float{size: 32}.max_exponent).toString());
+print((float{size: 32}.size).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -4040,7 +4040,7 @@ print(float{size: 32}.size);
 func TestTypeOf(t *testing.T) {
 	input := `
 var a: int{size: 8} = 42;
-print(typeof(a));
+print((typeof(a)).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -4057,15 +4057,15 @@ print(typeof(a));
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
-	if output != "8-bit signed int" {
-		t.Errorf("expected '8-bit signed int', got %q", output)
+	if output != "nullable 8-bit signed int" {
+		t.Errorf("expected 'nullable 8-bit signed int', got %q", output)
 	}
 }
 
 func TestTypeOfDotMin(t *testing.T) {
 	input := `
 var a: int{size: 8} = 42;
-print(typeof(a).min);
+print((typeof(a).min).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -4090,7 +4090,7 @@ print(typeof(a).min);
 func TestTypeOfFloat(t *testing.T) {
 	input := `
 var a: float{size: 32} = 3.14;
-print(typeof(a));
+print((typeof(a)).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -4107,15 +4107,15 @@ print(typeof(a));
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
-	if output != "32-bit float" {
-		t.Errorf("expected '32-bit float', got %q", output)
+	if output != "nullable 32-bit float" {
+		t.Errorf("expected 'nullable 32-bit float', got %q", output)
 	}
 }
 
 func TestTypeOfFloatDotMax(t *testing.T) {
 	input := `
 var a: float{size: 32} = 3.14;
-print(typeof(a).max);
+print((typeof(a).max).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -4138,7 +4138,7 @@ print(typeof(a).max);
 }
 
 func TestNegIntMin(t *testing.T) {
-	input := "print(-int{size: 8}.min);"
+	input := "print((-int{size: 8}.min).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -4465,7 +4465,7 @@ func TestBoolTypeRef(t *testing.T) {
 func TestTypeOfOnBool(t *testing.T) {
 	input := `
 var a: bool = true;
-print(typeof(a));
+print((typeof(a)).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -4483,8 +4483,8 @@ print(typeof(a));
 		}
 	})
 
-	if output != "bool" {
-		t.Errorf("expected 'bool', got %q", output)
+	if output != "nullable bool" {
+		t.Errorf("expected 'nullable bool', got %q", output)
 	}
 }
 
@@ -4504,7 +4504,7 @@ func TestBoolSize(t *testing.T) {
 }
 
 func TestPrintBoolSize(t *testing.T) {
-	input := "print(bool.size);"
+	input := "print((bool.size).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -4524,7 +4524,7 @@ func TestPrintBoolSize(t *testing.T) {
 }
 
 func TestBoolTypePrint(t *testing.T) {
-	input := "print(bool);"
+	input := "print((bool).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -4540,15 +4540,15 @@ func TestBoolTypePrint(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
-	if output != "bool" {
-		t.Errorf("expected 'bool', got %q", output)
+	if output != "nullable bool" {
+		t.Errorf("expected 'nullable bool', got %q", output)
 	}
 }
 
 func TestTypeOfOnTypedVar(t *testing.T) {
 	input := `
 var a: int{size: 32} = 100;
-print(typeof(a).min);
+print((typeof(a).min).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -4658,7 +4658,7 @@ func TestUint64Max(t *testing.T) {
 }
 
 func TestPrintUint64Max(t *testing.T) {
-	input := "print(int{size: 64, signed: false}.max);"
+	input := "print((int{size: 64, signed: false}.max).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -4680,7 +4680,7 @@ func TestPrintUint64Max(t *testing.T) {
 }
 
 func TestPrintUint64Min(t *testing.T) {
-	input := "print(int{size: 64, signed: false}.min);"
+	input := "print((int{size: 64, signed: false}.min).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -4704,14 +4704,14 @@ func TestPrintUint64Min(t *testing.T) {
 func TestValueStringTypeDesc(t *testing.T) {
 	v := Value{IsType: true, IType: ast.IntegerType{Size: 32, Signed: true, Nullable: false}}
 	result := v.String()
-	if result != "32-bit signed int" {
-		t.Errorf("expected '32-bit signed int', got %q", result)
+	if result != "non-nullable 32-bit signed int" {
+		t.Errorf("expected 'non-nullable 32-bit signed int', got %q", result)
 	}
 
 	v2 := Value{IsType: true, IsFloat: true, FType: ast.FloatType{Size: 64, Nullable: false}}
 	result2 := v2.String()
-	if result2 != "64-bit float" {
-		t.Errorf("expected '64-bit float', got %q", result2)
+	if result2 != "non-nullable 64-bit float" {
+		t.Errorf("expected 'non-nullable 64-bit float', got %q", result2)
 	}
 }
 
@@ -5151,7 +5151,7 @@ func TestNullNot(t *testing.T) {
 }
 
 func TestPrintEq(t *testing.T) {
-	input := "print(1 == 1);"
+	input := "print((1 == 1).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -5171,7 +5171,7 @@ func TestPrintEq(t *testing.T) {
 }
 
 func TestPrintGt(t *testing.T) {
-	input := "print(2 > 1);"
+	input := "print((2 > 1).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -5191,7 +5191,7 @@ func TestPrintGt(t *testing.T) {
 }
 
 func TestPrintLtFloat(t *testing.T) {
-	input := "print(1.5 < 2.5);"
+	input := "print((1.5 < 2.5).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -5211,7 +5211,7 @@ func TestPrintLtFloat(t *testing.T) {
 }
 
 func TestPrintAnd(t *testing.T) {
-	input := "print(true && false);"
+	input := "print((true && false).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -5231,7 +5231,7 @@ func TestPrintAnd(t *testing.T) {
 }
 
 func TestPrintOr(t *testing.T) {
-	input := "print(true || false);"
+	input := "print((true || false).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -5251,7 +5251,7 @@ func TestPrintOr(t *testing.T) {
 }
 
 func TestPrintNot(t *testing.T) {
-	input := "print(!true);"
+	input := "print((!true).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -5271,7 +5271,7 @@ func TestPrintNot(t *testing.T) {
 }
 
 func TestPrintNotNot(t *testing.T) {
-	input := "print(!!true);"
+	input := "print((!!true).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -5291,7 +5291,7 @@ func TestPrintNotNot(t *testing.T) {
 }
 
 func TestPrintPrecedenceOrAnd(t *testing.T) {
-	input := "print(true || false && false);"
+	input := "print((true || false && false).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -5312,7 +5312,7 @@ func TestPrintPrecedenceOrAnd(t *testing.T) {
 }
 
 func TestPrintPrecedenceCmpAdd(t *testing.T) {
-	input := "print(1 + 2 < 3);"
+	input := "print((1 + 2 < 3).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -5333,7 +5333,7 @@ func TestPrintPrecedenceCmpAdd(t *testing.T) {
 }
 
 func TestPrintNotEq(t *testing.T) {
-	input := "print(1 != 2);"
+	input := "print((1 != 2).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -5539,7 +5539,7 @@ func TestPrintTypedInt64EqFloat64Error(t *testing.T) {
 	input := `
 var a: int = 5;
 var b: float = 5;
-print(a == b);
+print((a == b).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -5559,20 +5559,20 @@ func TestNullComparisons(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"print(null == null);", "true"},
-		{"print(null != null);", "false"},
-		{"print(null == 1);", "false"},
-		{"print(null != 1);", "true"},
-		{"print(1 == null);", "false"},
-		{"print(1 != null);", "true"},
-		{"print(null == 1.0);", "false"},
-		{"print(null != 1.0);", "true"},
-		{"print(null < 1);", "false"},
-		{"print(null > 1);", "false"},
-		{"print(null <= 1);", "false"},
-		{"print(null >= 1);", "false"},
-		{"print(1 < null);", "false"},
-		{"print(1 > null);", "false"},
+		{"print((null == null).toString());", "true"},
+		{"print((null != null).toString());", "false"},
+		{"print((null == 1).toString());", "false"},
+		{"print((null != 1).toString());", "true"},
+		{"print((1 == null).toString());", "false"},
+		{"print((1 != null).toString());", "true"},
+		{"print((null == 1.0).toString());", "false"},
+		{"print((null != 1.0).toString());", "true"},
+		{"print((null < 1).toString());", "false"},
+		{"print((null > 1).toString());", "false"},
+		{"print((null <= 1).toString());", "false"},
+		{"print((null >= 1).toString());", "false"},
+		{"print((1 < null).toString());", "false"},
+		{"print((1 > null).toString());", "false"},
 	}
 
 	for _, tt := range tests {
@@ -5600,15 +5600,15 @@ func TestNullInBooleanOps(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"print(null && true);", "false"},
-		{"print(null && false);", "false"},
-		{"print(true && null);", "false"},
-		{"print(false && null);", "false"},
-		{"print(null || true);", "true"},
-		{"print(null || false);", "false"},
-		{"print(true || null);", "true"},
-		{"print(false || null);", "false"},
-		{"print(!null);", "true"},
+		{"print((null && true).toString());", "false"},
+		{"print((null && false).toString());", "false"},
+		{"print((true && null).toString());", "false"},
+		{"print((false && null).toString());", "false"},
+		{"print((null || true).toString());", "true"},
+		{"print((null || false).toString());", "false"},
+		{"print((true || null).toString());", "true"},
+		{"print((false || null).toString());", "false"},
+		{"print((!null).toString());", "true"},
 	}
 
 	for _, tt := range tests {
@@ -5636,14 +5636,14 @@ func TestNaNComparisons(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"print(NaN == NaN);", "false"},
-		{"print(NaN != NaN);", "true"},
-		{"print(NaN < 0);", "false"},
-		{"print(NaN > 0);", "false"},
-		{"print(NaN <= 0);", "false"},
-		{"print(NaN >= 0);", "false"},
-		{"print(0 < NaN);", "false"},
-		{"print(0 > NaN);", "false"},
+		{"print((NaN == NaN).toString());", "false"},
+		{"print((NaN != NaN).toString());", "true"},
+		{"print((NaN < 0).toString());", "false"},
+		{"print((NaN > 0).toString());", "false"},
+		{"print((NaN <= 0).toString());", "false"},
+		{"print((NaN >= 0).toString());", "false"},
+		{"print((0 < NaN).toString());", "false"},
+		{"print((0 > NaN).toString());", "false"},
 	}
 
 	for _, tt := range tests {
@@ -5671,12 +5671,12 @@ func TestInfinityComparisons(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"print(infinity == infinity);", "true"},
-		{"print(-infinity < 0);", "true"},
-		{"print(-infinity > 0);", "false"},
-		{"print(infinity > 1000);", "true"},
-		{"print(-infinity < -1000);", "true"},
-		{"print(infinity == 1.0);", "false"},
+		{"print((infinity == infinity).toString());", "true"},
+		{"print((-infinity < 0).toString());", "true"},
+		{"print((-infinity > 0).toString());", "false"},
+		{"print((infinity > 1000).toString());", "true"},
+		{"print((-infinity < -1000).toString());", "true"},
+		{"print((infinity == 1.0).toString());", "false"},
 	}
 
 	for _, tt := range tests {
@@ -5701,7 +5701,7 @@ func TestInfinityComparisons(t *testing.T) {
 
 func TestFloatDivByZeroInline(t *testing.T) {
 	input := `
-print(1.0 / 0.0);
+print((1.0 / 0.0).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -5726,8 +5726,8 @@ func TestDoubleNegation(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"print(!!true);", "true"},
-		{"print(!!false);", "false"},
+		{"print((!!true).toString());", "true"},
+		{"print((!!false).toString());", "false"},
 	}
 
 	for _, tt := range tests {
@@ -5775,14 +5775,14 @@ func TestNoImplicitIntToBoolConversion(t *testing.T) {
 
 func TestBoolComparisonOperatorsError(t *testing.T) {
 	tests := []string{
-		"print(true < false);",
-		"print(true > false);",
-		"print(true <= false);",
-		"print(true >= false);",
-		"print(1 < true);",
-		"print(true < 1);",
-		"print(1.0 < true);",
-		"print(true < 1.0);",
+		"print((true < false).toString());",
+		"print((true > false).toString());",
+		"print((true <= false).toString());",
+		"print((true >= false).toString());",
+		"print((1 < true).toString());",
+		"print((true < 1).toString());",
+		"print((1.0 < true).toString());",
+		"print((true < 1.0).toString());",
 	}
 
 	for _, input := range tests {
@@ -5855,8 +5855,8 @@ func TestShortCircuitEvaluation(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"print(false && true);", "false"},
-		{"print(true || false);", "true"},
+		{"print((false && true).toString());", "false"},
+		{"print((true || false).toString());", "true"},
 	}
 
 	for _, tt := range tests {
@@ -5885,7 +5885,7 @@ var x: int{size: 32, signed: true, nullable: false} = 0;
 if (true) {
 	x = 1;
 }
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -5913,7 +5913,7 @@ var x: int{size: 32, signed: true, nullable: false} = 0;
 if (false) {
 	x = 1;
 }
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -5943,7 +5943,7 @@ if (true) {
 } else {
 	x = 2;
 }
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -5973,7 +5973,7 @@ if (false) {
 } else {
 	x = 2;
 }
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -5999,11 +5999,11 @@ func TestIfElseIfElse(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 1;
 if (x == 0) {
-	print(0);
+	print((0).toString());
 } else if (x == 1) {
-	print(1);
+	print((1).toString());
 } else {
-	print(2);
+	print((2).toString());
 }
 `
 	l := lexer.New(input)
@@ -6030,7 +6030,7 @@ func TestIfConditionNotBool(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 1;
 if (x) {
-	print(1);
+	print((1).toString());
 }
 `
 	l := lexer.New(input)
@@ -6056,7 +6056,7 @@ if (true) {
 		x = 3;
 	}
 }
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -6084,7 +6084,7 @@ var a: int{size: 32, signed: true, nullable: true} = null;
 if (a == null) {
 	var b: int{size: 32, signed: true, nullable: false} = 1;
 }
-print(b);
+print((b).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -6104,7 +6104,7 @@ func TestIfVariableVisibleInInnerScope(t *testing.T) {
 	input := `
 var a: int{size: 32, signed: true, nullable: false} = 1;
 if (true) {
-	print(a);
+	print((a).toString());
 }
 `
 	l := lexer.New(input)
@@ -6133,7 +6133,7 @@ var x: int{size: 32, signed: true, nullable: false} = 0;
 if (true) {
 	x = 1;
 }
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -6163,7 +6163,7 @@ if (a == 0) {
 } else {
 	var c: int{size: 32, signed: true, nullable: false} = 3;
 }
-print(b);
+print((b).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -6187,7 +6187,7 @@ if (a == 0) {
 } else if (a == 2) {
 	var c: int{size: 32, signed: true, nullable: false} = 3;
 }
-print(c);
+print((c).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -6207,9 +6207,9 @@ func TestIfNullConditionWithElse(t *testing.T) {
 	input := `
 var a: int{size: 32, signed: true, nullable: true} = null;
 if (a == null) {
-	print(1);
+	print((1).toString());
 } else {
-	print(2);
+	print((2).toString());
 }
 `
 	l := lexer.New(input)
@@ -6235,9 +6235,9 @@ if (a == null) {
 func TestIfNullLiteralConditionWithElse(t *testing.T) {
 	input := `
 if (null) {
-	print(1);
+	print((1).toString());
 } else {
-	print(2);
+	print((2).toString());
 }
 `
 	l := lexer.New(input)
@@ -6263,9 +6263,9 @@ if (null) {
 func TestIfNullLiteralConditionNoElse(t *testing.T) {
 	input := `
 if (null) {
-	print(1);
+	print((1).toString());
 }
-print(2);
+print((2).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -6290,7 +6290,7 @@ print(2);
 func TestIfConditionExprError(t *testing.T) {
 	input := `
 if (undefined) {
-	print(1);
+	print((1).toString());
 }
 `
 	l := lexer.New(input)
@@ -6310,7 +6310,7 @@ if (undefined) {
 func TestBlockStmtErrorPropagation(t *testing.T) {
 	input := `
 if (true) {
-	print(undefinedVar);
+	print((undefinedVar).toString());
 }
 `
 	l := lexer.New(input)
@@ -6346,9 +6346,9 @@ func TestVariableShadowingInIfBlock(t *testing.T) {
 var x: int{size: 32, signed: true, nullable: false} = 1;
 if (true) {
 	var x: int{size: 32, signed: true, nullable: false} = 2;
-	print(x);
+	print((x).toString());
 }
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -6373,7 +6373,7 @@ print(x);
 func TestEmptyThenBlock(t *testing.T) {
 	input := `
 if (true) { }
-print(1);
+print((1).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -6398,7 +6398,7 @@ print(1);
 func TestEmptyThenBlockWithElse(t *testing.T) {
 	input := `
 if (false) { } else {
-	print(1);
+	print((1).toString());
 }
 `
 	l := lexer.New(input)
@@ -6424,7 +6424,7 @@ if (false) { } else {
 func TestEmptyElseBlock(t *testing.T) {
 	input := `
 if (true) {
-	print(1);
+	print((1).toString());
 } else { }
 `
 	l := lexer.New(input)
@@ -6451,15 +6451,15 @@ func TestMultipleElseIfChain(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 2;
 if (x == 0) {
-	print(0);
+	print((0).toString());
 } else if (x == 1) {
-	print(1);
+	print((1).toString());
 } else if (x == 2) {
-	print(2);
+	print((2).toString());
 } else if (x == 3) {
-	print(3);
+	print((3).toString());
 } else {
-	print(4);
+	print((4).toString());
 }
 `
 	l := lexer.New(input)
@@ -6486,13 +6486,13 @@ func TestAllElseIfConditionsFalseNoElse(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 10;
 if (x == 0) {
-	print(0);
+	print((0).toString());
 } else if (x == 1) {
-	print(1);
+	print((1).toString());
 } else if (x == 2) {
-	print(2);
+	print((2).toString());
 }
-print(3);
+print((3).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -6521,7 +6521,7 @@ if (true) {
 	var b: int{size: 32, signed: true, nullable: false} = 2;
 }
 var b: int{size: 32, signed: true, nullable: false} = 3;
-print(b);
+print((b).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -6546,11 +6546,11 @@ print(b);
 func TestNullLiteralConditionWithElseIf(t *testing.T) {
 	input := `
 if (null) {
-	print(1);
+	print((1).toString());
 } else if (true) {
-	print(2);
+	print((2).toString());
 } else {
-	print(3);
+	print((3).toString());
 }
 `
 	l := lexer.New(input)
@@ -6578,9 +6578,9 @@ func TestComplexExpressionCondition(t *testing.T) {
 var x: int{size: 32, signed: true, nullable: false} = 1;
 var y: bool{nullable: false} = true;
 if (x + 1 == 2 && y) {
-	print(1);
+	print((1).toString());
 } else {
-	print(2);
+	print((2).toString());
 }
 `
 	l := lexer.New(input)
@@ -6611,7 +6611,7 @@ if (true) {
 	x = x + 1;
 	x = x * 3;
 }
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -6638,11 +6638,11 @@ func TestElseIfConditionCanAccessOuterVarModifiedBeforehand(t *testing.T) {
 var x: int{size: 32, signed: true, nullable: false} = 0;
 x = 5;
 if (x == 0) {
-	print(0);
+	print((0).toString());
 } else if (x == 5) {
-	print(5);
+	print((5).toString());
 } else {
-	print(99);
+	print((99).toString());
 }
 `
 	l := lexer.New(input)
@@ -6669,13 +6669,13 @@ func TestIfElseIfFirstConditionTrueSkipsRest(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 0;
 if (x == 0) {
-	print(0);
+	print((0).toString());
 } else if (x == 0) {
-	print(99);
+	print((99).toString());
 } else if (x == 0) {
-	print(99);
+	print((99).toString());
 } else {
-	print(99);
+	print((99).toString());
 }
 `
 	l := lexer.New(input)
@@ -6702,9 +6702,9 @@ func TestIfWithBoolVarCondition(t *testing.T) {
 	input := `
 var x: bool{nullable: false} = true;
 if (x) {
-	print(1);
+	print((1).toString());
 } else {
-	print(2);
+	print((2).toString());
 }
 `
 	l := lexer.New(input)
@@ -6731,13 +6731,13 @@ func TestElseIfModifiesOuterVarBeforeNextCondition(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 1;
 if (x == 0) {
-	print(0);
+	print((0).toString());
 } else if (x == 1) {
 	x = 2;
 } else if (x == 2) {
-	print(2);
+	print((2).toString());
 } else {
-	print(3);
+	print((3).toString());
 }
 `
 	l := lexer.New(input)
@@ -6764,7 +6764,7 @@ func TestForLoopCount(t *testing.T) {
 	input := `
 var i: int{size: 32, signed: true, nullable: false} = 0;
 for (i = 0; i < 5; i = i + 1) {
-	print(i);
+	print((i).toString());
 }
 `
 	l := lexer.New(input)
@@ -6790,7 +6790,7 @@ for (i = 0; i < 5; i = i + 1) {
 func TestForLoopWithVarDeclInit(t *testing.T) {
 	input := `
 for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 3; i = i + 1) {
-	print(i);
+	print((i).toString());
 }
 `
 	l := lexer.New(input)
@@ -6816,9 +6816,9 @@ for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 3; i = i + 1) 
 func TestForLoopVarScopedToLoop(t *testing.T) {
 	input := `
 for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 1; i = i + 1) {
-	print(i);
+	print((i).toString());
 }
-print(i);
+print((i).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -6838,7 +6838,7 @@ func TestForLoopEmptyInitCondUpdate(t *testing.T) {
 	input := `
 var i: int{size: 32, signed: true, nullable: false} = 0;
 for (;;) {
-	print(i);
+	print((i).toString());
 	i = i + 1;
 	if (i >= 3) {
 		break;
@@ -6869,7 +6869,7 @@ func TestWhileLoop(t *testing.T) {
 	input := `
 var i: int{size: 32, signed: true, nullable: false} = 0;
 while (i < 3) {
-	print(i);
+	print((i).toString());
 	i = i + 1;
 }
 `
@@ -6897,7 +6897,7 @@ func TestBreakInLoop(t *testing.T) {
 	input := `
 var i: int{size: 32, signed: true, nullable: false} = 0;
 while (true) {
-	print(i);
+	print((i).toString());
 	if (i >= 2) {
 		break;
 	}
@@ -6932,7 +6932,7 @@ while (i < 5) {
 	if (i == 3) {
 		skip;
 	}
-	print(i);
+	print((i).toString());
 }
 `
 	l := lexer.New(input)
@@ -6961,7 +6961,7 @@ for (var i: int{size: 32, signed: true, nullable: false} = 1; i <= 5; i = i + 1)
 	if (i == 3) {
 		skip;
 	}
-	print(i);
+	print((i).toString());
 }
 `
 	l := lexer.New(input)
@@ -7020,7 +7020,7 @@ func TestNestedLoops(t *testing.T) {
 	input := `
 for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 2; i = i + 1) {
 	for (var j: int{size: 32, signed: true, nullable: false} = 0; j < 2; j = j + 1) {
-		print(i * 10 + j);
+		print((i * 10 + j).toString());
 	}
 }
 `
@@ -7089,7 +7089,7 @@ for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 10; i = i + 1)
 		break;
 	}
 }
-print(1);
+print((1).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -7133,9 +7133,9 @@ func TestForLoopBodyScopedVar(t *testing.T) {
 	input := `
 for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 1; i = i + 1) {
 	var x: int{size: 32, signed: true, nullable: false} = 42;
-	print(x);
+	print((x).toString());
 }
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -7162,7 +7162,7 @@ while (i < 10) {
 	if (i == 5) {
 		break;
 	}
-	print(i);
+	print((i).toString());
 }
 `
 	l := lexer.New(input)
@@ -7337,7 +7337,7 @@ while (i < 10) {
 	}
 	i = i + 1;
 }
-print(i);
+print((i).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -7365,7 +7365,7 @@ var x: int{size: 32, signed: true, nullable: false} = 5;
 while (false) {
 	x = 10;
 }
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -7390,9 +7390,9 @@ print(x);
 func TestForLoopFalseCondition(t *testing.T) {
 	input := `
 for (var i: int{size: 32, signed: true, nullable: false} = 42; false; i = i + 1) {
-	print(i);
+	print((i).toString());
 }
-print(i);
+print((i).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -7411,7 +7411,7 @@ print(i);
 func TestForLoopCompoundUpdate(t *testing.T) {
 	input := `
 for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 3; i += 1) {
-	print(i);
+	print((i).toString());
 }
 `
 	l := lexer.New(input)
@@ -7437,7 +7437,7 @@ for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 3; i += 1) {
 func TestForLoopVarDeclWithoutInit(t *testing.T) {
 	input := `
 for (var i: int{size: 32, signed: true, nullable: false}; i < 3; i = i + 1) {
-	print(i);
+	print((i).toString());
 }
 `
 	l := lexer.New(input)
@@ -7464,7 +7464,7 @@ func TestForLoopInitRefOuterVar(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 5;
 for (var i: int{size: 32, signed: true, nullable: false} = x; i < x + 2; i = i + 1) {
-	print(i);
+	print((i).toString());
 }
 `
 	l := lexer.New(input)
@@ -7494,7 +7494,7 @@ for (i = 0;;) {
 	if (i >= 3) {
 		break;
 	}
-	print(i);
+	print((i).toString());
 	i = i + 1;
 }
 `
@@ -7525,7 +7525,7 @@ for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 3; i = i + 1) 
 		if (j == 1) {
 			break;
 		}
-		print(i * 10 + j);
+		print((i * 10 + j).toString());
 	}
 }
 `
@@ -7577,7 +7577,7 @@ while (i < 3) {
 	var x: int{size: 32, signed: true, nullable: false} = 42;
 	i = i + 1;
 }
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -7597,7 +7597,7 @@ func TestIncrementInt(t *testing.T) {
 	input := `
 var i: int{size: 32, signed: true, nullable: false} = 5;
 i++;
-print(i);
+print((i).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -7623,7 +7623,7 @@ func TestDecrementInt(t *testing.T) {
 	input := `
 var i: int{size: 32, signed: true, nullable: false} = 5;
 i--;
-print(i);
+print((i).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -7649,7 +7649,7 @@ func TestIncrementFloat(t *testing.T) {
 	input := `
 var f: float{size: 64, nullable: false} = 3.5;
 f++;
-print(f);
+print((f).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -7675,7 +7675,7 @@ func TestDecrementFloat(t *testing.T) {
 	input := `
 var f: float{size: 64, nullable: false} = 3.5;
 f--;
-print(f);
+print((f).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -7700,7 +7700,7 @@ print(f);
 func TestIncrementInForLoop(t *testing.T) {
 	input := `
 for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 3; i++) {
-	print(i);
+	print((i).toString());
 }
 `
 	l := lexer.New(input)
@@ -7726,7 +7726,7 @@ for (var i: int{size: 32, signed: true, nullable: false} = 0; i < 3; i++) {
 func TestDecrementInForLoop(t *testing.T) {
 	input := `
 for (var i: int{size: 32, signed: true, nullable: false} = 2; i >= 0; i--) {
-	print(i);
+	print((i).toString());
 }
 `
 	l := lexer.New(input)
@@ -7828,7 +7828,7 @@ var i: int{size: 32, signed: true, nullable: false} = 5;
 if (true) {
 	i++;
 }
-print(i);
+print((i).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -7856,7 +7856,7 @@ var i: int{size: 32, signed: true, nullable: false} = 5;
 if (true) {
 	i--;
 }
-print(i);
+print((i).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -7882,7 +7882,7 @@ func TestIncrementZero(t *testing.T) {
 	input := `
 var i: int{size: 32, signed: true, nullable: false} = 0;
 i++;
-print(i);
+print((i).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -7908,7 +7908,7 @@ func TestDecrementZero(t *testing.T) {
 	input := `
 var i: int{size: 32, signed: true, nullable: false} = 0;
 i--;
-print(i);
+print((i).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -7934,7 +7934,7 @@ func TestIncrementNegative(t *testing.T) {
 	input := `
 var i: int{size: 32, signed: true, nullable: false} = -3;
 i++;
-print(i);
+print((i).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -7960,7 +7960,7 @@ func TestDecrementNegative(t *testing.T) {
 	input := `
 var i: int{size: 32, signed: true, nullable: false} = -3;
 i--;
-print(i);
+print((i).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8004,7 +8004,7 @@ i--;
 func TestArrayDeclAndPrint(t *testing.T) {
 	input := `
 var a: array{size: 3}<int> = [1, 2, 3];
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8029,7 +8029,7 @@ print(a);
 func TestArrayDeclWithoutInit(t *testing.T) {
 	input := `
 var a: array{size: 3}<int>;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8073,7 +8073,7 @@ var a: array{size: 3}<int> = [1, 2];
 func TestArrayIndexAccess(t *testing.T) {
 	input := `
 var a: array{size: 3}<int> = [10, 20, 30];
-print(a[1]);
+print((a[1]).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8098,7 +8098,7 @@ print(a[1]);
 func TestArrayIndexOutOfBounds(t *testing.T) {
 	input := `
 var a: array{size: 3}<int> = [1, 2, 3];
-print(a[5]);
+print((a[5]).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8118,7 +8118,7 @@ func TestArrayIndexedAssign(t *testing.T) {
 	input := `
 var a: array{size: 3}<int> = [1, 2, 3];
 a[1] = 99;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8162,7 +8162,7 @@ a[5] = 99;
 func TestArrayLength(t *testing.T) {
 	input := `
 var a: array{size: 5}<int> = [1, 2, 3, 4, 5];
-print(a.length);
+print((a.length).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8187,7 +8187,7 @@ print(a.length);
 func TestListDeclAndPrint(t *testing.T) {
 	input := `
 var a: list<int> = [1, 2, 3];
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8212,7 +8212,7 @@ print(a);
 func TestListDeclEmpty(t *testing.T) {
 	input := `
 var a: list<int>;
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8238,7 +8238,7 @@ func TestListAdd(t *testing.T) {
 	input := `
 var a: list<int>;
 a.add(42);
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8264,7 +8264,7 @@ func TestListAddAtIndex(t *testing.T) {
 	input := `
 var a: list<int> = [1, 3];
 a.add(2, 1);
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8290,7 +8290,7 @@ func TestListRemove(t *testing.T) {
 	input := `
 var a: list<int> = [1, 2, 3];
 a.remove(1);
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8315,7 +8315,7 @@ print(a);
 func TestListLength(t *testing.T) {
 	input := `
 var a: list<int> = [1, 2, 3, 4];
-print(a.length);
+print((a.length).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8340,11 +8340,11 @@ print(a.length);
 func TestListWithMinMax(t *testing.T) {
 	input := `
 var a: list{min: 1, max: 5}<int> = [1, 2, 3];
-print(a.length);
+print((a.length).toString());
 a.add(4);
-print(a.length);
+print((a.length).toString());
 a.add(5);
-print(a.length);
+print((a.length).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8408,7 +8408,7 @@ func TestListRemoveReturnsElement(t *testing.T) {
 	input := `
 var a: list<int> = [1, 2, 3];
 var x: int{size: 64} = a.remove(1);
-print(x);
+print((x).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8432,7 +8432,7 @@ print(x);
 
 func TestArrayLiteralExpr(t *testing.T) {
 	input := `
-print([1, 2, 3]);
+print(([1, 2, 3]).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8456,7 +8456,7 @@ print([1, 2, 3]);
 
 func TestEmptyArrayLiteral(t *testing.T) {
 	input := `
-print([]);
+print(([]).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8479,34 +8479,34 @@ print([]);
 }
 
 func TestArrayTypeDesc(t *testing.T) {
-	ft := ast.FloatType{Size: 32}
+	ft := ast.FloatType{Size: 32, Nullable: false}
 	at := ast.ArrayType{ElemType: ft, Size: 5}
 	result := typeDescForType(at)
-	if result != "array{size: 5}<32-bit float>" {
-		t.Errorf("expected 'array{size: 5}<32-bit float>', got %q", result)
+	if result != "array{size: 5}<non-nullable 32-bit float>" {
+		t.Errorf("expected 'array{size: 5}<non-nullable 32-bit float>', got %q", result)
 	}
 }
 
 func TestListTypeDesc(t *testing.T) {
-	result := typeDescForType(ast.ListType{ElemType: ast.IntegerType{Size: 64, Signed: true}})
-	if result != "list<64-bit signed int>" {
-		t.Errorf("expected 'list<64-bit signed int>', got %q", result)
+	result := typeDescForType(ast.ListType{ElemType: ast.IntegerType{Size: 64, Signed: true, Nullable: false}})
+	if result != "list<non-nullable 64-bit signed int>" {
+		t.Errorf("expected 'list<non-nullable 64-bit signed int>', got %q", result)
 	}
 }
 
 func TestListTypeDescWithMinMax(t *testing.T) {
 	result := typeDescForType(ast.ListType{
-		ElemType: ast.IntegerType{Size: 32, Signed: true},
+		ElemType: ast.IntegerType{Size: 32, Signed: true, Nullable: false},
 		HasMin:   true, MinSize: 1,
 		HasMax: true, MaxSize: 10,
 	})
-	if result != "list{min: 1, max: 10}<32-bit signed int>" {
-		t.Errorf("expected 'list{min: 1, max: 10}<32-bit signed int>', got %q", result)
+	if result != "list{min: 1, max: 10}<non-nullable 32-bit signed int>" {
+		t.Errorf("expected 'list{min: 1, max: 10}<non-nullable 32-bit signed int>', got %q", result)
 	}
 }
 
 func TestArrayTypeDisplay(t *testing.T) {
-	input := "print(array{size: 3}<int>);"
+	input := "print((array{size: 3}<int>).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -8522,13 +8522,13 @@ func TestArrayTypeDisplay(t *testing.T) {
 		}
 	})
 
-	if output != "array{size: 3}<64-bit signed int>" {
-		t.Errorf("expected 'array{size: 3}<64-bit signed int>', got %q", output)
+	if output != "array{size: 3}<non-nullable 64-bit signed int>" {
+		t.Errorf("expected 'array{size: 3}<non-nullable 64-bit signed int>', got %q", output)
 	}
 }
 
 func TestListTypeDisplay(t *testing.T) {
-	input := "print(list<int>);"
+	input := "print((list<int>).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -8544,8 +8544,8 @@ func TestListTypeDisplay(t *testing.T) {
 		}
 	})
 
-	if output != "list<64-bit signed int>" {
-		t.Errorf("expected 'list<64-bit signed int>', got %q", output)
+	if output != "list<non-nullable 64-bit signed int>" {
+		t.Errorf("expected 'list<non-nullable 64-bit signed int>', got %q", output)
 	}
 }
 
@@ -8601,7 +8601,7 @@ func TestExprStmtMethodCall(t *testing.T) {
 	input := `
 var a: list<int> = [1, 2, 3];
 a.add(4);
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8657,7 +8657,7 @@ func TestArrayTypeEvalMemberNotFound(t *testing.T) {
 func TestTypeOfOnArray(t *testing.T) {
 	input := `
 var a: array{size: 4}<int> = [1, 2, 3, 4];
-print(typeof(a));
+print((typeof(a)).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -8674,13 +8674,13 @@ print(typeof(a));
 		}
 	})
 
-	if output != "array{size: 4}<64-bit signed int>" {
-		t.Errorf("expected 'array{size: 4}<64-bit signed int>', got %q", output)
+	if output != "array{size: 4}<non-nullable 64-bit signed int>" {
+		t.Errorf("expected 'array{size: 4}<non-nullable 64-bit signed int>', got %q", output)
 	}
 }
 
 func TestTypeOfOperandError(t *testing.T) {
-	input := "print(typeof(undefinedVar));"
+	input := "print((typeof(undefinedVar)).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -9322,7 +9322,7 @@ func TestExecuteIndexedAssignIndexEvalError(t *testing.T) {
 func TestArraySizeInference(t *testing.T) {
 	input := `
 var a: array<int> = [1, 2, 3];
-print(a.length);
+print((a.length).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9345,7 +9345,7 @@ print(a.length);
 func TestArraySizeInferencePrint(t *testing.T) {
 	input := `
 var a: array<int> = [1, 2, 3];
-print(a);
+print((a).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9368,7 +9368,7 @@ print(a);
 func TestArrayBracketSyntaxRuntime(t *testing.T) {
 	input := `
 var a: array[3]<int> = [10, 20, 30];
-print(a[1]);
+print((a[1]).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9389,7 +9389,7 @@ print(a[1]);
 }
 
 func TestArrayElemTypeMember(t *testing.T) {
-	input := "print(array{size: 5}<int>.elem_type);"
+	input := "print((array{size: 5}<int>.elem_type).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -9403,13 +9403,13 @@ func TestArrayElemTypeMember(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
-	if output != "64-bit signed int" {
-		t.Errorf("expected '64-bit signed int', got %q", output)
+	if output != "non-nullable 64-bit signed int" {
+		t.Errorf("expected 'non-nullable 64-bit signed int', got %q", output)
 	}
 }
 
 func TestArrayElemTypeMemberFloat(t *testing.T) {
-	input := "print(array{size: 3}<float>.elem_type);"
+	input := "print((array{size: 3}<float>.elem_type).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -9423,13 +9423,13 @@ func TestArrayElemTypeMemberFloat(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
-	if output != "64-bit float" {
-		t.Errorf("expected '64-bit float', got %q", output)
+	if output != "non-nullable 64-bit float" {
+		t.Errorf("expected 'non-nullable 64-bit float', got %q", output)
 	}
 }
 
 func TestArrayElemTypeChainedMember(t *testing.T) {
-	input := "print(array{size: 5}<int>.elem_type.size);"
+	input := "print((array{size: 5}<int>.elem_type.size).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -9449,7 +9449,7 @@ func TestArrayElemTypeChainedMember(t *testing.T) {
 }
 
 func TestArrayElemTypeMemberBool(t *testing.T) {
-	input := "print(array{size: 3}<bool>.elem_type);"
+	input := "print((array{size: 3}<bool>.elem_type).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -9463,13 +9463,13 @@ func TestArrayElemTypeMemberBool(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
-	if output != "bool" {
-		t.Errorf("expected 'bool', got %q", output)
+	if output != "non-nullable bool" {
+		t.Errorf("expected 'non-nullable bool', got %q", output)
 	}
 }
 
 func TestArrayElemTypeNestedArray(t *testing.T) {
-	input := "print(array{size: 3}<array{size: 2}<int>>.elem_type);"
+	input := "print((array{size: 3}<array{size: 2}<int>>.elem_type).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -9483,13 +9483,13 @@ func TestArrayElemTypeNestedArray(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
-	if output != "array{size: 2}<64-bit signed int>" {
+	if output != "array{size: 2}<non-nullable 64-bit signed int>" {
 		t.Errorf("expected 'array{size: 2}<...>', got %q", output)
 	}
 }
 
 func TestArrayElemTypeNestedList(t *testing.T) {
-	input := "print(array{size: 3}<list<int>>.elem_type);"
+	input := "print((array{size: 3}<list<int>>.elem_type).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -9503,7 +9503,7 @@ func TestArrayElemTypeNestedList(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
-	if output != "list<64-bit signed int>" {
+	if output != "list<non-nullable 64-bit signed int>" {
 		t.Errorf("expected 'list<...>', got %q", output)
 	}
 }
@@ -9519,7 +9519,7 @@ func TestArrayElemTypeOnListType(t *testing.T) {
 }
 
 func TestArrayBracketSyntaxTypeDisplay(t *testing.T) {
-	input := "print(array[4]<int>);"
+	input := "print((array[4]<int>).toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -9533,7 +9533,7 @@ func TestArrayBracketSyntaxTypeDisplay(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
-	if output != "array{size: 4}<64-bit signed int>" {
+	if output != "array{size: 4}<non-nullable 64-bit signed int>" {
 		t.Errorf("expected 'array{size: 4}<...>', got %q", output)
 	}
 }
@@ -9541,7 +9541,7 @@ func TestArrayBracketSyntaxTypeDisplay(t *testing.T) {
 func TestStringDeclAndPrint(t *testing.T) {
 	input := `
 var s: string = "hello";
-print(s);
+print((s).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9578,7 +9578,7 @@ func TestStringLitPrint(t *testing.T) {
 func TestStringFixedSize(t *testing.T) {
 	input := `
 var s: string{size: 5} = "hello";
-print(s);
+print((s).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9612,7 +9612,7 @@ var s: string{size: 5} = "hello!";
 func TestStringFixedSizeInitWithoutValue(t *testing.T) {
 	input := `
 var s: string{size: 5};
-print(s);
+print((s).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9633,7 +9633,7 @@ func TestStringConcatOperator(t *testing.T) {
 	input := `
 var a: string = "hello";
 var b: string = " world";
-print(a + b);
+print((a + b).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9653,7 +9653,7 @@ print(a + b);
 func TestStringConcatMethod(t *testing.T) {
 	input := `
 var a: string = "hello";
-print(a.concat(" world"));
+print((a.concat(" world")).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9673,8 +9673,8 @@ print(a.concat(" world"));
 func TestStringIndex(t *testing.T) {
 	input := `
 var s: string = "hello";
-print(s[0]);
-print(s[4]);
+print((s[0]).toString());
+print((s[4]).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9694,7 +9694,7 @@ print(s[4]);
 func TestStringIndexOutOfBounds(t *testing.T) {
 	input := `
 var s: string = "hi";
-print(s[5]);
+print((s[5]).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9710,7 +9710,7 @@ func TestStringIndexAssign(t *testing.T) {
 	input := `
 var s: string = "hello";
 s[0] = "H";
-print(s);
+print((s).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9730,7 +9730,7 @@ print(s);
 func TestStringLength(t *testing.T) {
 	input := `
 var s: string = "hello";
-print(s.length);
+print((s.length).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9752,9 +9752,9 @@ func TestStringEquality(t *testing.T) {
 var a: string = "hello";
 var b: string = "hello";
 var c: string = "world";
-print(a == b);
-print(a == c);
-print(a != c);
+print((a == b).toString());
+print((a == c).toString());
+print((a != c).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9777,9 +9777,9 @@ var s: string = "he";
 s.add("l");
 s.add("l");
 s.add("o");
-print(s);
+print((s).toString());
 s.remove(4);
-print(s);
+print((s).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9827,7 +9827,7 @@ s.remove(0);
 }
 
 func TestStringTypeRefPrint(t *testing.T) {
-	input := `print(string);`
+	input := `print((string).toString());`
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -9844,7 +9844,7 @@ func TestStringTypeRefPrint(t *testing.T) {
 }
 
 func TestStringTypeRefWithSize(t *testing.T) {
-	input := `print(string{size: 10});`
+	input := `print((string{size: 10}).toString());`
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -9861,7 +9861,7 @@ func TestStringTypeRefWithSize(t *testing.T) {
 }
 
 func TestStringEscapeSequences(t *testing.T) {
-	input := "print(\"hello\\nworld\");"
+	input := "print((\"hello\\nworld\").toString());"
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
@@ -9881,7 +9881,7 @@ func TestStringAssignment(t *testing.T) {
 	input := `
 var s: string = "hello";
 s = "world";
-print(s);
+print((s).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9902,7 +9902,7 @@ func TestStringAddAtIndex(t *testing.T) {
 	input := `
 var s: string = "hllo";
 s.add("e", 1);
-print(s);
+print((s).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9922,7 +9922,7 @@ print(s);
 func TestStringDynamicBounds(t *testing.T) {
 	input := `
 var s: string{min: 1, max: 5} = "hi";
-print(s.length);
+print((s.length).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -9942,8 +9942,8 @@ print(s.length);
 func TestStringUTF8(t *testing.T) {
 	input := `
 var s: string = "héllo";
-print(s.length);
-print(s[1]);
+print((s.length).toString());
+print((s[1]).toString());
 `
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -10802,5 +10802,407 @@ func TestEvalStringMemberRemoveSuccessVarRef(t *testing.T) {
 	result, _ := i.env.Get("s")
 	if result.StringData != "ello" {
 		t.Errorf("expected 'ello', got %q", result.StringData)
+	}
+}
+
+func TestPrintRequiresString(t *testing.T) {
+	input := "print(42);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for print with non-string, got none")
+	}
+	if err.Error() != "print requires a string argument, got untyped int literal" {
+		t.Errorf("wrong error message: %v", err)
+	}
+}
+
+func TestToStringAsProperty(t *testing.T) {
+	input := "print((42).toString);"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for toString as property, got none")
+	}
+	if err.Error() != `value of type untyped int literal has no attribute "toString"` {
+		t.Errorf("wrong error message: %v", err)
+	}
+}
+
+func TestToStringWithArgs(t *testing.T) {
+	input := "print((42).toString(42));"
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for toString with args, got none")
+	}
+	if err.Error() != "toString takes no arguments" {
+		t.Errorf("wrong error message: %v", err)
+	}
+}
+
+func TestVarRedeclareSameScope(t *testing.T) {
+	input := `
+var x: int = 1;
+var x: bool = true;
+print(x.toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected parser errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true" {
+		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+func TestArrayCompoundAssign(t *testing.T) {
+	input := `
+var a: array<int> = [];
+a += 1;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err == nil {
+			t.Errorf("expected error, got none")
+		}
+	})
+	_ = output
+}
+
+func TestArrayInvalidMember(t *testing.T) {
+	input := `
+var a: array<int> = [];
+a.foo;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for invalid member, got none")
+	}
+}
+
+func TestListCompoundAssign(t *testing.T) {
+	input := `
+var a: list<int> = [];
+a += 1;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error, got none")
+	}
+}
+
+func TestListInvalidMember(t *testing.T) {
+	input := `
+var a: list<int> = [];
+a.foo;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for invalid member, got none")
+	}
+}
+
+func TestArrayNoSpaceBeforeAssignRuntime(t *testing.T) {
+	input := `
+var a: array<int>=[1, 2, 3];
+print(a.toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "[1, 2, 3]" {
+		t.Errorf("expected '[1, 2, 3]', got %q", output)
+	}
+}
+
+func TestListNoSpaceBeforeAssignRuntime(t *testing.T) {
+	input := `
+var a: list<int>=[1, 2, 3];
+print(a.toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "[1, 2, 3]" {
+		t.Errorf("expected '[1, 2, 3]', got %q", output)
+	}
+}
+
+func TestShadowingElseBlock(t *testing.T) {
+	input := `
+var x: int = 1;
+if (false) { } else {
+	var x: int = 2;
+	print((x).toString());
+}
+print((x).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "2\n1" {
+		t.Errorf("expected '2\\n1', got %q", output)
+	}
+}
+
+func TestShadowingElseIfChain(t *testing.T) {
+	input := `
+var x: int = 1;
+if (false) { } else if (true) {
+	var x: int = 2;
+	print((x).toString());
+}
+print((x).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "2\n1" {
+		t.Errorf("expected '2\\n1', got %q", output)
+	}
+}
+
+func TestShadowingForBody(t *testing.T) {
+	input := `
+var x: int = 1;
+for (var i: int = 0; i < 2; i = i + 1) {
+	var x: int = 99;
+	print((x).toString());
+}
+print((x).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "99\n99\n1" {
+		t.Errorf("expected '99\\n99\\n1', got %q", output)
+	}
+}
+
+func TestShadowingWhileBody(t *testing.T) {
+	input := `
+var x: int = 1;
+var done: bool = false;
+while (!done) {
+	var x: int = 99;
+	print((x).toString());
+	done = true;
+}
+print((x).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "99\n1" {
+		t.Errorf("expected '99\\n1', got %q", output)
+	}
+}
+
+func TestShadowingDifferentTypes(t *testing.T) {
+	input := `
+var x: int = 42;
+if (true) {
+	var x: bool = true;
+	print((x).toString());
+}
+print((x).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true\n42" {
+		t.Errorf("expected 'true\\n42', got %q", output)
+	}
+}
+
+func TestShadowingDeeplyNested(t *testing.T) {
+	input := `
+var x: int = 1;
+if (true) {
+	var x: int = 2;
+	if (true) {
+		var x: int = 3;
+		print((x).toString());
+	}
+	print((x).toString());
+}
+print((x).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "3\n2\n1" {
+		t.Errorf("expected '3\\n2\\n1', got %q", output)
+	}
+}
+
+func TestShadowingForInitScope(t *testing.T) {
+	input := `
+var x: int = 1;
+for (var x: int = 99; x < 1; x = x + 1) { }
+print((x).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestRedeclareSameScope(t *testing.T) {
+	input := `
+var x: int = 1;
+var x: bool = true;
+print((x).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true" {
+		t.Errorf("expected 'true', got %q", output)
 	}
 }

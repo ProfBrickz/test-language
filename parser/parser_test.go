@@ -3705,6 +3705,26 @@ func TestParseListTypeMissingLT(t *testing.T) {
 	}
 }
 
+func TestParseArrayTypeInvalidAfterElem(t *testing.T) {
+	input := "var a: array<int!;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '>' in array type")
+	}
+}
+
+func TestParseListTypeInvalidAfterElem(t *testing.T) {
+	input := "var a: list<int!;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '>' in list type")
+	}
+}
+
 func TestParseIndexedAssignMissingRBracket(t *testing.T) {
 	input := "arr[0 = 42;"
 	l := lexer.New(input)
@@ -3836,6 +3856,59 @@ func TestParseArrayNoSize(t *testing.T) {
 	at := stmt.Type.(ast.ArrayType)
 	if at.Size != 0 {
 		t.Errorf("expected size 0, got %d", at.Size)
+	}
+}
+
+func TestParseArrayNoSpaceBeforeAssign(t *testing.T) {
+	input := "var a: array<int>=[1,2,3];"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	stmt, ok := program.Stmts[0].(*ast.VarDecl)
+	if !ok {
+		t.Fatalf("expected *ast.VarDecl, got %T", program.Stmts[0])
+	}
+	at, ok := stmt.Type.(ast.ArrayType)
+	if !ok {
+		t.Fatalf("expected ast.ArrayType, got %T", stmt.Type)
+	}
+	if at.Size != 0 {
+		t.Errorf("expected size 0, got %d", at.Size)
+	}
+	_, ok = at.ElemType.(ast.IntegerType)
+	if !ok {
+		t.Fatalf("expected int element type, got %T", at.ElemType)
+	}
+}
+
+func TestParseListNoSpaceBeforeAssign(t *testing.T) {
+	input := "var a: list<int>=[1,2,3];"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	stmt, ok := program.Stmts[0].(*ast.VarDecl)
+	if !ok {
+		t.Fatalf("expected *ast.VarDecl, got %T", program.Stmts[0])
+	}
+	lt, ok := stmt.Type.(ast.ListType)
+	if !ok {
+		t.Fatalf("expected ast.ListType, got %T", stmt.Type)
+	}
+	_, ok = lt.ElemType.(ast.IntegerType)
+	if !ok {
+		t.Fatalf("expected int element type, got %T", lt.ElemType)
 	}
 }
 

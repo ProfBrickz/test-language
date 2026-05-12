@@ -243,12 +243,15 @@ func (p *Parser) parseArrayType() ast.ArrayType {
 	elemType := p.parseType()
 	elemType = forceTypeNotNullable(elemType)
 
+	if p.curToken.Type == lexer.TOK_GTE {
+		p.curToken = lexer.Token{Type: lexer.TOK_ASSIGN, Literal: "=", Line: p.curToken.Line}
+		return ast.ArrayType{ElemType: elemType, Size: size}
+	}
 	if p.curToken.Type != lexer.TOK_GT {
 		p.addError("expected '>' after array element type, got %s", p.curToken.Type)
 		return ast.ArrayType{ElemType: elemType, Size: size}
 	}
 	p.nextToken()
-
 	return ast.ArrayType{ElemType: elemType, Size: size}
 }
 
@@ -281,12 +284,16 @@ func (p *Parser) parseListType() ast.ListType {
 	elemType := p.parseType()
 	elemType = forceTypeNotNullable(elemType)
 
+	if p.curToken.Type == lexer.TOK_GTE {
+		p.curToken = lexer.Token{Type: lexer.TOK_ASSIGN, Literal: "=", Line: p.curToken.Line}
+		lt.ElemType = elemType
+		return lt
+	}
 	if p.curToken.Type != lexer.TOK_GT {
 		p.addError("expected '>' after list element type, got %s", p.curToken.Type)
 		return ast.ListType{ElemType: elemType, HasMin: lt.HasMin, MinSize: lt.MinSize, HasMax: lt.HasMax, MaxSize: lt.MaxSize}
 	}
 	p.nextToken()
-
 	lt.ElemType = elemType
 	return lt
 }
@@ -867,7 +874,7 @@ func (p *Parser) parsePostfix() ast.Expr {
 			p.nextToken()
 			if p.curToken.Type == lexer.TOK_LPAREN {
 				p.nextToken()
-				var args []ast.Expr
+				args := make([]ast.Expr, 0)
 				if p.curToken.Type != lexer.TOK_RPAREN {
 					args = append(args, p.parseExpr())
 					for p.curToken.Type == lexer.TOK_COMMA {

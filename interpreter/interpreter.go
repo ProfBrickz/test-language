@@ -169,14 +169,11 @@ func valueToTypeDesc(val Value) Value {
 	} else if val.IsFloat {
 		td.IsFloat = true
 		td.FType = val.FType
-		td.FType.Nullable = false
 	} else if val.IsBool {
 		td.IsBool = true
 		td.BType = val.BType
-		td.BType.Nullable = false
 	} else {
 		td.IType = val.IType
-		td.IType.Nullable = false
 	}
 	return td
 }
@@ -187,7 +184,7 @@ func (i *Interpreter) evalTypeMember(td Value, member string) (Value, error) {
 		case "size":
 			return Value{Data: int64(td.SType.Size)}, nil
 		default:
-			return Value{}, fmt.Errorf("type string has no member %q", member)
+			return Value{}, fmt.Errorf("type string has no attribute %q", member)
 		}
 	}
 	if td.IsArray {
@@ -196,12 +193,12 @@ func (i *Interpreter) evalTypeMember(td Value, member string) (Value, error) {
 			if at, ok := td.Type.(ast.ArrayType); ok {
 				return Value{Data: int64(at.Size)}, nil
 			}
-			return Value{}, fmt.Errorf("type has no member %q", member)
+			return Value{}, fmt.Errorf("type has no attribute %q", member)
 		case "size":
 			if at, ok := td.Type.(ast.ArrayType); ok {
 				return Value{Data: int64(at.Size)}, nil
 			}
-			return Value{}, fmt.Errorf("type has no member %q", member)
+			return Value{}, fmt.Errorf("type has no attribute %q", member)
 		case "elem_type":
 			if at, ok := td.Type.(ast.ArrayType); ok {
 				val := Value{IsType: true, Type: at.ElemType}
@@ -221,9 +218,9 @@ func (i *Interpreter) evalTypeMember(td Value, member string) (Value, error) {
 				}
 				return val, nil
 			}
-			return Value{}, fmt.Errorf("type has no member %q", member)
+			return Value{}, fmt.Errorf("type has no attribute %q", member)
 		default:
-			return Value{}, fmt.Errorf("type %s has no member %q", typeDescForVal(td), member)
+			return Value{}, fmt.Errorf("type %s has no attribute %q", typeDescForVal(td), member)
 		}
 	}
 	if td.IsFloat {
@@ -261,7 +258,7 @@ func (i *Interpreter) evalTypeMember(td Value, member string) (Value, error) {
 			return Value{IType: td.IType, Data: int64(td.IType.Size)}, nil
 		}
 	}
-	return Value{}, fmt.Errorf("type %s has no member %q", typeDescForVal(td), member)
+	return Value{}, fmt.Errorf("type %s has no attribute %q", typeDescForVal(td), member)
 }
 
 func (v Value) String() string {
@@ -348,34 +345,34 @@ func typeDescForType(t ast.Type) string {
 
 func typeDescFromVar(it ast.IntegerType, ft ast.FloatType, bt ast.BoolType, isFloat, isBool bool) string {
 	if isBool {
-		nullable := ""
+		nullability := "non-nullable "
 		if bt.Nullable {
-			nullable = "nullable "
+			nullability = "nullable "
 		}
-		return fmt.Sprintf("%sbool", nullable)
+		return fmt.Sprintf("%sbool", nullability)
 	}
 	if isFloat {
-		nullable := ""
-		if ft.Nullable {
-			nullable = "nullable "
-		}
 		if ft.Size == 0 {
 			return "untyped float literal"
 		}
-		return fmt.Sprintf("%s%d-bit float", nullable, ft.Size)
-	}
-	nullable := ""
-	if it.Nullable {
-		nullable = "nullable "
+		nullability := "non-nullable "
+		if ft.Nullable {
+			nullability = "nullable "
+		}
+		return fmt.Sprintf("%s%d-bit float", nullability, ft.Size)
 	}
 	if it.Size == 0 {
 		return "untyped int literal"
+	}
+	nullability := "non-nullable "
+	if it.Nullable {
+		nullability = "nullable "
 	}
 	sign := "signed"
 	if !it.Signed {
 		sign = "unsigned"
 	}
-	return fmt.Sprintf("%s%d-bit %s int", nullable, it.Size, sign)
+	return fmt.Sprintf("%s%d-bit %s int", nullability, it.Size, sign)
 }
 
 func typeDescForVal(v Value) string {
@@ -391,16 +388,16 @@ func typeDesc(t interface{}, isBool bool) string {
 		if typ.Nullable {
 			return "nullable bool"
 		}
-		return "bool"
+		return "non-nullable bool"
 	case ast.FloatType:
 		if typ.Size == 0 {
 			return "untyped float literal"
 		}
-		nullable := ""
+		nullability := "non-nullable "
 		if typ.Nullable {
-			nullable = "nullable "
+			nullability = "nullable "
 		}
-		return fmt.Sprintf("%s%d-bit float", nullable, typ.Size)
+		return fmt.Sprintf("%s%d-bit float", nullability, typ.Size)
 	case ast.IntegerType:
 		if typ.Size == 0 {
 			return "untyped int literal"
@@ -409,11 +406,11 @@ func typeDesc(t interface{}, isBool bool) string {
 		if !typ.Signed {
 			sign = "unsigned"
 		}
-		nullable := ""
+		nullability := "non-nullable "
 		if typ.Nullable {
-			nullable = "nullable "
+			nullability = "nullable "
 		}
-		return fmt.Sprintf("%s%d-bit %s int", nullable, typ.Size, sign)
+		return fmt.Sprintf("%s%d-bit %s int", nullability, typ.Size, sign)
 	}
 	return "unknown"
 }
@@ -711,21 +708,10 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 		if err != nil {
 			return err
 		}
-		if val.IsType {
-			fmt.Println(typeDescForVal(val))
-		} else if val.IsArray {
-			fmt.Println(val.String())
-		} else if val.IsString {
-			fmt.Println(val.StringData)
-		} else if val.Null {
-			fmt.Println("null")
-		} else if val.IsBool {
-			fmt.Println(val.BData)
-		} else if val.IsFloat {
-			fmt.Println(formatFloat(val.FData))
-		} else {
-			fmt.Println(intToStr(val.Data, val.IType, val.Untyped))
+		if !val.IsString {
+			return fmt.Errorf("print requires a string argument, got %s", typeDescForVal(val))
 		}
+		fmt.Println(val.StringData)
 	case *ast.ExprStmt:
 		_, err := i.evalExpr(s.Expr)
 		if err != nil {
@@ -951,7 +937,11 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 	}
 
 	if val.IsArray {
-		return fmt.Errorf("cannot use operator %s on array/list variable", stmt.Op)
+		typeName := "array"
+		if _, ok := val.Type.(ast.ListType); ok {
+			typeName = "list"
+		}
+		return fmt.Errorf("cannot use operator %s on %s variable", stmt.Op, typeName)
 	}
 
 	if stmt.Op == "=" {
@@ -1288,17 +1278,14 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 		val := Value{IsType: true}
 		switch t := e.Type.(type) {
 		case ast.FloatType:
-			t.Nullable = false
 			val.Type = t
 			val.IsFloat = true
 			val.FType = t
 		case ast.BoolType:
-			t.Nullable = false
 			val.Type = t
 			val.IsBool = true
 			val.BType = t
 		case ast.IntegerType:
-			t.Nullable = false
 			val.Type = t
 			val.IType = t
 		case ast.ArrayType:
@@ -1361,6 +1348,30 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 		if err != nil {
 			return Value{}, err
 		}
+		if e.Member == "toString" && e.Args != nil {
+			if len(e.Args) != 0 {
+				return Value{}, fmt.Errorf("toString takes no arguments")
+			}
+			if obj.IsType {
+				return Value{IsString: true, StringData: typeDescForVal(obj)}, nil
+			}
+			if obj.Null {
+				return Value{IsString: true, StringData: "null"}, nil
+			}
+			if obj.IsString {
+				return Value{IsString: true, StringData: obj.StringData}, nil
+			}
+			if obj.IsBool {
+				return Value{IsString: true, StringData: strconv.FormatBool(obj.BData)}, nil
+			}
+			if obj.IsFloat {
+				return Value{IsString: true, StringData: formatFloat(obj.FData)}, nil
+			}
+			if obj.IsArray {
+				return Value{IsString: true, StringData: obj.String()}, nil
+			}
+			return Value{IsString: true, StringData: intToStr(obj.Data, obj.IType, obj.Untyped)}, nil
+		}
 		if obj.IsType {
 			return i.evalTypeMember(obj, e.Member)
 		}
@@ -1394,7 +1405,7 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 			}
 			return result, nil
 		}
-		return Value{}, fmt.Errorf("value of type %s has no member %q", typeDescForVal(obj), e.Member)
+		return Value{}, fmt.Errorf("value of type %s has no attribute %q", typeDescForVal(obj), e.Member)
 	default:
 		return Value{}, fmt.Errorf("unknown expression type")
 	}
@@ -1467,7 +1478,11 @@ func (i *Interpreter) evalArrayMember(obj *Value, e *ast.MemberAccess) (Value, e
 		obj.ArrayData = newData
 		return removed, nil
 	default:
-		return Value{}, fmt.Errorf("array/list has no member %q", e.Member)
+		typeName := "array"
+		if _, ok := obj.Type.(ast.ListType); ok {
+			typeName = "list"
+		}
+		return Value{}, fmt.Errorf("%s has no attribute %q", typeName, e.Member)
 	}
 }
 
@@ -1564,7 +1579,7 @@ func (i *Interpreter) evalStringMember(obj *Value, e *ast.MemberAccess) (Value, 
 		obj.StringData = string(newRunes)
 		return Value{IsString: true, StringData: removed}, nil
 	default:
-		return Value{}, fmt.Errorf("string has no member %q", e.Member)
+		return Value{}, fmt.Errorf("string has no attribute %q", e.Member)
 	}
 }
 
