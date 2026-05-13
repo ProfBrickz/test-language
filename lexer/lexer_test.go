@@ -1029,3 +1029,25 @@ func TestCaseVariantFloatKeywords(t *testing.T) {
 		}
 	}
 }
+
+func TestRefCopyIsKeywords(t *testing.T) {
+	input := "ref copy is"
+	l := New(input)
+	tests := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{TOK_REF, "ref"},
+		{TOK_COPY, "copy"},
+		{TOK_IS, "is"},
+	}
+	for i, tt := range tests {
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("test[%d] - expected %s, got %s", i, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLiteral {
+			t.Errorf("test[%d] - expected literal %q, got %q", i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}

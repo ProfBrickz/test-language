@@ -140,6 +140,26 @@ type Assignment struct {
 	Index Expr
 	Op    string
 	Expr  Expr
+	IsRef bool
+}
+
+type RefDecl struct {
+	Name string
+	Type Type
+	Expr Expr
+}
+
+type CopyExpr struct {
+	Right Expr
+}
+
+type RefExpr struct {
+	Right Expr
+}
+
+type IsExpr struct {
+	Left  Expr
+	Right Expr
 }
 
 type PrintStmt struct {

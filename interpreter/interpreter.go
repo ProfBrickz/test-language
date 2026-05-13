@@ -578,31 +578,61 @@ func (s LoopSignal) Error() string {
 }
 
 type Environment struct {
-	variables map[string]Value
+	variables map[string]*Value
 	outer     *Environment
 }
 
 func NewEnv() *Environment {
-	return &Environment{variables: make(map[string]Value)}
+	return &Environment{variables: make(map[string]*Value)}
 }
 
 func NewEnclosedEnv(outer *Environment) *Environment {
-	return &Environment{variables: make(map[string]Value), outer: outer}
+	return &Environment{variables: make(map[string]*Value), outer: outer}
+}
+
+func (e *Environment) Define(name string, val Value) {
+	v := val
+	e.variables[name] = &v
+}
+
+func (e *Environment) DefineRef(name string, ptr *Value) {
+	e.variables[name] = ptr
 }
 
 func (e *Environment) Set(name string, val Value) {
-	e.variables[name] = val
+	env := e.LookupEnv(name)
+	if env != nil {
+		*env.variables[name] = val
+	}
+}
+
+func (e *Environment) Redirect(name string, ptr *Value) {
+	env := e.LookupEnv(name)
+	if env != nil {
+		env.variables[name] = ptr
+	}
 }
 
 func (e *Environment) Get(name string) (Value, bool) {
-	val, ok := e.variables[name]
+	ptr, ok := e.variables[name]
 	if ok {
-		return val, true
+		return *ptr, true
 	}
 	if e.outer != nil {
 		return e.outer.Get(name)
 	}
 	return Value{}, false
+}
+
+func (e *Environment) GetPtr(name string) *Value {
+	ptr, ok := e.variables[name]
+	if ok {
+		return ptr
+	}
+	if e.outer != nil {
+		return e.outer.GetPtr(name)
+	}
+	return nil
 }
 
 func (e *Environment) LookupEnv(name string) *Environment {
@@ -651,6 +681,8 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 	switch s := stmt.(type) {
 	case *ast.VarDecl:
 		return i.execVarDecl(s)
+	case *ast.RefDecl:
+		return i.execRefDecl(s)
 	case *ast.Assignment:
 		return i.executeAssignment(s)
 	case *ast.BlockStmt:
@@ -720,6 +752,48 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 	default:
 		return fmt.Errorf("unknown statement type")
 	}
+	return nil
+}
+
+func (i *Interpreter) execRefDecl(s *ast.RefDecl) error {
+	ref, ok := s.Expr.(*ast.VarRef)
+	if !ok {
+		return fmt.Errorf("ref declaration requires a variable reference")
+	}
+	bPtr := i.env.GetPtr(ref.Name)
+	if bPtr == nil {
+		return fmt.Errorf("undefined variable: %s", ref.Name)
+	}
+	if s.Type != nil {
+		bVal := *bPtr
+		switch st := s.Type.(type) {
+		case ast.IntegerType:
+			if bVal.IsFloat || bVal.IsBool || bVal.IsArray || bVal.IsString {
+				return fmt.Errorf("type mismatch: cannot reference %s as %s", typeDescForVal(bVal), typeDesc(st, false))
+			}
+		case ast.FloatType:
+			if !bVal.IsFloat || bVal.Untyped {
+				return fmt.Errorf("type mismatch: cannot reference %s as %s", typeDescForVal(bVal), typeDesc(st, false))
+			}
+		case ast.BoolType:
+			if !bVal.IsBool || bVal.Untyped {
+				return fmt.Errorf("type mismatch: cannot reference %s as %s", typeDescForVal(bVal), typeDesc(st, false))
+			}
+		case ast.ArrayType:
+			if !bVal.IsArray {
+				return fmt.Errorf("type mismatch: cannot reference %s as array type", typeDescForVal(bVal))
+			}
+		case ast.ListType:
+			if !bVal.IsArray {
+				return fmt.Errorf("type mismatch: cannot reference %s as list type", typeDescForVal(bVal))
+			}
+		case ast.StringType:
+			if !bVal.IsString {
+				return fmt.Errorf("type mismatch: cannot reference %s as string type", typeDescForVal(bVal))
+			}
+		}
+	}
+	i.env.DefineRef(s.Name, bPtr)
 	return nil
 }
 
@@ -798,7 +872,7 @@ func (i *Interpreter) execVarDecl(s *ast.VarDecl) error {
 	} else if (s.IsFloat && s.FType.Nullable) || (!s.IsFloat && s.IType.Nullable) {
 		val.Null = true
 	}
-	i.env.Set(s.Name, val)
+	i.env.Define(s.Name, val)
 	return nil
 }
 
@@ -820,7 +894,7 @@ func (i *Interpreter) execArrayDecl(s *ast.VarDecl, at ast.ArrayType) error {
 		}
 		at.Size = effectiveSize
 		rightVal.Type = at
-		i.env.Set(s.Name, rightVal)
+		i.env.Define(s.Name, rightVal)
 		return nil
 	}
 	data := make([]Value, at.Size)
@@ -828,7 +902,7 @@ func (i *Interpreter) execArrayDecl(s *ast.VarDecl, at ast.ArrayType) error {
 		data[idx] = Value{Data: 0, Untyped: true}
 	}
 	val := Value{Type: at, IsArray: true, ArrayData: data}
-	i.env.Set(s.Name, val)
+	i.env.Define(s.Name, val)
 	return nil
 }
 
@@ -848,14 +922,14 @@ func (i *Interpreter) execListDecl(s *ast.VarDecl, lt ast.ListType) error {
 			return fmt.Errorf("expected at most %d elements, got %d", lt.MaxSize, len(rightVal.ArrayData))
 		}
 		rightVal.Type = lt
-		i.env.Set(s.Name, rightVal)
+		i.env.Define(s.Name, rightVal)
 		return nil
 	}
 	if lt.HasMin && lt.MinSize > 0 {
 		return fmt.Errorf("list requires at least %d elements, but no initializer given", lt.MinSize)
 	}
 	val := Value{Type: lt, IsArray: true, ArrayData: []Value{}}
-	i.env.Set(s.Name, val)
+	i.env.Define(s.Name, val)
 	return nil
 }
 
@@ -880,25 +954,41 @@ func (i *Interpreter) execStringDecl(s *ast.VarDecl, st ast.StringType) error {
 		}
 		rightVal.Type = st
 		rightVal.SType = st
-		i.env.Set(s.Name, rightVal)
+		i.env.Define(s.Name, rightVal)
 		return nil
 	}
 	if st.Size > 0 {
 		val := Value{IsString: true, Type: st, SType: st, StringData: string(make([]byte, st.Size))}
-		i.env.Set(s.Name, val)
+		i.env.Define(s.Name, val)
 		return nil
 	}
 	if st.HasMin && st.MinSize > 0 {
 		return fmt.Errorf("string requires at least %d characters, but no initializer given", st.MinSize)
 	}
 	val := Value{IsString: true, Type: st, SType: st, StringData: ""}
-	i.env.Set(s.Name, val)
+	i.env.Define(s.Name, val)
 	return nil
 }
 
 func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 	if stmt.Index != nil {
+		if stmt.IsRef {
+			return fmt.Errorf("cannot use 'ref' with indexed assignment")
+		}
 		return i.executeIndexedAssign(stmt)
+	}
+
+	if stmt.IsRef {
+		ref, ok := stmt.Expr.(*ast.VarRef)
+		if !ok {
+			return fmt.Errorf("'ref' in assignment requires a variable reference")
+		}
+		bPtr := i.env.GetPtr(ref.Name)
+		if bPtr == nil {
+			return fmt.Errorf("undefined variable: %s", ref.Name)
+		}
+		i.env.Redirect(stmt.Name, bPtr)
+		return nil
 	}
 
 	env := i.env.LookupEnv(stmt.Name)
@@ -1270,6 +1360,34 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 		return val, nil
 	case *ast.BinaryExpr:
 		return i.evalBinary(e)
+	case *ast.CopyExpr:
+		val, err := i.evalExpr(e.Right)
+		if err != nil {
+			return Value{}, err
+		}
+		if val.IsArray {
+			newData := make([]Value, len(val.ArrayData))
+			copy(newData, val.ArrayData)
+			val.ArrayData = newData
+		}
+		return val, nil
+	case *ast.IsExpr:
+		_, err := i.evalExpr(e.Left)
+		if err != nil {
+			return Value{}, err
+		}
+		_, err = i.evalExpr(e.Right)
+		if err != nil {
+			return Value{}, err
+		}
+		var leftPtr, rightPtr *Value
+		if ref, ok := e.Left.(*ast.VarRef); ok {
+			leftPtr = i.env.GetPtr(ref.Name)
+		}
+		if ref, ok := e.Right.(*ast.VarRef); ok {
+			rightPtr = i.env.GetPtr(ref.Name)
+		}
+		return Value{Untyped: true, BData: leftPtr != nil && leftPtr == rightPtr, IsBool: true}, nil
 	case *ast.UnaryExpr:
 		return i.evalUnary(e)
 	case *ast.NullLit:
@@ -1382,10 +1500,7 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 			}
 			if e.Member == "add" || e.Member == "remove" {
 				if ref, ok := e.Object.(*ast.VarRef); ok {
-					env := i.env.LookupEnv(ref.Name)
-					if env != nil {
-						env.Set(ref.Name, obj)
-					}
+					i.env.Set(ref.Name, obj)
 				}
 			}
 			return result, nil
@@ -1397,10 +1512,7 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 			}
 			if e.Member == "add" || e.Member == "remove" {
 				if ref, ok := e.Object.(*ast.VarRef); ok {
-					env := i.env.LookupEnv(ref.Name)
-					if env != nil {
-						env.Set(ref.Name, obj)
-					}
+					i.env.Set(ref.Name, obj)
 				}
 			}
 			return result, nil

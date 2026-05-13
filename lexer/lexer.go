@@ -71,6 +71,10 @@ const (
 	TOK_BREAK TokenType = "BREAK"
 	TOK_SKIP  TokenType = "SKIP"
 
+	TOK_REF  TokenType = "REF"
+	TOK_COPY TokenType = "COPY"
+	TOK_IS   TokenType = "IS"
+
 	TOK_EOF TokenType = "EOF"
 )
 
@@ -456,6 +460,12 @@ func (l *Lexer) readIdentifier() Token {
 		return Token{TOK_MAX, word, l.line}
 	case "typeof":
 		return Token{TOK_TYPEOF, word, l.line}
+	case "ref":
+		return Token{TOK_REF, word, l.line}
+	case "copy":
+		return Token{TOK_COPY, word, l.line}
+	case "is":
+		return Token{TOK_IS, word, l.line}
 	case "string":
 		return Token{TOK_STRING, word, l.line}
 	case "NaN":

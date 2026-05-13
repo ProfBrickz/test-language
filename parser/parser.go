@@ -59,6 +59,8 @@ func (p *Parser) parseStmt() ast.Stmt {
 	switch p.curToken.Type {
 	case lexer.TOK_VAR:
 		return p.parseVarDecl()
+	case lexer.TOK_REF:
+		return p.parseRefDecl()
 	case lexer.TOK_PRINT:
 		return p.parsePrint()
 	case lexer.TOK_IDENT:
@@ -444,6 +446,42 @@ func (p *Parser) parseVarDecl() *ast.VarDecl {
 	return &ast.VarDecl{Name: name, Type: t, IType: iType, FType: fType, BType: bType, SType: sType, Expr: expr, IsFloat: isFloat, IsBool: isBool, IsString: isString}
 }
 
+func (p *Parser) parseRefDecl() *ast.RefDecl {
+	p.nextToken()
+	if p.curToken.Type != lexer.TOK_IDENT {
+		p.addError("expected variable name, got %s", p.curToken.Type)
+		return nil
+	}
+	name := p.curToken.Literal
+	p.nextToken()
+
+	var declType ast.Type
+	if p.curToken.Type == lexer.TOK_COLON {
+		p.nextToken()
+		declType = p.parseType()
+	}
+
+	if p.curToken.Type != lexer.TOK_ASSIGN {
+		p.addError("expected '=', got %s", p.curToken.Type)
+		return nil
+	}
+	p.nextToken()
+
+	expr := p.parseExpr()
+
+	if _, ok := expr.(*ast.VarRef); !ok {
+		p.addError("ref declaration requires a variable reference on the right side")
+		return nil
+	}
+
+	if p.curToken.Type != lexer.TOK_SEMICOLON {
+		p.addError("expected ';', got %s", p.curToken.Type)
+		return nil
+	}
+
+	return &ast.RefDecl{Name: name, Type: declType, Expr: expr}
+}
+
 func (p *Parser) parseAssignment() *ast.Assignment {
 	name := p.curToken.Literal
 
@@ -455,14 +493,29 @@ func (p *Parser) parseAssignment() *ast.Assignment {
 	op := p.curToken.Literal
 
 	p.nextToken()
-	expr := p.parseExpr()
+
+	isRef := false
+	var expr ast.Expr
+	if p.curToken.Type == lexer.TOK_REF && op == "=" {
+		isRef = true
+		p.nextToken()
+		if p.curToken.Type != lexer.TOK_IDENT {
+			p.addError("expected variable name after 'ref' in assignment")
+			return nil
+		}
+		tok := p.curToken
+		p.nextToken()
+		expr = &ast.VarRef{Name: tok.Literal}
+	} else {
+		expr = p.parseExpr()
+	}
 
 	if p.curToken.Type != lexer.TOK_SEMICOLON {
 		p.addError("expected ';', got %s", p.curToken.Type)
 		return nil
 	}
 
-	return &ast.Assignment{Name: name, Op: op, Expr: expr}
+	return &ast.Assignment{Name: name, Op: op, Expr: expr, IsRef: isRef}
 }
 
 func (p *Parser) parseIndexedAssign() *ast.Assignment {
@@ -598,6 +651,8 @@ func (p *Parser) parseFor() *ast.ForStmt {
 	if p.curToken.Type != lexer.TOK_SEMICOLON {
 		if p.curToken.Type == lexer.TOK_VAR {
 			init = p.parseVarDecl()
+		} else if p.curToken.Type == lexer.TOK_REF {
+			init = p.parseRefDecl()
 		} else if p.curToken.Type == lexer.TOK_IDENT {
 			init = p.parseAssignment()
 		} else {
@@ -769,11 +824,18 @@ func (p *Parser) parseAnd() ast.Expr {
 
 func (p *Parser) parseEquality() ast.Expr {
 	left := p.parseComparison()
-	for p.curToken.Type == lexer.TOK_EQ || p.curToken.Type == lexer.TOK_NOT_EQ {
-		op := p.curToken.Literal
-		p.nextToken()
-		right := p.parseComparison()
-		left = &ast.BinaryExpr{Left: left, Op: op, Right: right}
+	for p.curToken.Type == lexer.TOK_EQ || p.curToken.Type == lexer.TOK_NOT_EQ ||
+		p.curToken.Type == lexer.TOK_IS {
+		if p.curToken.Type == lexer.TOK_IS {
+			p.nextToken()
+			right := p.parseComparison()
+			left = &ast.IsExpr{Left: left, Right: right}
+		} else {
+			op := p.curToken.Literal
+			p.nextToken()
+			right := p.parseComparison()
+			left = &ast.BinaryExpr{Left: left, Op: op, Right: right}
+		}
 	}
 	return left
 }
@@ -847,6 +909,11 @@ func (p *Parser) parseUnary() ast.Expr {
 			p.addWarning("using null literal with boolean ! operator")
 		}
 		return &ast.UnaryExpr{Op: "!", Right: expr}
+	}
+	if p.curToken.Type == lexer.TOK_COPY {
+		p.nextToken()
+		expr := p.parseUnary()
+		return &ast.CopyExpr{Right: expr}
 	}
 	return p.parsePostfix()
 }

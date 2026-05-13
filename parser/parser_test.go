@@ -545,6 +545,197 @@ func TestParseAssignmentInvalidOp(t *testing.T) {
 	}
 }
 
+func TestParseRefDecl(t *testing.T) {
+	input := "ref a = b;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	stmt, ok := program.Stmts[0].(*ast.RefDecl)
+	if !ok {
+		t.Fatalf("expected *ast.RefDecl, got %T", program.Stmts[0])
+	}
+	if stmt.Name != "a" {
+		t.Errorf("expected name 'a', got %q", stmt.Name)
+	}
+	if stmt.Type != nil {
+		t.Errorf("expected nil type, got %T", stmt.Type)
+	}
+	varRef, ok := stmt.Expr.(*ast.VarRef)
+	if !ok {
+		t.Fatalf("expected *ast.VarRef, got %T", stmt.Expr)
+	}
+	if varRef.Name != "b" {
+		t.Errorf("expected VarRef 'b', got %q", varRef.Name)
+	}
+}
+
+func TestParseRefDeclWithType(t *testing.T) {
+	input := "ref a: int{size: 32, signed: true, nullable: false} = b;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	stmt, ok := program.Stmts[0].(*ast.RefDecl)
+	if !ok {
+		t.Fatalf("expected *ast.RefDecl, got %T", program.Stmts[0])
+	}
+	if stmt.Name != "a" {
+		t.Errorf("expected name 'a', got %q", stmt.Name)
+	}
+	if stmt.Type == nil {
+		t.Fatal("expected non-nil type")
+	}
+	it, ok := stmt.Type.(ast.IntegerType)
+	if !ok {
+		t.Fatalf("expected ast.IntegerType, got %T", stmt.Type)
+	}
+	if it.Size != 32 {
+		t.Errorf("expected size 32, got %d", it.Size)
+	}
+	if !it.Signed {
+		t.Errorf("expected signed true")
+	}
+	if it.Nullable {
+		t.Errorf("expected nullable false")
+	}
+}
+
+func TestParseRefDeclErrorNoName(t *testing.T) {
+	input := "ref = b;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing name")
+	}
+}
+
+func TestParseRefDeclErrorNoEq(t *testing.T) {
+	input := "ref a b;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '='")
+	}
+}
+
+func TestParseRefDeclErrorLiteral(t *testing.T) {
+	input := "ref a = 5;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected parse error for ref with literal")
+	}
+}
+
+func TestParseRefDeclErrorNoSemicolon(t *testing.T) {
+	input := "ref a = b"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ';'")
+	}
+}
+
+func TestParseAssignmentWithRef(t *testing.T) {
+	input := "a = ref b;"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	stmt, ok := program.Stmts[0].(*ast.Assignment)
+	if !ok {
+		t.Fatalf("expected *ast.Assignment, got %T", program.Stmts[0])
+	}
+	if stmt.Name != "a" {
+		t.Errorf("expected name 'a', got %q", stmt.Name)
+	}
+	if stmt.Op != "=" {
+		t.Errorf("expected op '=', got %q", stmt.Op)
+	}
+	if !stmt.IsRef {
+		t.Errorf("expected IsRef to be true")
+	}
+	varRef, ok := stmt.Expr.(*ast.VarRef)
+	if !ok {
+		t.Fatalf("expected *ast.VarRef, got %T", stmt.Expr)
+	}
+	if varRef.Name != "b" {
+		t.Errorf("expected VarRef 'b', got %q", varRef.Name)
+	}
+}
+
+func TestParseAssignmentRefErrorNoName(t *testing.T) {
+	input := "a = ref ;"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing name after ref")
+	}
+}
+
+func TestParseIsExpr(t *testing.T) {
+	input := "print(a is b);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	ise, ok := stmt.Expr.(*ast.IsExpr)
+	if !ok {
+		t.Fatalf("expected *ast.IsExpr, got %T", stmt.Expr)
+	}
+	left, ok := ise.Left.(*ast.VarRef)
+	if !ok || left.Name != "a" {
+		t.Errorf("expected left VarRef 'a', got %T %+v", ise.Left, ise.Left)
+	}
+	right, ok := ise.Right.(*ast.VarRef)
+	if !ok || right.Name != "b" {
+		t.Errorf("expected right VarRef 'b', got %T %+v", ise.Right, ise.Right)
+	}
+}
+
+func TestParseCopyExpr(t *testing.T) {
+	input := "print(copy a);"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	stmt := program.Stmts[0].(*ast.PrintStmt)
+	ce, ok := stmt.Expr.(*ast.CopyExpr)
+	if !ok {
+		t.Fatalf("expected *ast.CopyExpr, got %T", stmt.Expr)
+	}
+	varRef, ok := ce.Right.(*ast.VarRef)
+	if !ok || varRef.Name != "a" {
+		t.Errorf("expected VarRef 'a', got %T %+v", ce.Right, ce.Right)
+	}
+}
+
 func TestParsePrintComplexExpr(t *testing.T) {
 	input := "print(1 + 2 * 3 - 4 / 2);"
 	l := lexer.New(input)
@@ -3068,6 +3259,47 @@ func TestParseIncDecInForInit(t *testing.T) {
 	p.ParseProgram()
 	if len(p.Errors()) == 0 {
 		t.Errorf("expected error for inc/dec in for init")
+	}
+}
+
+func TestParseForWithRefInit(t *testing.T) {
+	input := "for (ref x = y; x; ) { print(x); }"
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	forStmt, ok := program.Stmts[0].(*ast.ForStmt)
+	if !ok {
+		t.Fatalf("expected *ast.ForStmt, got %T", program.Stmts[0])
+	}
+	refDecl, ok := forStmt.Init.(*ast.RefDecl)
+	if !ok {
+		t.Fatalf("expected *ast.RefDecl as init, got %T", forStmt.Init)
+	}
+	if refDecl.Name != "x" {
+		t.Errorf("expected ref name 'x', got %q", refDecl.Name)
+	}
+	varRef, ok := refDecl.Expr.(*ast.VarRef)
+	if !ok || varRef.Name != "y" {
+		t.Errorf("expected VarRef 'y', got %T %+v", refDecl.Expr, refDecl.Expr)
+	}
+	if forStmt.Condition == nil {
+		t.Fatal("expected condition, got nil")
+	}
+	condRef, ok := forStmt.Condition.(*ast.VarRef)
+	if !ok || condRef.Name != "x" {
+		t.Errorf("expected condition VarRef 'x', got %T %+v", forStmt.Condition, forStmt.Condition)
+	}
+	if forStmt.Update != nil {
+		t.Errorf("expected nil update, got %T", forStmt.Update)
+	}
+	if forStmt.Body == nil || len(forStmt.Body.Stmts) != 1 {
+		t.Fatalf("expected body with 1 statement")
 	}
 }
 

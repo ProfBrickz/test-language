@@ -627,7 +627,7 @@ print((x).toString());
 
 func TestEvalExprVarRef(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 42})
+	i.env.Define("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 42})
 
 	expr := &ast.VarRef{Name: "x"}
 	val, err := i.evalExpr(expr)
@@ -883,7 +883,7 @@ func TestExecuteVarDeclWithTypeMismatch(t *testing.T) {
 
 func TestExecuteVarDeclWithVarRefAndTypeMismatch(t *testing.T) {
 	i := New()
-	i.env.Set("y", Value{IType: ast.IntegerType{Size: 16, Signed: true}, Data: 200})
+	i.env.Define("y", Value{IType: ast.IntegerType{Size: 16, Signed: true}, Data: 200})
 	stmt := &ast.VarDecl{
 		Name:  "x",
 		IType: ast.IntegerType{Size: 8, Signed: true, Nullable: false},
@@ -1086,7 +1086,7 @@ func TestExecuteVarDeclWithExprError(t *testing.T) {
 
 func TestExecuteAssignmentWithExprError(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 10})
+	i.env.Define("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 10})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "=",
@@ -1935,7 +1935,7 @@ func TestCanImplicitConvertNonNullableFloatToNullableFloat(t *testing.T) {
 func TestEnvironmentNewAndSetGet(t *testing.T) {
 	env := NewEnv()
 	val := Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 42}
-	env.Set("x", val)
+	env.Define("x", val)
 
 	got, ok := env.Get("x")
 	if !ok {
@@ -2017,7 +2017,7 @@ func TestExecuteStmtNullableWithoutExpr(t *testing.T) {
 
 func TestExecuteAssignmentWithNullToNullable(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{IType: ast.IntegerType{Size: 32, Signed: true, Nullable: true}, Data: 10})
+	i.env.Define("x", Value{IType: ast.IntegerType{Size: 32, Signed: true, Nullable: true}, Data: 10})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "=",
@@ -2079,7 +2079,7 @@ func TestExecuteAssignmentNoOp(t *testing.T) {
 		Op:   "?",
 		Expr: &ast.IntegerLit{Value: 5},
 	}
-	i.env.Set("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 10})
+	i.env.Define("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 10})
 	err := i.executeAssignment(stmt)
 	if err == nil {
 		t.Errorf("expected error for unknown operator")
@@ -2096,7 +2096,7 @@ func TestStringNonNullableFloat(t *testing.T) {
 
 func TestExecuteAssignmentFloatAdd(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "+=",
@@ -2114,7 +2114,7 @@ func TestExecuteAssignmentFloatAdd(t *testing.T) {
 
 func TestExecuteAssignmentFloatSub(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 5.5, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 5.5, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "-=",
@@ -2132,7 +2132,7 @@ func TestExecuteAssignmentFloatSub(t *testing.T) {
 
 func TestExecuteAssignmentFloatMul(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 2.0, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 2.0, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "*=",
@@ -2150,7 +2150,7 @@ func TestExecuteAssignmentFloatMul(t *testing.T) {
 
 func TestExecuteAssignmentFloatDiv(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 10.0, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 10.0, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "/=",
@@ -2224,7 +2224,7 @@ func TestVarDeclWithFloatTypeMismatch(t *testing.T) {
 
 func TestExecuteAssignmentIntToFloatAdd(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "+=",
@@ -2242,7 +2242,7 @@ func TestExecuteAssignmentIntToFloatAdd(t *testing.T) {
 
 func TestExecuteAssignmentIntToFloatSub(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 5.5, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 5.5, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "-=",
@@ -2260,7 +2260,7 @@ func TestExecuteAssignmentIntToFloatSub(t *testing.T) {
 
 func TestExecuteAssignmentIntToFloatMul(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 2.0, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 2.0, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "*=",
@@ -2278,7 +2278,7 @@ func TestExecuteAssignmentIntToFloatMul(t *testing.T) {
 
 func TestExecuteAssignmentIntToFloatDiv(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 10.0, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 10.0, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "/=",
@@ -2296,7 +2296,7 @@ func TestExecuteAssignmentIntToFloatDiv(t *testing.T) {
 
 func TestExecuteAssignmentFloatUnknownOp(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "%",
@@ -2438,7 +2438,7 @@ func TestVarDeclIntToFloatTypeMismatch(t *testing.T) {
 
 func TestExecuteAssignmentIntToFloatEq(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "=",
@@ -2456,7 +2456,7 @@ func TestExecuteAssignmentIntToFloatEq(t *testing.T) {
 
 func TestExecuteAssignmentIntToFloatAddEq(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "+=",
@@ -2474,7 +2474,7 @@ func TestExecuteAssignmentIntToFloatAddEq(t *testing.T) {
 
 func TestExecuteAssignmentIntToFloatSubEq(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 5.5, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 5.5, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "-=",
@@ -2492,7 +2492,7 @@ func TestExecuteAssignmentIntToFloatSubEq(t *testing.T) {
 
 func TestExecuteAssignmentIntToFloatMulEq(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 2.0, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 2.0, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "*=",
@@ -2510,7 +2510,7 @@ func TestExecuteAssignmentIntToFloatMulEq(t *testing.T) {
 
 func TestExecuteAssignmentIntToFloatDivEq(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 10.0, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 10.0, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "/=",
@@ -2528,7 +2528,7 @@ func TestExecuteAssignmentIntToFloatDivEq(t *testing.T) {
 
 func TestExecuteAssignmentFloatDivByZero(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 10.0, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 10.0, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "/=",
@@ -2546,7 +2546,7 @@ func TestExecuteAssignmentFloatDivByZero(t *testing.T) {
 
 func TestExecuteAssignmentFloatDefaultOp(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "%",
@@ -2629,7 +2629,7 @@ func TestVarDeclRightValUntypedIntToFloat(t *testing.T) {
 
 func TestExecuteAssignmentDivByZeroInt(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 10.0, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 10.0, IsFloat: true})
 	// rightVal is integer with Data=0
 	stmt := &ast.Assignment{
 		Name: "x",
@@ -2678,7 +2678,7 @@ func TestVarDeclFloatToFloatOverflow(t *testing.T) {
 
 func TestExecuteAssignmentIntToFloatTypeMismatch(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, IsFloat: true})
 	// Integer that cannot convert to float
 	stmt := &ast.Assignment{
 		Name: "x",
@@ -2693,7 +2693,7 @@ func TestExecuteAssignmentIntToFloatTypeMismatch(t *testing.T) {
 
 func TestExecuteAssignmentFloatToFloatOverflow(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 16}, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 16}, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "=",
@@ -2711,7 +2711,7 @@ func TestExecuteAssignmentFloatToFloatOverflow(t *testing.T) {
 
 func TestExecuteAssignmentFloatAddOverflow(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 16}, FData: 60000.0, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 16}, FData: 60000.0, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "+=",
@@ -2725,7 +2725,7 @@ func TestExecuteAssignmentFloatAddOverflow(t *testing.T) {
 
 func TestExecuteAssignmentFloatDivOverflow(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 16}, FData: 60000.0, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 16}, FData: 60000.0, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "/=",
@@ -2739,7 +2739,7 @@ func TestExecuteAssignmentFloatDivOverflow(t *testing.T) {
 
 func TestExecuteAssignmentFloatToIntError(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, IsFloat: false})
+	i.env.Define("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, IsFloat: false})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "=",
@@ -2769,7 +2769,7 @@ func TestVarDeclFloatOverflowCheck(t *testing.T) {
 func TestExecuteAssignmentFloatEqOverflow(t *testing.T) {
 	i := New()
 	// Assign float value that overflows target type
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 16}, FData: 100.0, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 16}, FData: 100.0, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "=",
@@ -2815,7 +2815,7 @@ func TestVarDeclFloatOverflowCoverage(t *testing.T) {
 // Test for executeAssignment - default operator case (line 329-330)
 func TestExecuteAssignmentDefaultOpCoverage(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.5, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "%", // unknown operator
@@ -2829,7 +2829,7 @@ func TestExecuteAssignmentDefaultOpCoverage(t *testing.T) {
 
 func TestExecuteAssignmentFloatEqOverflowCoverage(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 16}, FData: 1.0, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 16}, FData: 1.0, IsFloat: true})
 	// rightVal is float32 with value 70000, result overflows float16
 	stmt := &ast.Assignment{
 		Name: "x",
@@ -2844,7 +2844,7 @@ func TestExecuteAssignmentFloatEqOverflowCoverage(t *testing.T) {
 
 func TestExecuteAssignmentFloatOverflowCoverage(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 16}, FData: 1.0, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 16}, FData: 1.0, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "=",
@@ -3205,7 +3205,7 @@ func TestExecuteStmtTypedFloatMismatch(t *testing.T) {
 
 func TestExecuteAssignmentUnknownOpIntToFloat(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.0, IsFloat: true})
+	i.env.Define("x", Value{FType: ast.FloatType{Size: 32}, FData: 1.0, IsFloat: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "%=",
@@ -3652,7 +3652,7 @@ func TestExecuteStmtBoolToIntegerError(t *testing.T) {
 
 func TestExecuteAssignmentBoolDefaultOp(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{BType: ast.BoolType{Nullable: false}, BData: true, IsBool: true})
+	i.env.Define("x", Value{BType: ast.BoolType{Nullable: false}, BData: true, IsBool: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "%=",
@@ -3666,7 +3666,7 @@ func TestExecuteAssignmentBoolDefaultOp(t *testing.T) {
 
 func TestExecuteAssignmentBoolTypeMismatch(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{BType: ast.BoolType{Nullable: false}, BData: true, IsBool: true})
+	i.env.Define("x", Value{BType: ast.BoolType{Nullable: false}, BData: true, IsBool: true})
 	stmt := &ast.Assignment{
 		Name: "x",
 		Op:   "=",
@@ -4753,7 +4753,7 @@ func TestTypeMemberError(t *testing.T) {
 
 func TestValueMemberError(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{Untyped: true, Data: 42})
+	i.env.Define("x", Value{Untyped: true, Data: 42})
 	expr := &ast.MemberAccess{
 		Object: &ast.VarRef{Name: "x"},
 		Member: "foo",
@@ -5458,8 +5458,8 @@ func TestGteFloatEqual(t *testing.T) {
 
 func TestTypedInt64EqFloat64Error(t *testing.T) {
 	i := New()
-	i.env.Set("a", Value{IType: ast.IntegerType{Size: 64, Signed: true}, Data: 5})
-	i.env.Set("b", Value{FType: ast.FloatType{Size: 64}, FData: 5.0, IsFloat: true})
+	i.env.Define("a", Value{IType: ast.IntegerType{Size: 64, Signed: true}, Data: 5})
+	i.env.Define("b", Value{FType: ast.FloatType{Size: 64}, FData: 5.0, IsFloat: true})
 	expr := &ast.BinaryExpr{
 		Left:  &ast.VarRef{Name: "a"},
 		Op:    "==",
@@ -5473,8 +5473,8 @@ func TestTypedInt64EqFloat64Error(t *testing.T) {
 
 func TestTypedInt32EqFloat64(t *testing.T) {
 	i := New()
-	i.env.Set("a", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 5})
-	i.env.Set("b", Value{FType: ast.FloatType{Size: 64}, FData: 5.0, IsFloat: true})
+	i.env.Define("a", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 5})
+	i.env.Define("b", Value{FType: ast.FloatType{Size: 64}, FData: 5.0, IsFloat: true})
 	expr := &ast.BinaryExpr{
 		Left:  &ast.VarRef{Name: "a"},
 		Op:    "==",
@@ -5507,8 +5507,8 @@ func TestUntypedIntEqFloat(t *testing.T) {
 
 func TestTypedInt64LtFloat64Error(t *testing.T) {
 	i := New()
-	i.env.Set("a", Value{IType: ast.IntegerType{Size: 64, Signed: true}, Data: 5})
-	i.env.Set("b", Value{FType: ast.FloatType{Size: 64}, FData: 10.0, IsFloat: true})
+	i.env.Define("a", Value{IType: ast.IntegerType{Size: 64, Signed: true}, Data: 5})
+	i.env.Define("b", Value{FType: ast.FloatType{Size: 64}, FData: 10.0, IsFloat: true})
 	expr := &ast.BinaryExpr{
 		Left:  &ast.VarRef{Name: "a"},
 		Op:    "<",
@@ -5522,8 +5522,8 @@ func TestTypedInt64LtFloat64Error(t *testing.T) {
 
 func TestBoolEqIntError(t *testing.T) {
 	i := New()
-	i.env.Set("a", Value{Untyped: true, BData: true, IsBool: true})
-	i.env.Set("b", Value{Untyped: true, Data: 1})
+	i.env.Define("a", Value{Untyped: true, BData: true, IsBool: true})
+	i.env.Define("b", Value{Untyped: true, Data: 1})
 	expr := &ast.BinaryExpr{
 		Left:  &ast.VarRef{Name: "a"},
 		Op:    "==",
@@ -6329,7 +6329,7 @@ if (true) {
 
 func TestExecElseUnexpectedType(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 1})
+	i.env.Define("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 1})
 	stmt := &ast.IfStmt{
 		Condition: &ast.BoolLit{Value: false, Untyped: true},
 		Then:      &ast.BlockStmt{},
@@ -8551,7 +8551,7 @@ func TestListTypeDisplay(t *testing.T) {
 
 func TestArrayMemberNotFound(t *testing.T) {
 	i := New()
-	i.env.Set("a", Value{
+	i.env.Define("a", Value{
 		IsArray:   true,
 		ArrayData: []Value{{Data: 1}},
 	})
@@ -8991,7 +8991,7 @@ a[0] += 1;
 
 func TestExecuteIndexedAssignNullIndex(t *testing.T) {
 	i := New()
-	i.env.Set("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
+	i.env.Define("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
 	err := i.ExecuteStmt(&ast.Assignment{
 		Name:  "a",
 		Index: &ast.NullLit{},
@@ -9005,7 +9005,7 @@ func TestExecuteIndexedAssignNullIndex(t *testing.T) {
 
 func TestExecuteIndexedAssignOutOfBounds(t *testing.T) {
 	i := New()
-	i.env.Set("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
+	i.env.Define("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
 	err := i.ExecuteStmt(&ast.Assignment{
 		Name:  "a",
 		Index: &ast.IntegerLit{Value: 5, Untyped: true},
@@ -9019,7 +9019,7 @@ func TestExecuteIndexedAssignOutOfBounds(t *testing.T) {
 
 func TestExecuteIndexedAssignExprError(t *testing.T) {
 	i := New()
-	i.env.Set("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
+	i.env.Define("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
 	err := i.ExecuteStmt(&ast.Assignment{
 		Name:  "a",
 		Index: &ast.IntegerLit{Value: 0, Untyped: true},
@@ -9043,7 +9043,7 @@ func TestEvalExprArrayLitError(t *testing.T) {
 
 func TestEvalExprIndexExprNonArray(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{Data: 42, Untyped: true})
+	i.env.Define("x", Value{Data: 42, Untyped: true})
 	_, err := i.evalExpr(&ast.IndexExpr{
 		Object: &ast.VarRef{Name: "x"},
 		Index:  &ast.IntegerLit{Value: 0, Untyped: true},
@@ -9055,7 +9055,7 @@ func TestEvalExprIndexExprNonArray(t *testing.T) {
 
 func TestEvalExprIndexExprNullIndex(t *testing.T) {
 	i := New()
-	i.env.Set("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
+	i.env.Define("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
 	_, err := i.evalExpr(&ast.IndexExpr{
 		Object: &ast.VarRef{Name: "a"},
 		Index:  &ast.NullLit{},
@@ -9067,7 +9067,7 @@ func TestEvalExprIndexExprNullIndex(t *testing.T) {
 
 func TestEvalExprIndexExprOutOfBounds(t *testing.T) {
 	i := New()
-	i.env.Set("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
+	i.env.Define("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
 	_, err := i.evalExpr(&ast.IndexExpr{
 		Object: &ast.VarRef{Name: "a"},
 		Index:  &ast.IntegerLit{Value: 5, Untyped: true},
@@ -9090,7 +9090,7 @@ func TestEvalExprIndexExprEvalObjectError(t *testing.T) {
 
 func TestEvalExprIndexExprEvalIndexError(t *testing.T) {
 	i := New()
-	i.env.Set("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
+	i.env.Define("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
 	_, err := i.evalExpr(&ast.IndexExpr{
 		Object: &ast.VarRef{Name: "a"},
 		Index:  &ast.VarRef{Name: "undefined"},
@@ -9273,7 +9273,7 @@ func TestEvalTypeMemberBoolNotFound(t *testing.T) {
 
 func TestEvalMemberAccessNonArrayNonType(t *testing.T) {
 	i := New()
-	i.env.Set("x", Value{Data: 42, Untyped: true})
+	i.env.Define("x", Value{Data: 42, Untyped: true})
 	_, err := i.evalExpr(&ast.MemberAccess{
 		Object: &ast.VarRef{Name: "x"},
 		Member: "foo",
@@ -9307,7 +9307,7 @@ func TestEvalArrayMemberListRemoveBelowMin(t *testing.T) {
 
 func TestExecuteIndexedAssignIndexEvalError(t *testing.T) {
 	i := New()
-	i.env.Set("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
+	i.env.Define("a", Value{IsArray: true, ArrayData: []Value{{Data: 1, Untyped: true}}})
 	err := i.ExecuteStmt(&ast.Assignment{
 		Name:  "a",
 		Index: &ast.VarRef{Name: "undefined"},
@@ -10205,7 +10205,7 @@ func TestExecStringDeclSuccess(t *testing.T) {
 func TestExecuteAssignmentStringOpNotEqualError(t *testing.T) {
 	i := New()
 	env := NewEnv()
-	env.Set("s", Value{IsString: true, StringData: "hello"})
+	env.Define("s", Value{IsString: true, StringData: "hello"})
 	i.env = env
 	stmt := &ast.Assignment{
 		Name: "s",
@@ -10221,7 +10221,7 @@ func TestExecuteAssignmentStringOpNotEqualError(t *testing.T) {
 func TestExecuteAssignmentStringWrongTypeError(t *testing.T) {
 	i := New()
 	env := NewEnv()
-	env.Set("s", Value{IsString: true, StringData: "hello", Type: ast.StringType{}, SType: ast.StringType{}})
+	env.Define("s", Value{IsString: true, StringData: "hello", Type: ast.StringType{}, SType: ast.StringType{}})
 	i.env = env
 	stmt := &ast.Assignment{
 		Name: "s",
@@ -10237,7 +10237,7 @@ func TestExecuteAssignmentStringWrongTypeError(t *testing.T) {
 func TestExecuteAssignmentStringSizeMismatchError(t *testing.T) {
 	i := New()
 	env := NewEnv()
-	env.Set("s", Value{
+	env.Define("s", Value{
 		IsString: true, StringData: "hello",
 		Type: ast.StringType{Size: 5}, SType: ast.StringType{Size: 5},
 	})
@@ -10256,7 +10256,7 @@ func TestExecuteAssignmentStringSizeMismatchError(t *testing.T) {
 func TestExecuteAssignmentStringHasMinError(t *testing.T) {
 	i := New()
 	env := NewEnv()
-	env.Set("s", Value{
+	env.Define("s", Value{
 		IsString: true, StringData: "hello",
 		Type: ast.StringType{HasMin: true, MinSize: 3}, SType: ast.StringType{HasMin: true, MinSize: 3},
 	})
@@ -10275,7 +10275,7 @@ func TestExecuteAssignmentStringHasMinError(t *testing.T) {
 func TestExecuteAssignmentStringHasMaxError(t *testing.T) {
 	i := New()
 	env := NewEnv()
-	env.Set("s", Value{
+	env.Define("s", Value{
 		IsString: true, StringData: "hi",
 		Type: ast.StringType{HasMax: true, MaxSize: 2}, SType: ast.StringType{HasMax: true, MaxSize: 2},
 	})
@@ -10294,7 +10294,7 @@ func TestExecuteAssignmentStringHasMaxError(t *testing.T) {
 func TestExecuteAssignmentStringSuccess(t *testing.T) {
 	i := New()
 	env := NewEnv()
-	env.Set("s", Value{IsString: true, StringData: "hello", Type: ast.StringType{}, SType: ast.StringType{}})
+	env.Define("s", Value{IsString: true, StringData: "hello", Type: ast.StringType{}, SType: ast.StringType{}})
 	i.env = env
 	stmt := &ast.Assignment{
 		Name: "s",
@@ -10314,7 +10314,7 @@ func TestExecuteAssignmentStringSuccess(t *testing.T) {
 func TestExecuteAssignmentStringEvalExprError(t *testing.T) {
 	i := New()
 	env := NewEnv()
-	env.Set("s", Value{IsString: true, StringData: "hello", Type: ast.StringType{}, SType: ast.StringType{}})
+	env.Define("s", Value{IsString: true, StringData: "hello", Type: ast.StringType{}, SType: ast.StringType{}})
 	i.env = env
 	stmt := &ast.Assignment{
 		Name: "s",
@@ -10330,7 +10330,7 @@ func TestExecuteAssignmentStringEvalExprError(t *testing.T) {
 func TestExecuteIndexedAssignStringOpNotEqualError(t *testing.T) {
 	i := New()
 	env := NewEnv()
-	env.Set("s", Value{IsString: true, StringData: "hello"})
+	env.Define("s", Value{IsString: true, StringData: "hello"})
 	i.env = env
 	stmt := &ast.Assignment{
 		Name:  "s",
@@ -10347,7 +10347,7 @@ func TestExecuteIndexedAssignStringOpNotEqualError(t *testing.T) {
 func TestExecuteIndexedAssignStringIndexEvalError(t *testing.T) {
 	i := New()
 	env := NewEnv()
-	env.Set("s", Value{IsString: true, StringData: "hello"})
+	env.Define("s", Value{IsString: true, StringData: "hello"})
 	i.env = env
 	stmt := &ast.Assignment{
 		Name:  "s",
@@ -10364,7 +10364,7 @@ func TestExecuteIndexedAssignStringIndexEvalError(t *testing.T) {
 func TestExecuteIndexedAssignStringNullIndexError(t *testing.T) {
 	i := New()
 	env := NewEnv()
-	env.Set("s", Value{IsString: true, StringData: "hello"})
+	env.Define("s", Value{IsString: true, StringData: "hello"})
 	i.env = env
 	stmt := &ast.Assignment{
 		Name:  "s",
@@ -10381,7 +10381,7 @@ func TestExecuteIndexedAssignStringNullIndexError(t *testing.T) {
 func TestExecuteIndexedAssignStringOutOfBoundsError(t *testing.T) {
 	i := New()
 	env := NewEnv()
-	env.Set("s", Value{IsString: true, StringData: "hello"})
+	env.Define("s", Value{IsString: true, StringData: "hello"})
 	i.env = env
 	stmt := &ast.Assignment{
 		Name:  "s",
@@ -10398,7 +10398,7 @@ func TestExecuteIndexedAssignStringOutOfBoundsError(t *testing.T) {
 func TestExecuteIndexedAssignStringRightValEvalError(t *testing.T) {
 	i := New()
 	env := NewEnv()
-	env.Set("s", Value{IsString: true, StringData: "hello"})
+	env.Define("s", Value{IsString: true, StringData: "hello"})
 	i.env = env
 	stmt := &ast.Assignment{
 		Name:  "s",
@@ -10415,7 +10415,7 @@ func TestExecuteIndexedAssignStringRightValEvalError(t *testing.T) {
 func TestExecuteIndexedAssignStringNotSingleCharError(t *testing.T) {
 	i := New()
 	env := NewEnv()
-	env.Set("s", Value{IsString: true, StringData: "hello"})
+	env.Define("s", Value{IsString: true, StringData: "hello"})
 	i.env = env
 	stmt := &ast.Assignment{
 		Name:  "s",
@@ -10432,7 +10432,7 @@ func TestExecuteIndexedAssignStringNotSingleCharError(t *testing.T) {
 func TestExecuteIndexedAssignStringSuccess(t *testing.T) {
 	i := New()
 	env := NewEnv()
-	env.Set("s", Value{IsString: true, StringData: "hello"})
+	env.Define("s", Value{IsString: true, StringData: "hello"})
 	i.env = env
 	stmt := &ast.Assignment{
 		Name:  "s",
@@ -10762,7 +10762,7 @@ func TestEvalBinaryStringConcatTypeMismatchError(t *testing.T) {
 func TestEvalStringMemberAddSuccessVarRef(t *testing.T) {
 	i := New()
 	env := NewEnv()
-	env.Set("s", Value{IsString: true, StringData: "hello"})
+	env.Define("s", Value{IsString: true, StringData: "hello"})
 	i.env = env
 	expr := &ast.MemberAccess{
 		Object: &ast.VarRef{Name: "s"},
@@ -10785,7 +10785,7 @@ func TestEvalStringMemberAddSuccessVarRef(t *testing.T) {
 func TestEvalStringMemberRemoveSuccessVarRef(t *testing.T) {
 	i := New()
 	env := NewEnv()
-	env.Set("s", Value{IsString: true, StringData: "hello"})
+	env.Define("s", Value{IsString: true, StringData: "hello"})
 	i.env = env
 	expr := &ast.MemberAccess{
 		Object: &ast.VarRef{Name: "s"},
@@ -11204,5 +11204,654 @@ print((x).toString());
 	})
 	if output != "true" {
 		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+func TestRefDeclPrimitiveShared(t *testing.T) {
+	input := `var b: int = 42; ref a = b; a = 10; print((b).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "10" {
+		t.Errorf("expected '10', got %q", output)
+	}
+}
+
+func TestRefDeclPrimitiveIs(t *testing.T) {
+	input := `var b: int = 42; ref a = b; print((a is b).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true" {
+		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+func TestVarDeclPrimitiveIsIndependent(t *testing.T) {
+	input := `var b: int = 42; var a: int = b; print((a is b).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "false" {
+		t.Errorf("expected 'false', got %q", output)
+	}
+}
+
+func TestRefDeclArrayShared(t *testing.T) {
+	input := `var b: array<int> = [1, 2, 3]; ref a = b; a.add(4); print((b.length).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "4" {
+		t.Errorf("expected '4', got %q", output)
+	}
+}
+
+func TestRefDeclArrayIs(t *testing.T) {
+	input := `var b: array<int> = [1, 2, 3]; ref a = b; print((a is b).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true" {
+		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+func TestCopyExprArraySameValues(t *testing.T) {
+	input := `var b: array<int> = [1, 2, 3]; var a: array<int> = copy b; print((a[1]).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "2" {
+		t.Errorf("expected '2', got %q", output)
+	}
+}
+
+func TestCopyExprArrayNewOuter(t *testing.T) {
+	input := `var b: array<array{size: 2}<int>> = [[1, 2], [3, 4]]; var a: array<array{size: 2}<int>> = copy b; print((a is b).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "false" {
+		t.Errorf("expected 'false' (copy creates new outer array), got %q", output)
+	}
+}
+
+func TestCopyExprPrimitive(t *testing.T) {
+	input := `var b: int = 42; var a: int = copy b; print((a is b).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "false" {
+		t.Errorf("expected 'false' (copy of primitive creates independent value), got %q", output)
+	}
+}
+
+func TestIsOperatorSameVar(t *testing.T) {
+	input := `var a: int = 42; print((a is a).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true" {
+		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+func TestIsOperatorDifferentVars(t *testing.T) {
+	input := `var a: int = 42; var b: int = 42; print((a is b).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "false" {
+		t.Errorf("expected 'false', got %q", output)
+	}
+}
+
+func TestAssignRefRedirect(t *testing.T) {
+	input := `var a: int = 5; var b: int = 10; a = ref b; print((a is b).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true" {
+		t.Errorf("expected 'true' after redirect, got %q", output)
+	}
+}
+
+func TestAssignRefRedirectMutation(t *testing.T) {
+	input := `var a: int = 5; var b: int = 10; a = ref b; a = 20; print((b).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "20" {
+		t.Errorf("expected '20' (redirected a shares with b), got %q", output)
+	}
+}
+
+func TestRefDeclArrayIndexedAssignShared(t *testing.T) {
+	input := `var b: array<int> = [1, 2, 3]; ref a = b; a[1] = 99; print((b[1]).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "99" {
+		t.Errorf("expected '99' (ref array indexed assign affects original), got %q", output)
+	}
+}
+
+func TestRefDeclIncDecShared(t *testing.T) {
+	input := `var b: int = 5; ref a = b; a++; print((b).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "6" {
+		t.Errorf("expected '6' (inc/dec on ref affects original), got %q", output)
+	}
+}
+
+func TestRefDeclTyped(t *testing.T) {
+	input := `var b: int = 42; ref a: int{size: 32, signed: true, nullable: false} = b; a = 10; print((b).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "10" {
+		t.Errorf("expected '10', got %q", output)
+	}
+}
+
+func TestRefParseErrorLiteral(t *testing.T) {
+	input := `ref a = 5;`
+	l := lexer.New(input)
+	p := parser.New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected parse error for ref with literal")
+	}
+}
+
+func TestRefDeclStringShared(t *testing.T) {
+	input := `var b: string = "hello"; ref a = b; a.add("w"); print((b).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "hellow" {
+		t.Errorf("expected 'hellow' (ref string mutation affects original), got %q", output)
+	}
+}
+
+func TestRefDeclGetPtrOuterEnv(t *testing.T) {
+	input := `var b: int = 42; if (true) { ref a = b; a = 10; print((b).toString()); }`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "10" {
+		t.Errorf("expected '10', got %q", output)
+	}
+}
+
+func TestRefDeclFloatType(t *testing.T) {
+	input := `var b: float = 3.14; ref a: float = b; print((a is b).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true" {
+		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+func TestRefDeclFloatTypeError(t *testing.T) {
+	input := `var b: int = 42; ref a: float = b;`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected type error for float ref with int variable")
+	}
+}
+
+func TestRefDeclBoolType(t *testing.T) {
+	input := `var b: bool = true; ref a: bool = b; print((a is b).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true" {
+		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+func TestRefDeclBoolTypeError(t *testing.T) {
+	input := `var b: int = 42; ref a: bool = b;`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected type error for bool ref with int variable")
+	}
+}
+
+func TestRefDeclStringType(t *testing.T) {
+	input := `var b: string = "hello"; ref a: string = b; print((a is b).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output != "true" {
+		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+func TestRefDeclStringTypeError(t *testing.T) {
+	input := `var b: int = 42; ref a: string = b;`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected type error for string ref with int variable")
+	}
+}
+
+func TestRefDeclIntegerTypeError(t *testing.T) {
+	input := `var b: float = 3.14; ref a: int{size: 32, signed: true, nullable: false} = b;`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected type error for int ref with float variable")
+	}
+}
+
+func TestRefDeclNonVarRefError(t *testing.T) {
+	i := New()
+	stmt := &ast.RefDecl{
+		Name: "a",
+		Expr: &ast.IntegerLit{Value: 42, Untyped: true},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error for ref with non-variable expression")
+	}
+}
+
+func TestRefDeclArrayTypeViaAST(t *testing.T) {
+	i := New()
+	i.env.Define("b", Value{
+		IsArray:   true,
+		ArrayData: []Value{{Data: 1, IType: ast.IntegerType{Size: 64, Signed: true}}},
+	})
+	stmt := &ast.RefDecl{
+		Name: "a",
+		Type: ast.ArrayType{ElemType: ast.IntegerType{Size: 64, Signed: true}},
+		Expr: &ast.VarRef{Name: "b"},
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestRefDeclArrayTypeErrorViaAST(t *testing.T) {
+	i := New()
+	i.env.Define("b", Value{Data: 42, IType: ast.IntegerType{Size: 64, Signed: true}})
+	stmt := &ast.RefDecl{
+		Name: "a",
+		Type: ast.ArrayType{ElemType: ast.IntegerType{Size: 64, Signed: true}},
+		Expr: &ast.VarRef{Name: "b"},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected type error for array ref with int variable")
+	}
+}
+
+func TestRefDeclListTypeViaAST(t *testing.T) {
+	i := New()
+	i.env.Define("b", Value{
+		IsArray:   true,
+		ArrayData: []Value{{Data: 1, IType: ast.IntegerType{Size: 64, Signed: true}}},
+	})
+	stmt := &ast.RefDecl{
+		Name: "a",
+		Type: ast.ListType{},
+		Expr: &ast.VarRef{Name: "b"},
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestRefDeclListTypeErrorViaAST(t *testing.T) {
+	i := New()
+	i.env.Define("b", Value{Data: 42, IType: ast.IntegerType{Size: 64, Signed: true}})
+	stmt := &ast.RefDecl{
+		Name: "a",
+		Type: ast.ListType{},
+		Expr: &ast.VarRef{Name: "b"},
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected type error for list ref with int variable")
+	}
+}
+
+func TestExecuteAssignmentRefIndexedError(t *testing.T) {
+	i := New()
+	stmt := &ast.Assignment{
+		Name:  "x",
+		Index: &ast.IntegerLit{Value: 0, Untyped: true},
+		Op:    "=",
+		Expr:  &ast.VarRef{Name: "y"},
+		IsRef: true,
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected error for ref with indexed assignment")
+	}
+}
+
+func TestExecuteAssignmentRefNonVarRefError(t *testing.T) {
+	i := New()
+	i.env.Define("x", Value{Data: 10, IType: ast.IntegerType{Size: 64, Signed: true}})
+	stmt := &ast.Assignment{
+		Name:  "x",
+		Op:    "=",
+		Expr:  &ast.IntegerLit{Value: 42, Untyped: true},
+		IsRef: true,
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected error for ref assignment with non-variable expression")
+	}
+}
+
+func TestCopyExprEvalError(t *testing.T) {
+	input := `print(copy nonexistent);`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for copy with undefined variable")
+	}
+}
+
+func TestIsExprLeftEvalError(t *testing.T) {
+	input := `var y: int = 5; print(nonexistent is y);`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for is with undefined left operand")
+	}
+}
+
+func TestIsExprRightEvalError(t *testing.T) {
+	input := `var x: int = 5; print(x is nonexistent);`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for is with undefined right operand")
+	}
+}
+
+func TestRefDeclUndefinedVar(t *testing.T) {
+	input := `ref a = nonexistent;`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for ref to undefined variable")
+	}
+}
+
+func TestExecuteAssignmentRefUndefinedTarget(t *testing.T) {
+	input := `x = ref nonexistent;`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for ref assignment with undefined target variable")
 	}
 }
