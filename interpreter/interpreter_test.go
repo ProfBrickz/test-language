@@ -344,7 +344,7 @@ func TestEvalBinaryUnknownOp(t *testing.T) {
 	i := New()
 	expr := &ast.BinaryExpr{
 		Left:  &ast.IntegerLit{Value: 10, Untyped: true},
-		Op:    "%",
+		Op:    "^",
 		Right: &ast.IntegerLit{Value: 3, Untyped: true},
 	}
 	_, err := i.evalBinary(expr)
@@ -2038,7 +2038,7 @@ func TestEvalBinaryDefaultOp(t *testing.T) {
 	i := New()
 	expr := &ast.BinaryExpr{
 		Left:  &ast.IntegerLit{Value: 10, Untyped: true},
-		Op:    "%", // modulo not supported
+		Op:    "^", // unknown operator
 		Right: &ast.IntegerLit{Value: 3, Untyped: true},
 	}
 	_, err := i.evalBinary(expr)
@@ -8931,8 +8931,21 @@ a = [3, 4];
 	}
 	i := New()
 	err := i.Run(program)
-	if err == nil {
-		t.Errorf("expected error for reassigning array variable")
+	if err != nil {
+		t.Errorf("unexpected error for reassigning array variable: %v", err)
+	}
+	val, ok := i.env.Get("a")
+	if !ok {
+		t.Errorf("variable 'a' not found")
+	}
+	if !val.IsArray {
+		t.Errorf("expected 'a' to be an array")
+	}
+	if len(val.ArrayData) != 2 {
+		t.Errorf("expected 2 elements, got %d", len(val.ArrayData))
+	}
+	if val.ArrayData[0].Data != 3 || val.ArrayData[1].Data != 4 {
+		t.Errorf("expected [3, 4], got %v", val)
 	}
 }
 
@@ -11853,5 +11866,254 @@ func TestExecuteAssignmentRefUndefinedTarget(t *testing.T) {
 	err := i.Run(program)
 	if err == nil {
 		t.Errorf("expected error for ref assignment with undefined target variable")
+	}
+}
+
+func TestEvalBinaryModulo(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 17, Untyped: true},
+		Op:    "%",
+		Right: &ast.IntegerLit{Value: 5, Untyped: true},
+	}
+	val, err := i.evalBinary(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val.Data != 2 {
+		t.Errorf("expected 2, got %d", val.Data)
+	}
+}
+
+func TestEvalBinaryModuloFloatError(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 10.5, Untyped: true},
+		Op:    "%",
+		Right: &ast.FloatLit{Value: 3.0, Untyped: true},
+	}
+	_, err := i.evalBinary(expr)
+	if err == nil {
+		t.Errorf("expected error for modulo with float operands")
+	}
+}
+
+func TestEvalBinaryModuloByZero(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 10, Untyped: true},
+		Op:    "%",
+		Right: &ast.IntegerLit{Value: 0, Untyped: true},
+	}
+	_, err := i.evalBinary(expr)
+	if err == nil {
+		t.Errorf("expected error for modulo by zero")
+	}
+}
+
+func TestExecuteAssignmentModEq(t *testing.T) {
+	i := New()
+	i.env.Define("x", Value{Data: 17, IType: ast.IntegerType{Size: 64, Signed: true}})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "%=",
+		Expr: &ast.IntegerLit{Value: 5, Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, _ := i.env.Get("x")
+	if val.Data != 2 {
+		t.Errorf("expected 2, got %d", val.Data)
+	}
+}
+
+func TestExecuteAssignmentModByZero(t *testing.T) {
+	i := New()
+	i.env.Define("x", Value{Data: 10, IType: ast.IntegerType{Size: 64, Signed: true}})
+	stmt := &ast.Assignment{
+		Name: "x",
+		Op:   "%=",
+		Expr: &ast.IntegerLit{Value: 0, Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected error for modulo by zero")
+	}
+}
+
+func TestExecuteAssignmentArrayNonArrayError(t *testing.T) {
+	input := `
+var a: array{size: 2}<int> = [1, 2];
+a = 42;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for assigning non-array to array variable")
+	}
+}
+
+func TestExecuteAssignmentArraySizeMismatch(t *testing.T) {
+	input := `
+var a: array{size: 2}<int> = [1, 2];
+a = [3, 4, 5];
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for array size mismatch")
+	}
+}
+
+func TestExecuteAssignmentListMinError(t *testing.T) {
+	input := `
+var a: list{min: 2}<int> = [1, 2];
+a = [3];
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for list min constraint violation")
+	}
+}
+
+func TestExecuteAssignmentListMaxError(t *testing.T) {
+	input := `
+var a: list{max: 3}<int> = [1, 2];
+a = [3, 4, 5, 6];
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for list max constraint violation")
+	}
+}
+
+func TestExecuteAssignmentListValidReassign(t *testing.T) {
+	input := `
+var a: list<int> = [1, 2];
+a = [3, 4, 5];
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, ok := i.env.Get("a")
+	if !ok {
+		t.Fatalf("variable 'a' not found")
+	}
+	if !val.IsArray {
+		t.Errorf("expected 'a' to be an array")
+	}
+	if len(val.ArrayData) != 3 {
+		t.Errorf("expected 3 elements, got %d", len(val.ArrayData))
+	}
+}
+
+func TestExecuteAssignmentFloatModEqError(t *testing.T) {
+	input := `
+var x: float{nullable: false} = 10.5;
+x %= 3.0;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for modulo on float")
+	}
+}
+
+func TestExecuteAssignmentArrayCompoundError(t *testing.T) {
+	i := New()
+	i.env.Define("a", Value{IsArray: true, ArrayData: []Value{{Data: 1}, {Data: 2}}, Type: ast.ArrayType{Size: 2, ElemType: ast.IntegerType{Size: 64, Signed: true}}})
+	stmt := &ast.Assignment{
+		Name: "a",
+		Op:   "%=",
+		Expr: &ast.IntegerLit{Value: 2, Untyped: true},
+	}
+	err := i.executeAssignment(stmt)
+	if err == nil {
+		t.Errorf("expected error for compound assign on array")
+	}
+}
+
+func TestExecuteAssignmentArrayReassignEvalError(t *testing.T) {
+	input := `
+var a: array{size: 2}<int> = [1, 2];
+a = nonexistent;
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for reassigning array from undefined variable")
+	}
+}
+
+func TestExecuteAssignmentArraySizeInference(t *testing.T) {
+	input := `
+var a: array{size: auto}<int>;
+a = [1, 2, 3];
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	val, ok := i.env.Get("a")
+	if !ok {
+		t.Fatalf("variable 'a' not found")
+	}
+	if len(val.ArrayData) != 3 {
+		t.Errorf("expected 3 elements, got %d", len(val.ArrayData))
 	}
 }

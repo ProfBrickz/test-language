@@ -1030,6 +1030,30 @@ func TestCaseVariantFloatKeywords(t *testing.T) {
 	}
 }
 
+func TestPercentToken(t *testing.T) {
+	input := "%"
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_MODULO {
+		t.Errorf("expected TOK_MODULO, got %s", tok.Type)
+	}
+	if tok.Literal != "%" {
+		t.Errorf("expected literal %q, got %q", "%", tok.Literal)
+	}
+}
+
+func TestPercentEqToken(t *testing.T) {
+	input := "%="
+	l := New(input)
+	tok := l.NextToken()
+	if tok.Type != TOK_MOD_EQ {
+		t.Errorf("expected TOK_MOD_EQ, got %s", tok.Type)
+	}
+	if tok.Literal != "%=" {
+		t.Errorf("expected literal %q, got %q", "%=", tok.Literal)
+	}
+}
+
 func TestRefCopyIsKeywords(t *testing.T) {
 	input := "ref copy is"
 	l := New(input)

@@ -545,7 +545,7 @@ func (p *Parser) parseIndexedAssign() *ast.Assignment {
 func isAssignOp(typ lexer.TokenType) bool {
 	return typ == lexer.TOK_ASSIGN || typ == lexer.TOK_PLUS_EQ ||
 		typ == lexer.TOK_MINUS_EQ || typ == lexer.TOK_STAR_EQ ||
-		typ == lexer.TOK_SLASH_EQ
+		typ == lexer.TOK_SLASH_EQ || typ == lexer.TOK_MOD_EQ
 }
 
 func (p *Parser) parsePrint() *ast.PrintStmt {
@@ -698,6 +698,8 @@ func (p *Parser) parseFor() *ast.ForStmt {
 				op = "*="
 			case lexer.TOK_SLASH_EQ:
 				op = "/="
+			case lexer.TOK_MOD_EQ:
+				op = "%="
 			default:
 				p.addError("expected assignment operator or '++'/'--' in for update, got %s", p.curToken.Type)
 				return nil
@@ -871,7 +873,7 @@ func (p *Parser) parseAddSub() ast.Expr {
 
 func (p *Parser) parseMulDiv() ast.Expr {
 	left := p.parseUnary()
-	for p.curToken.Type == lexer.TOK_STAR || p.curToken.Type == lexer.TOK_SLASH {
+	for p.curToken.Type == lexer.TOK_STAR || p.curToken.Type == lexer.TOK_SLASH || p.curToken.Type == lexer.TOK_MODULO {
 		op := p.curToken.Literal
 		p.nextToken()
 		right := p.parseUnary()

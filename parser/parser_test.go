@@ -4347,3 +4347,13 @@ func TestParseStringDeclFixedWithoutInit(t *testing.T) {
 		t.Errorf("expected size 5, got %d", st.Size)
 	}
 }
+
+func TestParseForUpdateModEq(t *testing.T) {
+	input := "for (i = 0; i < 10; i %= 3) { }"
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}

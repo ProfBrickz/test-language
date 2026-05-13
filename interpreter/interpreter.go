@@ -1031,7 +1031,39 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 		if _, ok := val.Type.(ast.ListType); ok {
 			typeName = "list"
 		}
-		return fmt.Errorf("cannot use operator %s on %s variable", stmt.Op, typeName)
+		if stmt.Op != "=" {
+			return fmt.Errorf("cannot use operator %s on %s variable", stmt.Op, typeName)
+		}
+		rightVal, err := i.evalExpr(stmt.Expr)
+		if err != nil {
+			return err
+		}
+		if !rightVal.IsArray {
+			return fmt.Errorf("cannot assign %s to %s variable", typeDescForVal(rightVal), typeName)
+		}
+		if at, ok := val.Type.(ast.ArrayType); ok {
+			effectiveSize := at.Size
+			if effectiveSize == 0 {
+				effectiveSize = len(rightVal.ArrayData)
+			}
+			if len(rightVal.ArrayData) != effectiveSize {
+				return fmt.Errorf("expected %d elements, got %d", effectiveSize, len(rightVal.ArrayData))
+			}
+			at.Size = effectiveSize
+			rightVal.Type = at
+		} else if lt, ok := val.Type.(ast.ListType); ok {
+			if lt.HasMin && len(rightVal.ArrayData) < lt.MinSize {
+				return fmt.Errorf("expected at least %d elements, got %d", lt.MinSize, len(rightVal.ArrayData))
+			}
+			if lt.HasMax && len(rightVal.ArrayData) > lt.MaxSize {
+				return fmt.Errorf("expected at most %d elements, got %d", lt.MaxSize, len(rightVal.ArrayData))
+			}
+			rightVal.Type = lt
+		}
+		val = rightVal
+		val.Null = false
+		env.Set(stmt.Name, val)
+		return nil
 	}
 
 	if stmt.Op == "=" {
@@ -1138,6 +1170,11 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 				return fmt.Errorf("division by zero")
 			}
 			result = result / rightVal.Data
+		case "%=":
+			if rightVal.Data == 0 {
+				return fmt.Errorf("modulo by zero")
+			}
+			result = result % rightVal.Data
 		default:
 			return fmt.Errorf("unknown operator: %s", stmt.Op)
 		}
@@ -1827,6 +1864,14 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 			}
 			result = left.Data / right.Data
 		}
+	case "%":
+		if isFloat {
+			return Value{}, fmt.Errorf("modulo requires integer operands")
+		}
+		if right.Data == 0 {
+			return Value{}, fmt.Errorf("modulo by zero")
+		}
+		result = left.Data % right.Data
 	default:
 		return Value{}, fmt.Errorf("unknown operator: %s", expr.Op)
 	}

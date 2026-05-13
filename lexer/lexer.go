@@ -56,6 +56,8 @@ const (
 	TOK_AND         TokenType = "&&"
 	TOK_OR          TokenType = "||"
 	TOK_NOT         TokenType = "!"
+	TOK_MODULO      TokenType = "%"
+	TOK_MOD_EQ      TokenType = "%="
 
 	TOK_LBRACKET TokenType = "["
 	TOK_RBRACKET TokenType = "]"
@@ -156,6 +158,11 @@ func (l *Lexer) NextToken() Token {
 			return l.makeToken(TOK_SLASH_EQ, 2)
 		}
 		return l.makeToken(TOK_SLASH, 1)
+	case '%':
+		if l.peekNext() == '=' {
+			return l.makeToken(TOK_MOD_EQ, 2)
+		}
+		return l.makeToken(TOK_MODULO, 1)
 	case '=':
 		if l.peekNext() == '=' {
 			return l.makeToken(TOK_EQ, 2)
