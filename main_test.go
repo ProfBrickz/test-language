@@ -502,6 +502,216 @@ func TestMainErrorPath(t *testing.T) {
 	}
 }
 
+func TestHelpFlag(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language", "--help"}
+	err := run()
+	if err != nil {
+		t.Errorf("expected no error for --help, got %v", err)
+	}
+}
+
+func TestShortHelpFlag(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language", "-h"}
+	err := run()
+	if err != nil {
+		t.Errorf("expected no error for -h, got %v", err)
+	}
+}
+
+func TestWarningsParseFlag(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 32} = 010;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	os.Args = []string{"test-language", "--warnings", "parse", testFile}
+	err := run()
+
+	w.Close()
+	os.Stderr = oldStderr
+	errOut, _ := io.ReadAll(r)
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !strings.Contains(string(errOut), "Warning:") {
+		t.Errorf("expected warning with --warnings parse, got: %s", string(errOut))
+	}
+}
+
+func TestWarningsRunFlagSuppressesWarnings(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 32} = 010;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	os.Args = []string{"test-language", "--warnings", "run", testFile}
+	err := run()
+
+	w.Close()
+	os.Stderr = oldStderr
+	errOut, _ := io.ReadAll(r)
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if strings.Contains(string(errOut), "Warning:") {
+		t.Errorf("expected no warnings with --warnings run, got: %s", string(errOut))
+	}
+}
+
+func TestWarningsBothFlag(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 32} = 010;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	os.Args = []string{"test-language", "--warnings", "both", testFile}
+	err := run()
+
+	w.Close()
+	os.Stderr = oldStderr
+	errOut, _ := io.ReadAll(r)
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !strings.Contains(string(errOut), "Warning:") {
+		t.Errorf("expected warning with --warnings both, got: %s", string(errOut))
+	}
+}
+
+func TestErrorsRunFlag(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 32} = 42/0;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language", "--errors", "run", testFile}
+	err := run()
+	if err == nil {
+		t.Errorf("expected error for runtime error with --errors run")
+	}
+}
+
+func TestErrorsParseFlag(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "invalid syntax here;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language", "--errors", "parse", testFile}
+	err := run()
+	if err == nil {
+		t.Errorf("expected parse error with --errors parse")
+	}
+}
+
+func TestErrorsBothFlag(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 32} = 42;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language", "--errors", "both", testFile}
+	err := run()
+	if err != nil {
+		t.Errorf("expected no error with --errors both, got %v", err)
+	}
+}
+
+func TestErrorsInvalidValue(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language", "--errors", "invalid"}
+	err := run()
+	if err == nil {
+		t.Errorf("expected error for invalid --errors value")
+	}
+}
+
+func TestErrorsMissingValue(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language", "--errors"}
+	err := run()
+	if err == nil {
+		t.Errorf("expected error for --errors without value")
+	}
+}
+
+func TestWarningsInvalidValue(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language", "--warnings", "invalid"}
+	err := run()
+	if err == nil {
+		t.Errorf("expected error for invalid --warnings value")
+	}
+}
+
+func TestWarningsMissingValue(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language", "--warnings"}
+	err := run()
+	if err == nil {
+		t.Errorf("expected error for --warnings without value")
+	}
+}
+
 func TestReplScannerEOF(t *testing.T) {
 	oldStdin := os.Stdin
 	oldStdout := os.Stdout
@@ -524,5 +734,476 @@ func TestReplScannerEOF(t *testing.T) {
 
 	if !strings.Contains(string(out), "Welcome to the language interpreter") {
 		t.Errorf("expected welcome message, got: %s", string(out))
+	}
+}
+
+func TestErrorsParseCatchesStaticError(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var a: int = 0; var b: int = 10 / a;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	os.Args = []string{"test-language", "--errors", "parse", testFile}
+	err := run()
+
+	w.Close()
+	os.Stderr = oldStderr
+	errOut, _ := io.ReadAll(r)
+
+	if err == nil {
+		t.Errorf("expected error for static analysis finding")
+	}
+	if !strings.Contains(string(errOut), "division by zero will occur") {
+		t.Errorf("expected 'division by zero will occur', got: %s", string(errOut))
+	}
+}
+
+func TestWarningsParseShowsStaticWarning(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 64, signed: true, nullable: true} = 10; var y: int = 10 / x;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	os.Args = []string{"test-language", "--errors", "run", "--warnings", "parse", testFile}
+	err := run()
+
+	w.Close()
+	os.Stderr = oldStderr
+	errOut, _ := io.ReadAll(r)
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !strings.Contains(string(errOut), "value may be null when used with operator") {
+		t.Errorf("expected null warning, got: %s", string(errOut))
+	}
+}
+
+func TestParseLineNoLine(t *testing.T) {
+	line := parseLine("no line number here")
+	if line != 0 {
+		t.Errorf("expected 0, got %d", line)
+	}
+}
+
+func TestParseLineNoColon(t *testing.T) {
+	line := parseLine("line 5 no colon after number")
+	if line != 0 {
+		t.Errorf("expected 0, got %d", line)
+	}
+}
+
+func TestParseLineNonNumeric(t *testing.T) {
+	line := parseLine("line abc: message")
+	if line != 0 {
+		t.Errorf("expected 0, got %d", line)
+	}
+}
+
+func TestParseLineValid(t *testing.T) {
+	line := parseLine("line 42: some message")
+	if line != 42 {
+		t.Errorf("expected 42, got %d", line)
+	}
+}
+
+func TestNullFlagNone(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 64, signed: true, nullable: true} = 10; var y: int = 10 / x;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	os.Args = []string{"test-language", "--null", "none", testFile}
+	err := run()
+
+	w.Close()
+	os.Stderr = oldStderr
+	errOut, _ := io.ReadAll(r)
+
+	if err != nil {
+		t.Errorf("expected no error with --null none, got %v", err)
+	}
+	if strings.Contains(string(errOut), "Warning:") {
+		t.Errorf("expected no warnings with --null none, got: %s", string(errOut))
+	}
+}
+
+func TestNullFlagError(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 64, signed: true, nullable: true} = 10; var y: int = 10 / x;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language", "--null", "error", testFile}
+	err := run()
+	if err == nil {
+		t.Errorf("expected error with --null error")
+	}
+}
+
+func TestNullFlagMissingValue(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language", "--null"}
+	err := run()
+	if err == nil {
+		t.Errorf("expected error for --null without value")
+	}
+}
+
+func TestNullFlagInvalidValue(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language", "--null", "invalid"}
+	err := run()
+	if err == nil {
+		t.Errorf("expected error for invalid --null value")
+	}
+}
+
+func TestNullFlagWarningValue(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 64, signed: true, nullable: true} = 10; var y: int = 10 / x;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	os.Args = []string{"test-language", "--null", "warning", testFile}
+	err := run()
+
+	w.Close()
+	os.Stderr = oldStderr
+	errOut, _ := io.ReadAll(r)
+
+	if err != nil {
+		t.Errorf("expected no error with --null warning, got %v", err)
+	}
+	if !strings.Contains(string(errOut), "Warning:") {
+		t.Errorf("expected warning with --null warning, got: %s", string(errOut))
+	}
+}
+
+func TestNullFlagEqualsSyntax(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 64, signed: true, nullable: true} = 10; var y: int = 10 / x;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	os.Args = []string{"test-language", "--null=none", testFile}
+	err := run()
+
+	w.Close()
+	os.Stderr = oldStderr
+	errOut, _ := io.ReadAll(r)
+
+	if err != nil {
+		t.Errorf("expected no error with --null=none, got %v", err)
+	}
+	if strings.Contains(string(errOut), "Warning:") {
+		t.Errorf("expected no warnings with --null=none, got: %s", string(errOut))
+	}
+}
+
+func TestErrorsFlagEqualsSyntax(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 64, signed: true, nullable: true} = 10; var y: int = 10 / x;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language", "--errors=run", "--null=none", testFile}
+	err := run()
+	if err != nil {
+		t.Errorf("expected no error with --errors=run --null=none, got %v", err)
+	}
+}
+
+func TestWarningsFlagEqualsSyntax(t *testing.T) {
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 64, signed: true, nullable: true} = 10; var y: int = 10 / x;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	os.Args = []string{"test-language", "--warnings=parse", "--null=none", testFile}
+	err := run()
+
+	w.Close()
+	os.Stderr = oldStderr
+	errOut, _ := io.ReadAll(r)
+
+	if err != nil {
+		t.Errorf("expected no error with --warnings=parse --null=none, got %v", err)
+	}
+	if strings.Contains(string(errOut), "Warning:") {
+		t.Errorf("expected no warnings with --null=none, got: %s", string(errOut))
+	}
+}
+
+func writeConfigFile(t *testing.T, dir, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, "lang-config.json"), []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+}
+
+func TestConfigFileApplied(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeConfigFile(t, tmpDir, `{"null": "none", "warnings": "run"}`)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(oldDir)
+
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 64, signed: true, nullable: true} = 10; var y: int = 10 / x;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	os.Args = []string{"test-language", testFile}
+	err := run()
+
+	w.Close()
+	os.Stderr = oldStderr
+	errOut, _ := io.ReadAll(r)
+
+	if err != nil {
+		t.Errorf("expected no error with config, got %v", err)
+	}
+	if strings.Contains(string(errOut), "Warning:") {
+		t.Errorf("expected no warnings from config, got: %s", string(errOut))
+	}
+}
+
+func TestCliOverridesConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeConfigFile(t, tmpDir, `{"null": "none", "warnings": "run"}`)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(oldDir)
+
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 64, signed: true, nullable: true} = 10; var y: int = 10 / x;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	os.Args = []string{"test-language", "--null=warning", "--warnings=both", testFile}
+	err := run()
+
+	w.Close()
+	os.Stderr = oldStderr
+	errOut, _ := io.ReadAll(r)
+
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if !strings.Contains(string(errOut), "Warning:") {
+		t.Errorf("expected warning from CLI override, got: %s", string(errOut))
+	}
+}
+
+func TestConfigFileInvalidJson(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeConfigFile(t, tmpDir, "not valid json")
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(oldDir)
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language"}
+	err := run()
+	if err != nil {
+		t.Errorf("expected no error for invalid config, got %v", err)
+	}
+}
+
+func TestConfigWarningsParse(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeConfigFile(t, tmpDir, `{"warnings": "parse", "null": "warning"}`)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(oldDir)
+
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 64, signed: true, nullable: true} = 10; var y: int = 10 / x;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	os.Args = []string{"test-language", testFile}
+	err := run()
+
+	w.Close()
+	os.Stderr = oldStderr
+	errOut, _ := io.ReadAll(r)
+
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if !strings.Contains(string(errOut), "Warning:") {
+		t.Errorf("expected warning from config, got: %s", string(errOut))
+	}
+}
+
+func TestConfigErrorsParse(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeConfigFile(t, tmpDir, `{"errors": "parse", "null": "error"}`)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(oldDir)
+
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 64, signed: true, nullable: true} = 10; var y: int = 10 / x;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language", testFile}
+	err := run()
+	if err == nil {
+		t.Errorf("expected error from config with null=error")
+	}
+}
+
+func TestConfigErrorsBoth(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeConfigFile(t, tmpDir, `{"errors": "both", "warnings": "both", "null": "none"}`)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(oldDir)
+
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 64} = 10; var y: int = x + 1;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language", testFile}
+	err := run()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+}
+
+func TestConfigErrorsRun(t *testing.T) {
+	tmpDir := t.TempDir()
+	writeConfigFile(t, tmpDir, `{"errors": "run"}`)
+
+	oldDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(oldDir)
+
+	testFile := filepath.Join(tmpDir, "test.lang")
+	content := "var x: int{size: 64} = 10; var y: int = x + 1;"
+	if err := os.WriteFile(testFile, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	os.Args = []string{"test-language", testFile}
+	err := run()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
 	}
 }

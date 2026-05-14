@@ -10829,7 +10829,7 @@ func TestPrintRequiresString(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected error for print with non-string, got none")
 	}
-	if err.Error() != "print requires a string argument, got untyped int literal" {
+	if err.Error() != "line 1: print requires a string argument, got untyped int literal" {
 		t.Errorf("wrong error message: %v", err)
 	}
 }
@@ -10845,7 +10845,7 @@ func TestToStringAsProperty(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected error for toString as property, got none")
 	}
-	if err.Error() != `value of type untyped int literal has no attribute "toString"` {
+	if err.Error() != `line 1: value of type untyped int literal has no attribute "toString"` {
 		t.Errorf("wrong error message: %v", err)
 	}
 }
@@ -10861,7 +10861,7 @@ func TestToStringWithArgs(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected error for toString with args, got none")
 	}
-	if err.Error() != "toString takes no arguments" {
+	if err.Error() != "line 1: toString takes no arguments" {
 		t.Errorf("wrong error message: %v", err)
 	}
 }
@@ -12115,5 +12115,93 @@ a = [1, 2, 3];
 	}
 	if len(val.ArrayData) != 3 {
 		t.Errorf("expected 3 elements, got %d", len(val.ArrayData))
+	}
+}
+
+func TestShowErrorsDefaultsToBoth(t *testing.T) {
+	i := New()
+	if !i.ShowParseErrors() {
+		t.Errorf("expected ShowParseErrors to be true by default")
+	}
+	if !i.ShowRunErrors() {
+		t.Errorf("expected ShowRunErrors to be true by default")
+	}
+}
+
+func TestSetShowErrorsParse(t *testing.T) {
+	i := New()
+	i.SetShowErrors(ShowParse)
+	if !i.ShowParseErrors() {
+		t.Errorf("expected ShowParseErrors to be true after setting ShowParse")
+	}
+	if i.ShowRunErrors() {
+		t.Errorf("expected ShowRunErrors to be false after setting ShowParse")
+	}
+}
+
+func TestSetShowErrorsRun(t *testing.T) {
+	i := New()
+	i.SetShowErrors(ShowRun)
+	if i.ShowParseErrors() {
+		t.Errorf("expected ShowParseErrors to be false after setting ShowRun")
+	}
+	if !i.ShowRunErrors() {
+		t.Errorf("expected ShowRunErrors to be true after setting ShowRun")
+	}
+}
+
+func TestSetShowErrorsBoth(t *testing.T) {
+	i := New()
+	i.SetShowErrors(ShowParse)
+	i.SetShowErrors(ShowBoth)
+	if !i.ShowParseErrors() {
+		t.Errorf("expected ShowParseErrors to be true after setting ShowBoth")
+	}
+	if !i.ShowRunErrors() {
+		t.Errorf("expected ShowRunErrors to be true after setting ShowBoth")
+	}
+}
+
+func TestShowWarningsDefaultsToParse(t *testing.T) {
+	i := New()
+	if !i.ShowParseWarnings() {
+		t.Errorf("expected ShowParseWarnings to be true by default")
+	}
+	if i.ShowRunWarnings() {
+		t.Errorf("expected ShowRunWarnings to be false by default")
+	}
+}
+
+func TestSetShowWarningsParse(t *testing.T) {
+	i := New()
+	i.SetShowWarnings(ShowParse)
+	if !i.ShowParseWarnings() {
+		t.Errorf("expected ShowParseWarnings to be true after setting ShowParse")
+	}
+	if i.ShowRunWarnings() {
+		t.Errorf("expected ShowRunWarnings to be false after setting ShowParse")
+	}
+}
+
+func TestSetShowWarningsRun(t *testing.T) {
+	i := New()
+	i.SetShowWarnings(ShowRun)
+	if i.ShowParseWarnings() {
+		t.Errorf("expected ShowParseWarnings to be false after setting ShowRun")
+	}
+	if !i.ShowRunWarnings() {
+		t.Errorf("expected ShowRunWarnings to be true after setting ShowRun")
+	}
+}
+
+func TestSetShowWarningsBoth(t *testing.T) {
+	i := New()
+	i.SetShowWarnings(ShowParse)
+	i.SetShowWarnings(ShowBoth)
+	if !i.ShowParseWarnings() {
+		t.Errorf("expected ShowParseWarnings to be true after setting ShowBoth")
+	}
+	if !i.ShowRunWarnings() {
+		t.Errorf("expected ShowRunWarnings to be true after setting ShowBoth")
 	}
 }

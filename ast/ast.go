@@ -61,65 +61,79 @@ type IntegerLit struct {
 	Value   int64
 	IType   IntegerType
 	Untyped bool
+	Line    int
 }
 
 type FloatLit struct {
 	Value   float64
 	FType   FloatType
 	Untyped bool
+	Line    int
 }
 
 type BoolLit struct {
 	Value   bool
 	BType   BoolType
 	Untyped bool
+	Line    int
 }
 
 type StringLit struct {
 	Value   string
 	SType   StringType
 	Untyped bool
+	Line    int
 }
 
-type NullLit struct{}
+type NullLit struct {
+	Line int
+}
 
 type VarRef struct {
 	Name string
+	Line int
 }
 
 type UnaryExpr struct {
 	Op    string
 	Right Expr
+	Line  int
 }
 
 type TypeOfExpr struct {
 	Expr Expr
+	Line int
 }
 
 type BinaryExpr struct {
 	Left  Expr
 	Op    string
 	Right Expr
+	Line  int
 }
 
 type IndexExpr struct {
 	Object Expr
 	Index  Expr
+	Line   int
 }
 
 type ArrayLit struct {
 	Elements []Expr
+	Line     int
 }
 
 type MemberAccess struct {
 	Object Expr
 	Member string
 	Args   []Expr
+	Line   int
 }
 
 type TypeRef struct {
 	Type   Type
 	IsType bool
+	Line   int
 }
 
 type VarDecl struct {
@@ -133,6 +147,7 @@ type VarDecl struct {
 	IsFloat  bool
 	IsBool   bool
 	IsString bool
+	Line     int
 }
 
 type Assignment struct {
@@ -141,43 +156,52 @@ type Assignment struct {
 	Op    string
 	Expr  Expr
 	IsRef bool
+	Line  int
 }
 
 type RefDecl struct {
 	Name string
 	Type Type
 	Expr Expr
+	Line int
 }
 
 type CopyExpr struct {
 	Right Expr
+	Line  int
 }
 
 type RefExpr struct {
 	Right Expr
+	Line  int
 }
 
 type IsExpr struct {
 	Left  Expr
 	Right Expr
+	Line  int
 }
 
 type PrintStmt struct {
 	Expr Expr
+	Line int
 }
 
 type ExprStmt struct {
 	Expr Expr
+	Line int
 }
 
 type BlockStmt struct {
 	Stmts []Stmt
+	Line  int
 }
 
 type IfStmt struct {
 	Condition Expr
 	Then      *BlockStmt
 	Else      Stmt
+	Line      int
 }
 
 type ForStmt struct {
@@ -185,20 +209,27 @@ type ForStmt struct {
 	Condition Expr
 	Update    Stmt
 	Body      *BlockStmt
+	Line      int
 }
 
 type WhileStmt struct {
 	Condition Expr
 	Body      *BlockStmt
+	Line      int
 }
 
-type BreakStmt struct{}
+type BreakStmt struct {
+	Line int
+}
 
-type SkipStmt struct{}
+type SkipStmt struct {
+	Line int
+}
 
 type IncDecStmt struct {
 	Name string
 	Op   string
+	Line int
 }
 
 type Program struct {

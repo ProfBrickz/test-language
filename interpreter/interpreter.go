@@ -646,12 +646,46 @@ func (e *Environment) LookupEnv(name string) *Environment {
 	return nil
 }
 
+type ShowWhen int
+
+const (
+	ShowParse ShowWhen = iota
+	ShowRun
+	ShowBoth
+)
+
 type Interpreter struct {
-	env *Environment
+	env          *Environment
+	showWarnings ShowWhen
+	showErrors   ShowWhen
 }
 
 func New() *Interpreter {
-	return &Interpreter{env: NewEnv()}
+	return &Interpreter{env: NewEnv(), showWarnings: ShowParse, showErrors: ShowBoth}
+}
+
+func (i *Interpreter) SetShowErrors(when ShowWhen) {
+	i.showErrors = when
+}
+
+func (i *Interpreter) SetShowWarnings(when ShowWhen) {
+	i.showWarnings = when
+}
+
+func (i *Interpreter) ShowParseErrors() bool {
+	return i.showErrors == ShowParse || i.showErrors == ShowBoth
+}
+
+func (i *Interpreter) ShowRunErrors() bool {
+	return i.showErrors == ShowRun || i.showErrors == ShowBoth
+}
+
+func (i *Interpreter) ShowParseWarnings() bool {
+	return i.showWarnings == ShowParse || i.showWarnings == ShowBoth
+}
+
+func (i *Interpreter) ShowRunWarnings() bool {
+	return i.showWarnings == ShowRun || i.showWarnings == ShowBoth
 }
 
 func (i *Interpreter) pushScope() {
@@ -662,6 +696,10 @@ func (i *Interpreter) popScope() {
 	if i.env.outer != nil {
 		i.env = i.env.outer
 	}
+}
+
+func (i *Interpreter) errorf(line int, format string, args ...interface{}) error {
+	return fmt.Errorf("line %d: %s", line, fmt.Sprintf(format, args...))
 }
 
 func (i *Interpreter) Run(program *ast.Program) error {
@@ -704,14 +742,14 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 	case *ast.IncDecStmt:
 		env := i.env.LookupEnv(s.Name)
 		if env == nil {
-			return fmt.Errorf("undefined variable: %s", s.Name)
+			return i.errorf(s.Line, "undefined variable: %s", s.Name)
 		}
 		val, _ := env.Get(s.Name)
 		if val.Null {
-			return fmt.Errorf("cannot increment/decrement null")
+			return i.errorf(s.Line, "cannot increment/decrement null")
 		}
 		if val.IsBool || val.IsArray {
-			return fmt.Errorf("cannot increment/decrement %s", typeDescForVal(val))
+			return i.errorf(s.Line, "cannot increment/decrement %s", typeDescForVal(val))
 		}
 		if s.Op == "++" {
 			if val.IsFloat {
@@ -741,7 +779,7 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 			return err
 		}
 		if !val.IsString {
-			return fmt.Errorf("print requires a string argument, got %s", typeDescForVal(val))
+			return i.errorf(s.Line, "print requires a string argument, got %s", typeDescForVal(val))
 		}
 		fmt.Println(val.StringData)
 	case *ast.ExprStmt:
@@ -758,38 +796,38 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 func (i *Interpreter) execRefDecl(s *ast.RefDecl) error {
 	ref, ok := s.Expr.(*ast.VarRef)
 	if !ok {
-		return fmt.Errorf("ref declaration requires a variable reference")
+		return i.errorf(s.Line, "ref declaration requires a variable reference")
 	}
 	bPtr := i.env.GetPtr(ref.Name)
 	if bPtr == nil {
-		return fmt.Errorf("undefined variable: %s", ref.Name)
+		return i.errorf(s.Line, "undefined variable: %s", ref.Name)
 	}
 	if s.Type != nil {
 		bVal := *bPtr
 		switch st := s.Type.(type) {
 		case ast.IntegerType:
 			if bVal.IsFloat || bVal.IsBool || bVal.IsArray || bVal.IsString {
-				return fmt.Errorf("type mismatch: cannot reference %s as %s", typeDescForVal(bVal), typeDesc(st, false))
+				return i.errorf(s.Line, "type mismatch: cannot reference %s as %s", typeDescForVal(bVal), typeDesc(st, false))
 			}
 		case ast.FloatType:
 			if !bVal.IsFloat || bVal.Untyped {
-				return fmt.Errorf("type mismatch: cannot reference %s as %s", typeDescForVal(bVal), typeDesc(st, false))
+				return i.errorf(s.Line, "type mismatch: cannot reference %s as %s", typeDescForVal(bVal), typeDesc(st, false))
 			}
 		case ast.BoolType:
 			if !bVal.IsBool || bVal.Untyped {
-				return fmt.Errorf("type mismatch: cannot reference %s as %s", typeDescForVal(bVal), typeDesc(st, false))
+				return i.errorf(s.Line, "type mismatch: cannot reference %s as %s", typeDescForVal(bVal), typeDesc(st, false))
 			}
 		case ast.ArrayType:
 			if !bVal.IsArray {
-				return fmt.Errorf("type mismatch: cannot reference %s as array type", typeDescForVal(bVal))
+				return i.errorf(s.Line, "type mismatch: cannot reference %s as array type", typeDescForVal(bVal))
 			}
 		case ast.ListType:
 			if !bVal.IsArray {
-				return fmt.Errorf("type mismatch: cannot reference %s as list type", typeDescForVal(bVal))
+				return i.errorf(s.Line, "type mismatch: cannot reference %s as list type", typeDescForVal(bVal))
 			}
 		case ast.StringType:
 			if !bVal.IsString {
-				return fmt.Errorf("type mismatch: cannot reference %s as string type", typeDescForVal(bVal))
+				return i.errorf(s.Line, "type mismatch: cannot reference %s as string type", typeDescForVal(bVal))
 			}
 		}
 	}
@@ -813,12 +851,12 @@ func (i *Interpreter) execVarDecl(s *ast.VarDecl) error {
 	if s.Expr != nil {
 		if lit, ok := s.Expr.(*ast.IntegerLit); ok && lit.Untyped && !s.IsFloat && !s.IsBool {
 			if err := checkIntFits(lit.Value, s.IType); err != nil {
-				return err
+				return i.errorf(s.Line, "%v", err)
 			}
 		}
 		if lit, ok := s.Expr.(*ast.FloatLit); ok && lit.Untyped && s.IsFloat {
 			if err := checkFloatFits(lit.Value, s.FType); err != nil {
-				return err
+				return i.errorf(s.Line, "%v", err)
 			}
 		}
 		rightVal, err := i.evalExpr(s.Expr)
@@ -827,37 +865,37 @@ func (i *Interpreter) execVarDecl(s *ast.VarDecl) error {
 		}
 		if rightVal.Null {
 			if !s.IsBool && !s.IType.Nullable && !s.FType.Nullable || (s.IsBool && !s.BType.Nullable) {
-				return fmt.Errorf("cannot assign null to %s", typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
+				return i.errorf(s.Line, "cannot assign null to %s", typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
 			}
 			val.Null = true
 		} else {
 			if rightVal.IsBool {
 				if !s.IsBool {
-					return fmt.Errorf("cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
+					return i.errorf(s.Line, "cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
 				}
 				if rightVal.BType.Nullable && !s.BType.Nullable {
-					return fmt.Errorf("cannot assign nullable %s to non-nullable %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
+					return i.errorf(s.Line, "cannot assign nullable %s to non-nullable %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
 				}
 				val.BData = rightVal.BData
 			} else if rightVal.IsFloat {
 				if !s.IsFloat {
-					return fmt.Errorf("cannot assign %s to int variable", typeDescForVal(rightVal))
+					return i.errorf(s.Line, "cannot assign %s to int variable", typeDescForVal(rightVal))
 				}
 				if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, true, s.IType, s.FType, true) {
-					return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, true, false))
+					return i.errorf(s.Line, "type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, true, false))
 				}
 				val.FData = convertFloat(rightVal.FData, s.FType)
 			} else {
 				if s.IsBool {
-					return fmt.Errorf("cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
+					return i.errorf(s.Line, "cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
 				} else if s.IsFloat {
 					if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, ast.FloatType{}, false, ast.IntegerType{}, s.FType, true) {
-						return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(ast.IntegerType{}, s.FType, ast.BoolType{}, true, false))
+						return i.errorf(s.Line, "type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(ast.IntegerType{}, s.FType, ast.BoolType{}, true, false))
 					}
 					val.FData = convertFloat(float64(rightVal.Data), s.FType)
 				} else {
 					if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, false, s.IType, s.FType, false) {
-						return fmt.Errorf("type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, ast.BoolType{}, false, false))
+						return i.errorf(s.Line, "type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, ast.BoolType{}, false, false))
 					}
 					val.Data = convertInt(rightVal.Data, s.IType)
 				}
@@ -883,14 +921,14 @@ func (i *Interpreter) execArrayDecl(s *ast.VarDecl, at ast.ArrayType) error {
 			return err
 		}
 		if !rightVal.IsArray {
-			return fmt.Errorf("cannot assign %s to array variable", typeDescForVal(rightVal))
+			return i.errorf(s.Line, "cannot assign %s to array variable", typeDescForVal(rightVal))
 		}
 		effectiveSize := at.Size
 		if effectiveSize == 0 {
 			effectiveSize = len(rightVal.ArrayData)
 		}
 		if len(rightVal.ArrayData) != effectiveSize {
-			return fmt.Errorf("expected %d elements, got %d", effectiveSize, len(rightVal.ArrayData))
+			return i.errorf(s.Line, "expected %d elements, got %d", effectiveSize, len(rightVal.ArrayData))
 		}
 		at.Size = effectiveSize
 		rightVal.Type = at
@@ -913,20 +951,20 @@ func (i *Interpreter) execListDecl(s *ast.VarDecl, lt ast.ListType) error {
 			return err
 		}
 		if !rightVal.IsArray {
-			return fmt.Errorf("cannot assign %s to list variable", typeDescForVal(rightVal))
+			return i.errorf(s.Line, "cannot assign %s to list variable", typeDescForVal(rightVal))
 		}
 		if lt.HasMin && len(rightVal.ArrayData) < lt.MinSize {
-			return fmt.Errorf("expected at least %d elements, got %d", lt.MinSize, len(rightVal.ArrayData))
+			return i.errorf(s.Line, "expected at least %d elements, got %d", lt.MinSize, len(rightVal.ArrayData))
 		}
 		if lt.HasMax && len(rightVal.ArrayData) > lt.MaxSize {
-			return fmt.Errorf("expected at most %d elements, got %d", lt.MaxSize, len(rightVal.ArrayData))
+			return i.errorf(s.Line, "expected at most %d elements, got %d", lt.MaxSize, len(rightVal.ArrayData))
 		}
 		rightVal.Type = lt
 		i.env.Define(s.Name, rightVal)
 		return nil
 	}
 	if lt.HasMin && lt.MinSize > 0 {
-		return fmt.Errorf("list requires at least %d elements, but no initializer given", lt.MinSize)
+		return i.errorf(s.Line, "list requires at least %d elements, but no initializer given", lt.MinSize)
 	}
 	val := Value{Type: lt, IsArray: true, ArrayData: []Value{}}
 	i.env.Define(s.Name, val)
@@ -940,17 +978,17 @@ func (i *Interpreter) execStringDecl(s *ast.VarDecl, st ast.StringType) error {
 			return err
 		}
 		if !rightVal.IsString {
-			return fmt.Errorf("cannot assign %s to string variable", typeDescForVal(rightVal))
+			return i.errorf(s.Line, "cannot assign %s to string variable", typeDescForVal(rightVal))
 		}
 		runeCount := utf8.RuneCountInString(rightVal.StringData)
 		if st.Size > 0 && runeCount != st.Size {
-			return fmt.Errorf("expected %d characters, got %d", st.Size, runeCount)
+			return i.errorf(s.Line, "expected %d characters, got %d", st.Size, runeCount)
 		}
 		if st.HasMin && runeCount < st.MinSize {
-			return fmt.Errorf("expected at least %d characters, got %d", st.MinSize, runeCount)
+			return i.errorf(s.Line, "expected at least %d characters, got %d", st.MinSize, runeCount)
 		}
 		if st.HasMax && runeCount > st.MaxSize {
-			return fmt.Errorf("expected at most %d characters, got %d", st.MaxSize, runeCount)
+			return i.errorf(s.Line, "expected at most %d characters, got %d", st.MaxSize, runeCount)
 		}
 		rightVal.Type = st
 		rightVal.SType = st
@@ -963,7 +1001,7 @@ func (i *Interpreter) execStringDecl(s *ast.VarDecl, st ast.StringType) error {
 		return nil
 	}
 	if st.HasMin && st.MinSize > 0 {
-		return fmt.Errorf("string requires at least %d characters, but no initializer given", st.MinSize)
+		return i.errorf(s.Line, "string requires at least %d characters, but no initializer given", st.MinSize)
 	}
 	val := Value{IsString: true, Type: st, SType: st, StringData: ""}
 	i.env.Define(s.Name, val)
@@ -973,7 +1011,7 @@ func (i *Interpreter) execStringDecl(s *ast.VarDecl, st ast.StringType) error {
 func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 	if stmt.Index != nil {
 		if stmt.IsRef {
-			return fmt.Errorf("cannot use 'ref' with indexed assignment")
+			return i.errorf(stmt.Line, "cannot use 'ref' with indexed assignment")
 		}
 		return i.executeIndexedAssign(stmt)
 	}
@@ -981,11 +1019,11 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 	if stmt.IsRef {
 		ref, ok := stmt.Expr.(*ast.VarRef)
 		if !ok {
-			return fmt.Errorf("'ref' in assignment requires a variable reference")
+			return i.errorf(stmt.Line, "'ref' in assignment requires a variable reference")
 		}
 		bPtr := i.env.GetPtr(ref.Name)
 		if bPtr == nil {
-			return fmt.Errorf("undefined variable: %s", ref.Name)
+			return i.errorf(stmt.Line, "undefined variable: %s", ref.Name)
 		}
 		i.env.Redirect(stmt.Name, bPtr)
 		return nil
@@ -993,31 +1031,31 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 
 	env := i.env.LookupEnv(stmt.Name)
 	if env == nil {
-		return fmt.Errorf("undefined variable: %s", stmt.Name)
+		return i.errorf(stmt.Line, "undefined variable: %s", stmt.Name)
 	}
 	val, _ := env.Get(stmt.Name)
 
 	if val.IsString {
 		if stmt.Op != "=" {
-			return fmt.Errorf("cannot use operator %s on string variable", stmt.Op)
+			return i.errorf(stmt.Line, "cannot use operator %s on string variable", stmt.Op)
 		}
 		rightVal, err := i.evalExpr(stmt.Expr)
 		if err != nil {
 			return err
 		}
 		if !rightVal.IsString {
-			return fmt.Errorf("cannot assign %s to string", typeDescForVal(rightVal))
+			return i.errorf(stmt.Line, "cannot assign %s to string", typeDescForVal(rightVal))
 		}
 		runeCount := utf8.RuneCountInString(rightVal.StringData)
 		if st, ok := val.Type.(ast.StringType); ok {
 			if st.Size > 0 && runeCount != st.Size {
-				return fmt.Errorf("expected %d characters, got %d", st.Size, runeCount)
+				return i.errorf(stmt.Line, "expected %d characters, got %d", st.Size, runeCount)
 			}
 			if st.HasMin && runeCount < st.MinSize {
-				return fmt.Errorf("expected at least %d characters, got %d", st.MinSize, runeCount)
+				return i.errorf(stmt.Line, "expected at least %d characters, got %d", st.MinSize, runeCount)
 			}
 			if st.HasMax && runeCount > st.MaxSize {
-				return fmt.Errorf("expected at most %d characters, got %d", st.MaxSize, runeCount)
+				return i.errorf(stmt.Line, "expected at most %d characters, got %d", st.MaxSize, runeCount)
 			}
 		}
 		val.StringData = rightVal.StringData
@@ -1032,14 +1070,14 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 			typeName = "list"
 		}
 		if stmt.Op != "=" {
-			return fmt.Errorf("cannot use operator %s on %s variable", stmt.Op, typeName)
+			return i.errorf(stmt.Line, "cannot use operator %s on %s variable", stmt.Op, typeName)
 		}
 		rightVal, err := i.evalExpr(stmt.Expr)
 		if err != nil {
 			return err
 		}
 		if !rightVal.IsArray {
-			return fmt.Errorf("cannot assign %s to %s variable", typeDescForVal(rightVal), typeName)
+			return i.errorf(stmt.Line, "cannot assign %s to %s variable", typeDescForVal(rightVal), typeName)
 		}
 		if at, ok := val.Type.(ast.ArrayType); ok {
 			effectiveSize := at.Size
@@ -1047,16 +1085,16 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 				effectiveSize = len(rightVal.ArrayData)
 			}
 			if len(rightVal.ArrayData) != effectiveSize {
-				return fmt.Errorf("expected %d elements, got %d", effectiveSize, len(rightVal.ArrayData))
+				return i.errorf(stmt.Line, "expected %d elements, got %d", effectiveSize, len(rightVal.ArrayData))
 			}
 			at.Size = effectiveSize
 			rightVal.Type = at
 		} else if lt, ok := val.Type.(ast.ListType); ok {
 			if lt.HasMin && len(rightVal.ArrayData) < lt.MinSize {
-				return fmt.Errorf("expected at least %d elements, got %d", lt.MinSize, len(rightVal.ArrayData))
+				return i.errorf(stmt.Line, "expected at least %d elements, got %d", lt.MinSize, len(rightVal.ArrayData))
 			}
 			if lt.HasMax && len(rightVal.ArrayData) > lt.MaxSize {
-				return fmt.Errorf("expected at most %d elements, got %d", lt.MaxSize, len(rightVal.ArrayData))
+				return i.errorf(stmt.Line, "expected at most %d elements, got %d", lt.MaxSize, len(rightVal.ArrayData))
 			}
 			rightVal.Type = lt
 		}
@@ -1069,12 +1107,12 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 	if stmt.Op == "=" {
 		if lit, ok := stmt.Expr.(*ast.IntegerLit); ok && lit.Untyped && !val.IsFloat && !val.IsBool {
 			if err := checkIntFits(lit.Value, val.IType); err != nil {
-				return err
+				return i.errorf(stmt.Line, "%v", err)
 			}
 		}
 		if lit, ok := stmt.Expr.(*ast.FloatLit); ok && lit.Untyped && val.IsFloat {
 			if err := checkFloatFits(lit.Value, val.FType); err != nil {
-				return err
+				return i.errorf(stmt.Line, "%v", err)
 			}
 		}
 	}
@@ -1086,7 +1124,7 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 
 	if rightVal.Null {
 		if !val.IsBool && !val.IType.Nullable && !val.FType.Nullable || (val.IsBool && !val.BType.Nullable) {
-			return fmt.Errorf("cannot assign null to %s", typeDescForVal(val))
+			return i.errorf(stmt.Line, "cannot assign null to %s", typeDescForVal(val))
 		}
 		val.Null = true
 		val.Data = 0
@@ -1097,7 +1135,7 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 	}
 
 	if val.Null && stmt.Op != "=" {
-		return fmt.Errorf("cannot use null variable in %s operation", stmt.Op)
+		return i.errorf(stmt.Line, "cannot use null variable in %s operation", stmt.Op)
 	}
 
 	var result int64
@@ -1105,20 +1143,20 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 
 	if val.IsBool {
 		if !rightVal.IsBool {
-			return fmt.Errorf("cannot assign %s to %s", typeDescForVal(rightVal), typeDescForVal(val))
+			return i.errorf(stmt.Line, "cannot assign %s to %s", typeDescForVal(rightVal), typeDescForVal(val))
 		}
 		if rightVal.BType.Nullable && !val.BType.Nullable {
-			return fmt.Errorf("cannot assign nullable %s to non-nullable %s", typeDescForVal(rightVal), typeDescForVal(val))
+			return i.errorf(stmt.Line, "cannot assign nullable %s to non-nullable %s", typeDescForVal(rightVal), typeDescForVal(val))
 		}
 		switch stmt.Op {
 		case "=":
 			val.BData = rightVal.BData
 		default:
-			return fmt.Errorf("unknown operator: %s", stmt.Op)
+			return i.errorf(stmt.Line, "unknown operator: %s", stmt.Op)
 		}
 	} else if val.IsFloat && !rightVal.IsFloat {
 		if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, false, val.IType, val.FType, true) {
-			return fmt.Errorf("type mismatch: cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(val.IType, val.FType, ast.BoolType{}, true, false))
+			return i.errorf(stmt.Line, "type mismatch: cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(val.IType, val.FType, ast.BoolType{}, true, false))
 		}
 		switch stmt.Op {
 		case "=":
@@ -1132,11 +1170,11 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 		case "/=":
 			fresult = val.FData / float64(rightVal.Data)
 		default:
-			return fmt.Errorf("unknown operator: %s", stmt.Op)
+			return i.errorf(stmt.Line, "unknown operator: %s", stmt.Op)
 		}
 		val.FData = convertFloat(fresult, val.FType)
 	} else if !val.IsFloat && rightVal.IsFloat {
-		return fmt.Errorf("cannot assign %s to int variable", typeDescForVal(rightVal))
+		return i.errorf(stmt.Line, "cannot assign %s to int variable", typeDescForVal(rightVal))
 	} else if val.IsFloat {
 		fresult = val.FData
 		switch stmt.Op {
@@ -1151,7 +1189,7 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 		case "/=":
 			fresult = fresult / rightVal.FData
 		default:
-			return fmt.Errorf("unknown operator: %s", stmt.Op)
+			return i.errorf(stmt.Line, "unknown operator: %s", stmt.Op)
 		}
 		val.FData = convertFloat(fresult, val.FType)
 	} else {
@@ -1167,16 +1205,16 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 			result = result * rightVal.Data
 		case "/=":
 			if rightVal.Data == 0 {
-				return fmt.Errorf("division by zero")
+				return i.errorf(stmt.Line, "division by zero")
 			}
 			result = result / rightVal.Data
 		case "%=":
 			if rightVal.Data == 0 {
-				return fmt.Errorf("modulo by zero")
+				return i.errorf(stmt.Line, "modulo by zero")
 			}
 			result = result % rightVal.Data
 		default:
-			return fmt.Errorf("unknown operator: %s", stmt.Op)
+			return i.errorf(stmt.Line, "unknown operator: %s", stmt.Op)
 		}
 		val.Data = convertInt(result, val.IType)
 	}
@@ -1188,31 +1226,31 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 func (i *Interpreter) executeIndexedAssign(stmt *ast.Assignment) error {
 	env := i.env.LookupEnv(stmt.Name)
 	if env == nil {
-		return fmt.Errorf("undefined variable: %s", stmt.Name)
+		return i.errorf(stmt.Line, "undefined variable: %s", stmt.Name)
 	}
 	val, _ := env.Get(stmt.Name)
 	if val.IsString {
 		if stmt.Op != "=" {
-			return fmt.Errorf("operator %s not supported for string indexed assignment", stmt.Op)
+			return i.errorf(stmt.Line, "operator %s not supported for string indexed assignment", stmt.Op)
 		}
 		idxVal, err := i.evalExpr(stmt.Index)
 		if err != nil {
 			return err
 		}
 		if idxVal.Null {
-			return fmt.Errorf("index cannot be null")
+			return i.errorf(stmt.Line, "index cannot be null")
 		}
 		idx := int(idxVal.Data)
 		runes := []rune(val.StringData)
 		if idx < 0 || idx >= len(runes) {
-			return fmt.Errorf("index %d out of bounds for length %d", idx, len(runes))
+			return i.errorf(stmt.Line, "index %d out of bounds for length %d", idx, len(runes))
 		}
 		rightVal, err := i.evalExpr(stmt.Expr)
 		if err != nil {
 			return err
 		}
 		if !rightVal.IsString || utf8.RuneCountInString(rightVal.StringData) != 1 {
-			return fmt.Errorf("string index assignment requires a single character string")
+			return i.errorf(stmt.Line, "string index assignment requires a single character string")
 		}
 		runes[idx] = []rune(rightVal.StringData)[0]
 		val.StringData = string(runes)
@@ -1220,10 +1258,10 @@ func (i *Interpreter) executeIndexedAssign(stmt *ast.Assignment) error {
 		return nil
 	}
 	if !val.IsArray {
-		return fmt.Errorf("cannot index non-array variable")
+		return i.errorf(stmt.Line, "cannot index non-array variable")
 	}
 	if stmt.Op != "=" {
-		return fmt.Errorf("operator %s not supported for indexed assignment", stmt.Op)
+		return i.errorf(stmt.Line, "operator %s not supported for indexed assignment", stmt.Op)
 	}
 
 	idxVal, err := i.evalExpr(stmt.Index)
@@ -1231,11 +1269,11 @@ func (i *Interpreter) executeIndexedAssign(stmt *ast.Assignment) error {
 		return err
 	}
 	if idxVal.Null {
-		return fmt.Errorf("index cannot be null")
+		return i.errorf(stmt.Line, "index cannot be null")
 	}
 	idx := int(idxVal.Data)
 	if idx < 0 || idx >= len(val.ArrayData) {
-		return fmt.Errorf("index %d out of bounds for length %d", idx, len(val.ArrayData))
+		return i.errorf(stmt.Line, "index %d out of bounds for length %d", idx, len(val.ArrayData))
 	}
 
 	rightVal, err := i.evalExpr(stmt.Expr)
@@ -1259,7 +1297,7 @@ func (i *Interpreter) execIf(s *ast.IfStmt) error {
 		return nil
 	}
 	if !condVal.IsBool {
-		return fmt.Errorf("if condition must be a bool, got %s", typeDescForVal(condVal))
+		return i.errorf(s.Line, "if condition must be a bool, got %s", typeDescForVal(condVal))
 	}
 	if condVal.BData {
 		i.pushScope()
@@ -1304,7 +1342,7 @@ func (i *Interpreter) execFor(s *ast.ForStmt) error {
 				return err
 			}
 			if !condVal.IsBool {
-				return fmt.Errorf("for condition must be a bool, got %s", typeDescForVal(condVal))
+				return i.errorf(s.Line, "for condition must be a bool, got %s", typeDescForVal(condVal))
 			}
 			if !condVal.BData {
 				return nil
@@ -1343,7 +1381,7 @@ func (i *Interpreter) execWhile(s *ast.WhileStmt) error {
 			return err
 		}
 		if !condVal.IsBool {
-			return fmt.Errorf("while condition must be a bool, got %s", typeDescForVal(condVal))
+			return i.errorf(s.Line, "while condition must be a bool, got %s", typeDescForVal(condVal))
 		}
 		if !condVal.BData {
 			return nil
@@ -1392,7 +1430,7 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 	case *ast.VarRef:
 		val, ok := i.env.Get(e.Name)
 		if !ok {
-			return Value{}, fmt.Errorf("undefined variable: %s", e.Name)
+			return Value{}, i.errorf(e.Line, "undefined variable: %s", e.Name)
 		}
 		return val, nil
 	case *ast.BinaryExpr:
@@ -1481,21 +1519,21 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 			return Value{}, err
 		}
 		if idxVal.Null {
-			return Value{}, fmt.Errorf("index cannot be null")
+			return Value{}, i.errorf(e.Line, "index cannot be null")
 		}
 		idx := int(idxVal.Data)
 		if obj.IsString {
 			runes := []rune(obj.StringData)
 			if idx < 0 || idx >= len(runes) {
-				return Value{}, fmt.Errorf("index %d out of bounds for length %d", idx, len(runes))
+				return Value{}, i.errorf(e.Line, "index %d out of bounds for length %d", idx, len(runes))
 			}
 			return Value{IsString: true, StringData: string(runes[idx])}, nil
 		}
 		if !obj.IsArray {
-			return Value{}, fmt.Errorf("cannot index non-array value")
+			return Value{}, i.errorf(e.Line, "cannot index non-array value")
 		}
 		if idx < 0 || idx >= len(obj.ArrayData) {
-			return Value{}, fmt.Errorf("index %d out of bounds for length %d", idx, len(obj.ArrayData))
+			return Value{}, i.errorf(e.Line, "index %d out of bounds for length %d", idx, len(obj.ArrayData))
 		}
 		return obj.ArrayData[idx], nil
 	case *ast.MemberAccess:
@@ -1505,7 +1543,7 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 		}
 		if e.Member == "toString" && e.Args != nil {
 			if len(e.Args) != 0 {
-				return Value{}, fmt.Errorf("toString takes no arguments")
+				return Value{}, i.errorf(e.Line, "toString takes no arguments")
 			}
 			if obj.IsType {
 				return Value{IsString: true, StringData: typeDescForVal(obj)}, nil
@@ -1554,7 +1592,7 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 			}
 			return result, nil
 		}
-		return Value{}, fmt.Errorf("value of type %s has no attribute %q", typeDescForVal(obj), e.Member)
+		return Value{}, i.errorf(e.Line, "value of type %s has no attribute %q", typeDescForVal(obj), e.Member)
 	default:
 		return Value{}, fmt.Errorf("unknown expression type")
 	}
@@ -1566,7 +1604,7 @@ func (i *Interpreter) evalArrayMember(obj *Value, e *ast.MemberAccess) (Value, e
 		return Value{Data: int64(len(obj.ArrayData))}, nil
 	case "add":
 		if len(e.Args) == 0 || len(e.Args) > 2 {
-			return Value{}, fmt.Errorf("add requires 1 or 2 arguments")
+			return Value{}, i.errorf(e.Line, "add requires 1 or 2 arguments")
 		}
 		val, err := i.evalExpr(e.Args[0])
 		if err != nil {
@@ -1579,18 +1617,18 @@ func (i *Interpreter) evalArrayMember(obj *Value, e *ast.MemberAccess) (Value, e
 				return Value{}, err
 			}
 			if idxVal.Null {
-				return Value{}, fmt.Errorf("index cannot be null")
+				return Value{}, i.errorf(e.Line, "index cannot be null")
 			}
 			idx = int(idxVal.Data)
 		}
 		// Check bounds for list type
 		if lt, ok := obj.Type.(ast.ListType); ok {
 			if lt.HasMax && len(obj.ArrayData) >= lt.MaxSize {
-				return Value{}, fmt.Errorf("list is at maximum capacity (%d)", lt.MaxSize)
+				return Value{}, i.errorf(e.Line, "list is at maximum capacity (%d)", lt.MaxSize)
 			}
 		}
 		if idx < 0 || idx > len(obj.ArrayData) {
-			return Value{}, fmt.Errorf("index %d out of bounds for length %d", idx, len(obj.ArrayData))
+			return Value{}, i.errorf(e.Line, "index %d out of bounds for length %d", idx, len(obj.ArrayData))
 		}
 		// Insert at index
 		newData := make([]Value, len(obj.ArrayData)+1)
@@ -1601,23 +1639,23 @@ func (i *Interpreter) evalArrayMember(obj *Value, e *ast.MemberAccess) (Value, e
 		return Value{Null: true}, nil
 	case "remove":
 		if len(e.Args) != 1 {
-			return Value{}, fmt.Errorf("remove requires 1 argument")
+			return Value{}, i.errorf(e.Line, "remove requires 1 argument")
 		}
 		idxVal, err := i.evalExpr(e.Args[0])
 		if err != nil {
 			return Value{}, err
 		}
 		if idxVal.Null {
-			return Value{}, fmt.Errorf("index cannot be null")
+			return Value{}, i.errorf(e.Line, "index cannot be null")
 		}
 		idx := int(idxVal.Data)
 		if idx < 0 || idx >= len(obj.ArrayData) {
-			return Value{}, fmt.Errorf("index %d out of bounds for length %d", idx, len(obj.ArrayData))
+			return Value{}, i.errorf(e.Line, "index %d out of bounds for length %d", idx, len(obj.ArrayData))
 		}
 		// Check min bound for list type
 		if lt, ok := obj.Type.(ast.ListType); ok {
 			if lt.HasMin && len(obj.ArrayData) <= lt.MinSize {
-				return Value{}, fmt.Errorf("list is at minimum capacity (%d)", lt.MinSize)
+				return Value{}, i.errorf(e.Line, "list is at minimum capacity (%d)", lt.MinSize)
 			}
 		}
 		removed := obj.ArrayData[idx]
@@ -1631,7 +1669,7 @@ func (i *Interpreter) evalArrayMember(obj *Value, e *ast.MemberAccess) (Value, e
 		if _, ok := obj.Type.(ast.ListType); ok {
 			typeName = "list"
 		}
-		return Value{}, fmt.Errorf("%s has no attribute %q", typeName, e.Member)
+		return Value{}, i.errorf(e.Line, "%s has no attribute %q", typeName, e.Member)
 	}
 }
 
@@ -1642,23 +1680,23 @@ func (i *Interpreter) evalStringMember(obj *Value, e *ast.MemberAccess) (Value, 
 		return Value{Data: int64(runeCount)}, nil
 	case "concat":
 		if len(e.Args) != 1 {
-			return Value{}, fmt.Errorf("concat requires 1 argument")
+			return Value{}, i.errorf(e.Line, "concat requires 1 argument")
 		}
 		val, err := i.evalExpr(e.Args[0])
 		if err != nil {
 			return Value{}, err
 		}
 		if !val.IsString {
-			return Value{}, fmt.Errorf("cannot concat %s to string", typeDescForVal(val))
+			return Value{}, i.errorf(e.Line, "cannot concat %s to string", typeDescForVal(val))
 		}
 		return Value{IsString: true, StringData: obj.StringData + val.StringData}, nil
 	case "add":
 		if len(e.Args) == 0 || len(e.Args) > 2 {
-			return Value{}, fmt.Errorf("add requires 1 or 2 arguments")
+			return Value{}, i.errorf(e.Line, "add requires 1 or 2 arguments")
 		}
 		if st, ok := obj.Type.(ast.StringType); ok {
 			if st.Size > 0 {
-				return Value{}, fmt.Errorf("cannot add to fixed-size string")
+				return Value{}, i.errorf(e.Line, "cannot add to fixed-size string")
 			}
 		}
 		val, err := i.evalExpr(e.Args[0])
@@ -1666,7 +1704,7 @@ func (i *Interpreter) evalStringMember(obj *Value, e *ast.MemberAccess) (Value, 
 			return Value{}, err
 		}
 		if !val.IsString || utf8.RuneCountInString(val.StringData) != 1 {
-			return Value{}, fmt.Errorf("add requires a single character string")
+			return Value{}, i.errorf(e.Line, "add requires a single character string")
 		}
 		runes := []rune(obj.StringData)
 		idx := len(runes)
@@ -1676,18 +1714,18 @@ func (i *Interpreter) evalStringMember(obj *Value, e *ast.MemberAccess) (Value, 
 				return Value{}, err
 			}
 			if idxVal.Null {
-				return Value{}, fmt.Errorf("index cannot be null")
+				return Value{}, i.errorf(e.Line, "index cannot be null")
 			}
 			idx = int(idxVal.Data)
 		}
 		// Check max bound for dynamic string type
 		if st, ok := obj.Type.(ast.StringType); ok {
 			if st.HasMax && len(runes) >= st.MaxSize {
-				return Value{}, fmt.Errorf("string is at maximum capacity (%d)", st.MaxSize)
+				return Value{}, i.errorf(e.Line, "string is at maximum capacity (%d)", st.MaxSize)
 			}
 		}
 		if idx < 0 || idx > len(runes) {
-			return Value{}, fmt.Errorf("index %d out of bounds for length %d", idx, len(runes))
+			return Value{}, i.errorf(e.Line, "index %d out of bounds for length %d", idx, len(runes))
 		}
 		newRunes := make([]rune, 0, len(runes)+1)
 		newRunes = append(newRunes, runes[:idx]...)
@@ -1697,11 +1735,11 @@ func (i *Interpreter) evalStringMember(obj *Value, e *ast.MemberAccess) (Value, 
 		return Value{Null: true}, nil
 	case "remove":
 		if len(e.Args) != 1 {
-			return Value{}, fmt.Errorf("remove requires 1 argument")
+			return Value{}, i.errorf(e.Line, "remove requires 1 argument")
 		}
 		if st, ok := obj.Type.(ast.StringType); ok {
 			if st.Size > 0 {
-				return Value{}, fmt.Errorf("cannot remove from fixed-size string")
+				return Value{}, i.errorf(e.Line, "cannot remove from fixed-size string")
 			}
 		}
 		idxVal, err := i.evalExpr(e.Args[0])
@@ -1709,16 +1747,16 @@ func (i *Interpreter) evalStringMember(obj *Value, e *ast.MemberAccess) (Value, 
 			return Value{}, err
 		}
 		if idxVal.Null {
-			return Value{}, fmt.Errorf("index cannot be null")
+			return Value{}, i.errorf(e.Line, "index cannot be null")
 		}
 		idx := int(idxVal.Data)
 		runes := []rune(obj.StringData)
 		if idx < 0 || idx >= len(runes) {
-			return Value{}, fmt.Errorf("index %d out of bounds for length %d", idx, len(runes))
+			return Value{}, i.errorf(e.Line, "index %d out of bounds for length %d", idx, len(runes))
 		}
 		if st, ok := obj.Type.(ast.StringType); ok {
 			if st.HasMin && len(runes) <= st.MinSize {
-				return Value{}, fmt.Errorf("string is at minimum capacity (%d)", st.MinSize)
+				return Value{}, i.errorf(e.Line, "string is at minimum capacity (%d)", st.MinSize)
 			}
 		}
 		removed := string(runes[idx])
@@ -1728,7 +1766,7 @@ func (i *Interpreter) evalStringMember(obj *Value, e *ast.MemberAccess) (Value, 
 		obj.StringData = string(newRunes)
 		return Value{IsString: true, StringData: removed}, nil
 	default:
-		return Value{}, fmt.Errorf("string has no attribute %q", e.Member)
+		return Value{}, i.errorf(e.Line, "string has no attribute %q", e.Member)
 	}
 }
 
@@ -1743,11 +1781,11 @@ func (i *Interpreter) evalUnary(expr *ast.UnaryExpr) (Value, error) {
 			return Value{Untyped: true, BData: true, IsBool: true}, nil
 		}
 		if !right.IsBool {
-			return Value{}, fmt.Errorf("operator ! requires a bool, got %s", typeDescForVal(right))
+			return Value{}, i.errorf(expr.Line, "operator ! requires a bool, got %s", typeDescForVal(right))
 		}
 		return Value{Untyped: true, BData: !right.BData, IsBool: true}, nil
 	default:
-		return Value{}, fmt.Errorf("unknown unary operator: %s", expr.Op)
+		return Value{}, i.errorf(expr.Line, "unknown unary operator: %s", expr.Op)
 	}
 }
 
@@ -1767,9 +1805,9 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 
 	switch expr.Op {
 	case "==", "!=":
-		return i.evalEquality(left, right, expr.Op)
+		return i.evalEquality(left, right, expr.Op, expr.Line)
 	case "<", ">", "<=", ">=":
-		return i.evalComparison(left, right, expr.Op)
+		return i.evalComparison(left, right, expr.Op, expr.Line)
 	}
 
 	if left.Null || right.Null {
@@ -1779,7 +1817,7 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 	// String concatenation
 	if expr.Op == "+" && (left.IsString || right.IsString) {
 		if !left.IsString || !right.IsString {
-			return Value{}, fmt.Errorf("cannot concatenate %s and %s", typeDescForVal(left), typeDescForVal(right))
+			return Value{}, i.errorf(expr.Line, "cannot concatenate %s and %s", typeDescForVal(left), typeDescForVal(right))
 		}
 		return Value{IsString: true, StringData: left.StringData + right.StringData}, nil
 	}
@@ -1809,7 +1847,7 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 		} else {
 			resultType = left.IType
 			if !canImplicitConvert(right.IType, right.FType, false, left.IType, left.FType, false) && !canImplicitConvert(left.IType, left.FType, false, right.IType, right.FType, false) {
-				return Value{}, fmt.Errorf("type mismatch: cannot compute %s %s %s", typeDescForVal(left), expr.Op, typeDescForVal(right))
+				return Value{}, i.errorf(expr.Line, "type mismatch: cannot compute %s %s %s", typeDescForVal(left), expr.Op, typeDescForVal(right))
 			}
 			if canImplicitConvert(right.IType, right.FType, false, left.IType, left.FType, false) && left.IType.Size >= right.IType.Size {
 				right.Data = convertInt(right.Data, left.IType)
@@ -1860,20 +1898,20 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 			fresult = leftF / rightF
 		} else {
 			if right.Data == 0 {
-				return Value{}, fmt.Errorf("division by zero")
+				return Value{}, i.errorf(expr.Line, "division by zero")
 			}
 			result = left.Data / right.Data
 		}
 	case "%":
 		if isFloat {
-			return Value{}, fmt.Errorf("modulo requires integer operands")
+			return Value{}, i.errorf(expr.Line, "modulo requires integer operands")
 		}
 		if right.Data == 0 {
-			return Value{}, fmt.Errorf("modulo by zero")
+			return Value{}, i.errorf(expr.Line, "modulo by zero")
 		}
 		result = left.Data % right.Data
 	default:
-		return Value{}, fmt.Errorf("unknown operator: %s", expr.Op)
+		return Value{}, i.errorf(expr.Line, "unknown operator: %s", expr.Op)
 	}
 
 	if isFloat {
@@ -1896,7 +1934,7 @@ func (i *Interpreter) evalShortCircuit(expr *ast.BinaryExpr) (Value, error) {
 	}
 
 	if !left.Null && !left.IsBool {
-		return Value{}, fmt.Errorf("operator %s requires bools, got %s", expr.Op, typeDescForVal(left))
+		return Value{}, i.errorf(expr.Line, "operator %s requires bools, got %s", expr.Op, typeDescForVal(left))
 	}
 
 	if expr.Op == "&&" {
@@ -1915,7 +1953,7 @@ func (i *Interpreter) evalShortCircuit(expr *ast.BinaryExpr) (Value, error) {
 	}
 
 	if !right.Null && !right.IsBool {
-		return Value{}, fmt.Errorf("operator %s requires bools, got %s", expr.Op, typeDescForVal(right))
+		return Value{}, i.errorf(expr.Line, "operator %s requires bools, got %s", expr.Op, typeDescForVal(right))
 	}
 
 	if expr.Op == "&&" {
@@ -1931,7 +1969,7 @@ func (i *Interpreter) evalShortCircuit(expr *ast.BinaryExpr) (Value, error) {
 	}
 }
 
-func (i *Interpreter) evalEquality(left, right Value, op string) (Value, error) {
+func (i *Interpreter) evalEquality(left, right Value, op string, line int) (Value, error) {
 	if left.Null && right.Null {
 		if op == "==" {
 			return Value{Untyped: true, BData: true, IsBool: true}, nil
@@ -1955,12 +1993,12 @@ func (i *Interpreter) evalEquality(left, right Value, op string) (Value, error) 
 	}
 
 	if left.IsBool != right.IsBool && (left.IsBool || right.IsBool) {
-		return Value{}, fmt.Errorf("type mismatch: cannot compare %s %s %s", typeDescForVal(left), op, typeDescForVal(right))
+		return Value{}, i.errorf(line, "type mismatch: cannot compare %s %s %s", typeDescForVal(left), op, typeDescForVal(right))
 	}
 	if left.IsFloat != right.IsFloat && !left.Untyped && !right.Untyped {
 		if !canImplicitConvert(right.IType, right.FType, false, ast.IntegerType{}, left.FType, true) &&
 			!canImplicitConvert(left.IType, left.FType, false, ast.IntegerType{}, right.FType, true) {
-			return Value{}, fmt.Errorf("type mismatch: cannot compare %s %s %s", typeDescForVal(left), op, typeDescForVal(right))
+			return Value{}, i.errorf(line, "type mismatch: cannot compare %s %s %s", typeDescForVal(left), op, typeDescForVal(right))
 		}
 	}
 
@@ -1986,19 +2024,19 @@ func (i *Interpreter) evalEquality(left, right Value, op string) (Value, error) 
 	return Value{Untyped: true, BData: eq, IsBool: true}, nil
 }
 
-func (i *Interpreter) evalComparison(left, right Value, op string) (Value, error) {
+func (i *Interpreter) evalComparison(left, right Value, op string, line int) (Value, error) {
 	if left.Null || right.Null {
 		return Value{Untyped: true, BData: false, IsBool: true}, nil
 	}
 
 	if left.IsBool || right.IsBool {
-		return Value{}, fmt.Errorf("operator %s cannot be used with booleans", op)
+		return Value{}, i.errorf(line, "operator %s cannot be used with booleans", op)
 	}
 
 	if left.IsFloat != right.IsFloat && !left.Untyped && !right.Untyped {
 		if !canImplicitConvert(right.IType, right.FType, false, ast.IntegerType{}, left.FType, true) &&
 			!canImplicitConvert(left.IType, left.FType, false, ast.IntegerType{}, right.FType, true) {
-			return Value{}, fmt.Errorf("type mismatch: cannot compare %s %s %s", typeDescForVal(left), op, typeDescForVal(right))
+			return Value{}, i.errorf(line, "type mismatch: cannot compare %s %s %s", typeDescForVal(left), op, typeDescForVal(right))
 		}
 	}
 

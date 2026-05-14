@@ -68,12 +68,13 @@ func (p *Parser) parseStmt() ast.Stmt {
 			return p.parseIncDec()
 		}
 		if p.peekToken.Type == lexer.TOK_DOT {
+			stmtLine := p.curToken.Line
 			expr := p.parsePostfix()
 			if p.curToken.Type != lexer.TOK_SEMICOLON {
 				p.addError("expected ';'")
 				return nil
 			}
-			return &ast.ExprStmt{Expr: expr}
+			return &ast.ExprStmt{Expr: expr, Line: stmtLine}
 		}
 		if p.peekToken.Type == lexer.TOK_LBRACKET {
 			return p.parseIndexedAssign()
@@ -90,12 +91,13 @@ func (p *Parser) parseStmt() ast.Stmt {
 	case lexer.TOK_SKIP:
 		return p.parseSkip()
 	case lexer.TOK_TYPEOF:
+		stmtLine := p.curToken.Line
 		expr := p.parseExpr()
 		if p.curToken.Type != lexer.TOK_SEMICOLON {
 			p.addError("expected ';'")
 			return nil
 		}
-		return &ast.ExprStmt{Expr: expr}
+		return &ast.ExprStmt{Expr: expr, Line: stmtLine}
 	default:
 		p.addError("unexpected token: %s", p.curToken.Literal)
 		return nil
@@ -393,6 +395,7 @@ func (p *Parser) parseIntegerType() ast.IntegerType {
 }
 
 func (p *Parser) parseVarDecl() *ast.VarDecl {
+	line := p.curToken.Line
 	p.nextToken()
 	if p.curToken.Type != lexer.TOK_IDENT {
 		p.addError("expected variable name, got %s", p.curToken.Type)
@@ -443,10 +446,11 @@ func (p *Parser) parseVarDecl() *ast.VarDecl {
 		return nil
 	}
 
-	return &ast.VarDecl{Name: name, Type: t, IType: iType, FType: fType, BType: bType, SType: sType, Expr: expr, IsFloat: isFloat, IsBool: isBool, IsString: isString}
+	return &ast.VarDecl{Name: name, Type: t, IType: iType, FType: fType, BType: bType, SType: sType, Expr: expr, IsFloat: isFloat, IsBool: isBool, IsString: isString, Line: line}
 }
 
 func (p *Parser) parseRefDecl() *ast.RefDecl {
+	line := p.curToken.Line
 	p.nextToken()
 	if p.curToken.Type != lexer.TOK_IDENT {
 		p.addError("expected variable name, got %s", p.curToken.Type)
@@ -479,11 +483,12 @@ func (p *Parser) parseRefDecl() *ast.RefDecl {
 		return nil
 	}
 
-	return &ast.RefDecl{Name: name, Type: declType, Expr: expr}
+	return &ast.RefDecl{Name: name, Type: declType, Expr: expr, Line: line}
 }
 
 func (p *Parser) parseAssignment() *ast.Assignment {
 	name := p.curToken.Literal
+	line := p.curToken.Line
 
 	p.nextToken()
 	if !isAssignOp(p.curToken.Type) {
@@ -515,11 +520,12 @@ func (p *Parser) parseAssignment() *ast.Assignment {
 		return nil
 	}
 
-	return &ast.Assignment{Name: name, Op: op, Expr: expr, IsRef: isRef}
+	return &ast.Assignment{Name: name, Op: op, Expr: expr, IsRef: isRef, Line: line}
 }
 
 func (p *Parser) parseIndexedAssign() *ast.Assignment {
 	name := p.curToken.Literal
+	line := p.curToken.Line
 	p.nextToken()
 	p.nextToken()
 	index := p.parseExpr()
@@ -539,7 +545,7 @@ func (p *Parser) parseIndexedAssign() *ast.Assignment {
 		p.addError("expected ';'")
 		return nil
 	}
-	return &ast.Assignment{Name: name, Index: index, Op: op, Expr: expr}
+	return &ast.Assignment{Name: name, Index: index, Op: op, Expr: expr, Line: line}
 }
 
 func isAssignOp(typ lexer.TokenType) bool {
@@ -549,6 +555,7 @@ func isAssignOp(typ lexer.TokenType) bool {
 }
 
 func (p *Parser) parsePrint() *ast.PrintStmt {
+	line := p.curToken.Line
 	p.nextToken()
 	if p.curToken.Type != lexer.TOK_LPAREN {
 		p.addError("expected '(', got %s", p.curToken.Type)
@@ -569,11 +576,11 @@ func (p *Parser) parsePrint() *ast.PrintStmt {
 		return nil
 	}
 
-	return &ast.PrintStmt{Expr: expr}
+	return &ast.PrintStmt{Expr: expr, Line: line}
 }
 
 func (p *Parser) parseBlock() *ast.BlockStmt {
-	block := &ast.BlockStmt{}
+	block := &ast.BlockStmt{Line: p.curToken.Line}
 
 	if p.curToken.Type == lexer.TOK_LBRACE {
 		p.nextToken()
@@ -602,6 +609,7 @@ func (p *Parser) parseBlock() *ast.BlockStmt {
 }
 
 func (p *Parser) parseIf() *ast.IfStmt {
+	line := p.curToken.Line
 	p.nextToken()
 
 	if p.curToken.Type != lexer.TOK_LPAREN {
@@ -635,10 +643,11 @@ func (p *Parser) parseIf() *ast.IfStmt {
 		}
 	}
 
-	return &ast.IfStmt{Condition: condition, Then: thenBlock, Else: elseStmt}
+	return &ast.IfStmt{Condition: condition, Then: thenBlock, Else: elseStmt, Line: line}
 }
 
 func (p *Parser) parseFor() *ast.ForStmt {
+	line := p.curToken.Line
 	p.nextToken()
 
 	if p.curToken.Type != lexer.TOK_LPAREN {
@@ -679,12 +688,13 @@ func (p *Parser) parseFor() *ast.ForStmt {
 			return nil
 		}
 		name := p.curToken.Literal
+		updateLine := p.curToken.Line
 		p.nextToken()
 
 		if p.curToken.Type == lexer.TOK_PLUS_PLUS || p.curToken.Type == lexer.TOK_MINUS_MINUS {
 			op := p.curToken.Literal
 			p.nextToken()
-			update = &ast.IncDecStmt{Name: name, Op: op}
+			update = &ast.IncDecStmt{Name: name, Op: op, Line: updateLine}
 		} else {
 			var op string
 			switch p.curToken.Type {
@@ -707,12 +717,12 @@ func (p *Parser) parseFor() *ast.ForStmt {
 			p.nextToken()
 
 			expr := p.parseExpr()
-			update = &ast.Assignment{Name: name, Op: op, Expr: expr}
+			update = &ast.Assignment{Name: name, Op: op, Expr: expr, Line: updateLine}
 		}
 	}
 
 	if p.curToken.Type != lexer.TOK_RPAREN {
-		p.addError("expected ')' after for update, got %s", p.curToken.Type)
+		p.addError("expected ')', got %s", p.curToken.Type)
 		return nil
 	}
 	p.nextToken()
@@ -722,10 +732,11 @@ func (p *Parser) parseFor() *ast.ForStmt {
 		return nil
 	}
 
-	return &ast.ForStmt{Init: init, Condition: cond, Update: update, Body: body}
+	return &ast.ForStmt{Init: init, Condition: cond, Update: update, Body: body, Line: line}
 }
 
 func (p *Parser) parseWhile() *ast.WhileStmt {
+	line := p.curToken.Line
 	p.nextToken()
 
 	if p.curToken.Type != lexer.TOK_LPAREN {
@@ -747,7 +758,7 @@ func (p *Parser) parseWhile() *ast.WhileStmt {
 		return nil
 	}
 
-	return &ast.WhileStmt{Condition: cond, Body: body}
+	return &ast.WhileStmt{Condition: cond, Body: body, Line: line}
 }
 
 func (p *Parser) parseBreak() *ast.BreakStmt {
@@ -758,9 +769,8 @@ func (p *Parser) parseBreak() *ast.BreakStmt {
 		return nil
 	}
 
-	return &ast.BreakStmt{}
+	return &ast.BreakStmt{Line: p.curToken.Line}
 }
-
 func (p *Parser) parseSkip() *ast.SkipStmt {
 	p.nextToken()
 
@@ -769,11 +779,12 @@ func (p *Parser) parseSkip() *ast.SkipStmt {
 		return nil
 	}
 
-	return &ast.SkipStmt{}
+	return &ast.SkipStmt{Line: p.curToken.Line}
 }
 
 func (p *Parser) parseIncDec() *ast.IncDecStmt {
 	ident := p.curToken.Literal
+	identLine := p.curToken.Line
 	p.nextToken()
 	op := p.curToken.Literal
 	p.nextToken()
@@ -783,7 +794,7 @@ func (p *Parser) parseIncDec() *ast.IncDecStmt {
 		return nil
 	}
 
-	return &ast.IncDecStmt{Name: ident, Op: op}
+	return &ast.IncDecStmt{Name: ident, Op: op, Line: identLine}
 }
 
 func (p *Parser) parseExpr() ast.Expr {
@@ -794,6 +805,7 @@ func (p *Parser) parseOr() ast.Expr {
 	left := p.parseAnd()
 	for p.curToken.Type == lexer.TOK_OR {
 		op := p.curToken.Literal
+		opLine := p.curToken.Line
 		p.nextToken()
 		right := p.parseAnd()
 		if _, ok := left.(*ast.NullLit); ok {
@@ -802,7 +814,7 @@ func (p *Parser) parseOr() ast.Expr {
 		if _, ok := right.(*ast.NullLit); ok {
 			p.addWarning("using null literal with boolean || operator")
 		}
-		left = &ast.BinaryExpr{Left: left, Op: op, Right: right}
+		left = &ast.BinaryExpr{Left: left, Op: op, Right: right, Line: opLine}
 	}
 	return left
 }
@@ -811,6 +823,7 @@ func (p *Parser) parseAnd() ast.Expr {
 	left := p.parseEquality()
 	for p.curToken.Type == lexer.TOK_AND {
 		op := p.curToken.Literal
+		opLine := p.curToken.Line
 		p.nextToken()
 		right := p.parseEquality()
 		if _, ok := left.(*ast.NullLit); ok {
@@ -819,7 +832,7 @@ func (p *Parser) parseAnd() ast.Expr {
 		if _, ok := right.(*ast.NullLit); ok {
 			p.addWarning("using null literal with boolean && operator")
 		}
-		left = &ast.BinaryExpr{Left: left, Op: op, Right: right}
+		left = &ast.BinaryExpr{Left: left, Op: op, Right: right, Line: opLine}
 	}
 	return left
 }
@@ -829,14 +842,16 @@ func (p *Parser) parseEquality() ast.Expr {
 	for p.curToken.Type == lexer.TOK_EQ || p.curToken.Type == lexer.TOK_NOT_EQ ||
 		p.curToken.Type == lexer.TOK_IS {
 		if p.curToken.Type == lexer.TOK_IS {
+			isLine := p.curToken.Line
 			p.nextToken()
 			right := p.parseComparison()
-			left = &ast.IsExpr{Left: left, Right: right}
+			left = &ast.IsExpr{Left: left, Right: right, Line: isLine}
 		} else {
 			op := p.curToken.Literal
+			opLine := p.curToken.Line
 			p.nextToken()
 			right := p.parseComparison()
-			left = &ast.BinaryExpr{Left: left, Op: op, Right: right}
+			left = &ast.BinaryExpr{Left: left, Op: op, Right: right, Line: opLine}
 		}
 	}
 	return left
@@ -847,6 +862,7 @@ func (p *Parser) parseComparison() ast.Expr {
 	for p.curToken.Type == lexer.TOK_LT || p.curToken.Type == lexer.TOK_GT ||
 		p.curToken.Type == lexer.TOK_LTE || p.curToken.Type == lexer.TOK_GTE {
 		op := p.curToken.Literal
+		opLine := p.curToken.Line
 		p.nextToken()
 		right := p.parseAddSub()
 		if _, ok := left.(*ast.NullLit); ok {
@@ -855,7 +871,7 @@ func (p *Parser) parseComparison() ast.Expr {
 		if _, ok := right.(*ast.NullLit); ok {
 			p.addWarning("using null literal with comparison operator %s", op)
 		}
-		left = &ast.BinaryExpr{Left: left, Op: op, Right: right}
+		left = &ast.BinaryExpr{Left: left, Op: op, Right: right, Line: opLine}
 	}
 	return left
 }
@@ -864,9 +880,10 @@ func (p *Parser) parseAddSub() ast.Expr {
 	left := p.parseMulDiv()
 	for p.curToken.Type == lexer.TOK_PLUS || p.curToken.Type == lexer.TOK_MINUS {
 		op := p.curToken.Literal
+		opLine := p.curToken.Line
 		p.nextToken()
 		right := p.parseMulDiv()
-		left = &ast.BinaryExpr{Left: left, Op: op, Right: right}
+		left = &ast.BinaryExpr{Left: left, Op: op, Right: right, Line: opLine}
 	}
 	return left
 }
@@ -875,9 +892,10 @@ func (p *Parser) parseMulDiv() ast.Expr {
 	left := p.parseUnary()
 	for p.curToken.Type == lexer.TOK_STAR || p.curToken.Type == lexer.TOK_SLASH || p.curToken.Type == lexer.TOK_MODULO {
 		op := p.curToken.Literal
+		opLine := p.curToken.Line
 		p.nextToken()
 		right := p.parseUnary()
-		left = &ast.BinaryExpr{Left: left, Op: op, Right: right}
+		left = &ast.BinaryExpr{Left: left, Op: op, Right: right, Line: opLine}
 	}
 	return left
 }
@@ -888,6 +906,7 @@ func (p *Parser) parseUnary() ast.Expr {
 			p.addError("unary minus cannot be applied to a minus expression")
 			return nil
 		}
+		opLine := p.curToken.Line
 		p.nextToken()
 		expr := p.parsePostfix()
 		if lit, ok := expr.(*ast.IntegerLit); ok {
@@ -899,23 +918,26 @@ func (p *Parser) parseUnary() ast.Expr {
 			return lit
 		}
 		return &ast.BinaryExpr{
-			Left:  &ast.IntegerLit{Value: 0, Untyped: true},
+			Left:  &ast.IntegerLit{Value: 0, Untyped: true, Line: opLine},
 			Op:    "-",
 			Right: expr,
+			Line:  opLine,
 		}
 	}
 	if p.curToken.Type == lexer.TOK_NOT {
+		opLine := p.curToken.Line
 		p.nextToken()
 		expr := p.parseUnary()
 		if _, ok := expr.(*ast.NullLit); ok {
 			p.addWarning("using null literal with boolean ! operator")
 		}
-		return &ast.UnaryExpr{Op: "!", Right: expr}
+		return &ast.UnaryExpr{Op: "!", Right: expr, Line: opLine}
 	}
 	if p.curToken.Type == lexer.TOK_COPY {
+		opLine := p.curToken.Line
 		p.nextToken()
 		expr := p.parseUnary()
-		return &ast.CopyExpr{Right: expr}
+		return &ast.CopyExpr{Right: expr, Line: opLine}
 	}
 	return p.parsePostfix()
 }
@@ -925,6 +947,7 @@ func (p *Parser) parsePostfix() ast.Expr {
 	for {
 		switch p.curToken.Type {
 		case lexer.TOK_LBRACKET:
+			opLine := p.curToken.Line
 			p.nextToken()
 			index := p.parseExpr()
 			if p.curToken.Type != lexer.TOK_RBRACKET {
@@ -932,8 +955,9 @@ func (p *Parser) parsePostfix() ast.Expr {
 				return left
 			}
 			p.nextToken()
-			left = &ast.IndexExpr{Object: left, Index: index}
+			left = &ast.IndexExpr{Object: left, Index: index, Line: opLine}
 		case lexer.TOK_DOT:
+			opLine := p.curToken.Line
 			p.nextToken()
 			if !isMemberToken(p.curToken.Type) {
 				p.addError("expected member name after '.'")
@@ -956,9 +980,9 @@ func (p *Parser) parsePostfix() ast.Expr {
 					break
 				}
 				p.nextToken()
-				left = &ast.MemberAccess{Object: left, Member: name, Args: args}
+				left = &ast.MemberAccess{Object: left, Member: name, Args: args, Line: opLine}
 			} else {
-				left = &ast.MemberAccess{Object: left, Member: name}
+				left = &ast.MemberAccess{Object: left, Member: name, Line: opLine}
 			}
 		default:
 			return left
@@ -976,6 +1000,7 @@ func (p *Parser) parsePrimary() ast.Expr {
 	switch p.curToken.Type {
 	case lexer.TOK_INT_LIT:
 		lit := p.curToken.Literal
+		litLine := p.curToken.Line
 		clean := strings.ReplaceAll(lit, "_", "")
 		hasPrefix := strings.HasPrefix(lit, "0x") || strings.HasPrefix(lit, "0X") ||
 			strings.HasPrefix(lit, "0b") || strings.HasPrefix(lit, "0B") ||
@@ -1003,9 +1028,10 @@ func (p *Parser) parsePrimary() ast.Expr {
 			return nil
 		}
 		p.nextToken()
-		return &ast.IntegerLit{Value: val, Untyped: true}
+		return &ast.IntegerLit{Value: val, Untyped: true, Line: litLine}
 	case lexer.TOK_FLOAT_LIT:
 		lit := p.curToken.Literal
+		litLine := p.curToken.Line
 		clean := strings.ReplaceAll(lit, "_", "")
 		var val float64
 		var err error
@@ -1027,11 +1053,11 @@ func (p *Parser) parsePrimary() ast.Expr {
 			}
 		}
 		p.nextToken()
-		return &ast.FloatLit{Value: val, Untyped: true}
+		return &ast.FloatLit{Value: val, Untyped: true, Line: litLine}
 	case lexer.TOK_IDENT:
 		tok := p.curToken
 		p.nextToken()
-		return &ast.VarRef{Name: tok.Literal}
+		return &ast.VarRef{Name: tok.Literal, Line: tok.Line}
 	case lexer.TOK_LPAREN:
 		p.nextToken()
 		expr := p.parseExpr()
@@ -1042,43 +1068,54 @@ func (p *Parser) parsePrimary() ast.Expr {
 		p.nextToken()
 		return expr
 	case lexer.TOK_TRUE:
+		pLine := p.curToken.Line
 		p.nextToken()
-		return &ast.BoolLit{Value: true, Untyped: true}
+		return &ast.BoolLit{Value: true, Untyped: true, Line: pLine}
 	case lexer.TOK_FALSE:
+		pLine := p.curToken.Line
 		p.nextToken()
-		return &ast.BoolLit{Value: false, Untyped: true}
+		return &ast.BoolLit{Value: false, Untyped: true, Line: pLine}
 	case lexer.TOK_NULL:
+		pLine := p.curToken.Line
 		p.nextToken()
-		return &ast.NullLit{}
+		return &ast.NullLit{Line: pLine}
 	case lexer.TOK_STRING_LIT:
 		lit := p.curToken.Literal
+		litLine := p.curToken.Line
 		p.nextToken()
-		return &ast.StringLit{Value: lit, Untyped: true}
+		return &ast.StringLit{Value: lit, Untyped: true, Line: litLine}
 	case lexer.TOK_LBRACKET:
 		return p.parseArrayLit()
 	case lexer.TOK_INT:
+		refLine := p.curToken.Line
 		t := p.parseIntegerType()
-		return &ast.TypeRef{Type: t, IsType: true}
+		return &ast.TypeRef{Type: t, IsType: true, Line: refLine}
 	case lexer.TOK_FLOAT:
+		refLine := p.curToken.Line
 		t := p.parseFloatType()
-		return &ast.TypeRef{Type: t, IsType: true}
+		return &ast.TypeRef{Type: t, IsType: true, Line: refLine}
 	case lexer.TOK_BOOL:
+		refLine := p.curToken.Line
 		t := p.parseBoolType()
-		return &ast.TypeRef{Type: t, IsType: true}
+		return &ast.TypeRef{Type: t, IsType: true, Line: refLine}
 	case lexer.TOK_ARRAY:
+		refLine := p.curToken.Line
 		t := p.parseArrayType()
-		return &ast.TypeRef{Type: t, IsType: true}
+		return &ast.TypeRef{Type: t, IsType: true, Line: refLine}
 	case lexer.TOK_LIST:
+		refLine := p.curToken.Line
 		t := p.parseListType()
-		return &ast.TypeRef{Type: t, IsType: true}
+		return &ast.TypeRef{Type: t, IsType: true, Line: refLine}
 	case lexer.TOK_STRING:
+		refLine := p.curToken.Line
 		t := p.parseStringType()
-		return &ast.TypeRef{Type: t, IsType: true}
+		return &ast.TypeRef{Type: t, IsType: true, Line: refLine}
 	case lexer.TOK_TYPEOF:
 		if p.peekToken.Type != lexer.TOK_LPAREN {
 			p.addError("expected '(' after 'typeof'")
 			return nil
 		}
+		typeofLine := p.curToken.Line
 		p.nextToken()
 		p.nextToken()
 		expr := p.parseExpr()
@@ -1087,7 +1124,7 @@ func (p *Parser) parsePrimary() ast.Expr {
 			return nil
 		}
 		p.nextToken()
-		return &ast.TypeOfExpr{Expr: expr}
+		return &ast.TypeOfExpr{Expr: expr, Line: typeofLine}
 	default:
 		p.addError("unexpected token in expression: %s", p.curToken.Literal)
 		return nil
@@ -1095,6 +1132,7 @@ func (p *Parser) parsePrimary() ast.Expr {
 }
 
 func (p *Parser) parseArrayLit() ast.Expr {
+	arrLine := p.curToken.Line
 	p.nextToken()
 	var elements []ast.Expr
 	if p.curToken.Type != lexer.TOK_RBRACKET {
@@ -1106,10 +1144,10 @@ func (p *Parser) parseArrayLit() ast.Expr {
 	}
 	if p.curToken.Type != lexer.TOK_RBRACKET {
 		p.addError("expected ']'")
-		return &ast.ArrayLit{Elements: elements}
+		return &ast.ArrayLit{Elements: elements, Line: arrLine}
 	}
 	p.nextToken()
-	return &ast.ArrayLit{Elements: elements}
+	return &ast.ArrayLit{Elements: elements, Line: arrLine}
 }
 
 func (p *Parser) parsePrefixedFloat(s string, base int) float64 {
