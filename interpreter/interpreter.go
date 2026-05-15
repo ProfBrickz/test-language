@@ -733,6 +733,12 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 		return i.execIf(s)
 	case *ast.ForStmt:
 		return i.execFor(s)
+	case *ast.ForInStmt:
+		return i.execForIn(s)
+	case *ast.ForAtStmt:
+		return i.execForAt(s)
+	case *ast.ForOfStmt:
+		return i.execForOf(s)
 	case *ast.WhileStmt:
 		return i.execWhile(s)
 	case *ast.BreakStmt:
@@ -1372,6 +1378,143 @@ func (i *Interpreter) execFor(s *ast.ForStmt) error {
 			}
 		}
 	}
+}
+
+func (i *Interpreter) execForIn(s *ast.ForInStmt) error {
+	iterVal, err := i.evalExpr(s.Iter)
+	if err != nil {
+		return err
+	}
+	if iterVal.Null {
+		return i.errorf(s.Line, "cannot iterate over null")
+	}
+
+	var elements []Value
+	if iterVal.IsArray {
+		elements = iterVal.ArrayData
+	} else if iterVal.IsString {
+		runes := []rune(iterVal.StringData)
+		for _, r := range runes {
+			elements = append(elements, Value{IsString: true, StringData: string(r)})
+		}
+	} else {
+		return i.errorf(s.Line, "for-in requires an array, list, or string, got %s", typeDescForVal(iterVal))
+	}
+
+	for _, elem := range elements {
+		i.pushScope()
+		i.env.Define(s.VarName, elem)
+		err := i.executeStmt(s.Body)
+		i.popScope()
+
+		if err != nil {
+			if sig, ok := err.(LoopSignal); ok {
+				switch sig {
+				case SkipSignal:
+					continue
+				case BreakSignal:
+					return nil
+				}
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+func (i *Interpreter) execForAt(s *ast.ForAtStmt) error {
+	iterVal, err := i.evalExpr(s.Iter)
+	if err != nil {
+		return err
+	}
+	if iterVal.Null {
+		return i.errorf(s.Line, "cannot iterate over null")
+	}
+
+	var length int
+	if iterVal.IsArray {
+		length = len(iterVal.ArrayData)
+	} else if iterVal.IsString {
+		length = utf8.RuneCountInString(iterVal.StringData)
+	} else {
+		return i.errorf(s.Line, "for-at requires an array, list, or string, got %s", typeDescForVal(iterVal))
+	}
+
+	for idx := 0; idx < length; idx++ {
+		i.pushScope()
+		i.env.Define(s.VarName, Value{Data: int64(idx)})
+		err := i.executeStmt(s.Body)
+		i.popScope()
+
+		if err != nil {
+			if sig, ok := err.(LoopSignal); ok {
+				switch sig {
+				case SkipSignal:
+					continue
+				case BreakSignal:
+					return nil
+				}
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+func (i *Interpreter) execForOf(s *ast.ForOfStmt) error {
+	iterVal, err := i.evalExpr(s.Iter)
+	if err != nil {
+		return err
+	}
+	if iterVal.Null {
+		return i.errorf(s.Line, "cannot iterate over null")
+	}
+
+	if iterVal.IsArray {
+		for idx, elem := range iterVal.ArrayData {
+			i.pushScope()
+			i.env.Define(s.VarName1, Value{Data: int64(idx)})
+			i.env.Define(s.VarName2, elem)
+			err := i.executeStmt(s.Body)
+			i.popScope()
+
+			if err != nil {
+				if sig, ok := err.(LoopSignal); ok {
+					switch sig {
+					case SkipSignal:
+						continue
+					case BreakSignal:
+						return nil
+					}
+				}
+				return err
+			}
+		}
+	} else if iterVal.IsString {
+		runes := []rune(iterVal.StringData)
+		for idx, r := range runes {
+			i.pushScope()
+			i.env.Define(s.VarName1, Value{Data: int64(idx)})
+			i.env.Define(s.VarName2, Value{IsString: true, StringData: string(r)})
+			err := i.executeStmt(s.Body)
+			i.popScope()
+
+			if err != nil {
+				if sig, ok := err.(LoopSignal); ok {
+					switch sig {
+					case SkipSignal:
+						continue
+					case BreakSignal:
+						return nil
+					}
+				}
+				return err
+			}
+		}
+	} else {
+		return i.errorf(s.Line, "for-of requires an array, list, or string, got %s", typeDescForVal(iterVal))
+	}
+	return nil
 }
 
 func (i *Interpreter) execWhile(s *ast.WhileStmt) error {

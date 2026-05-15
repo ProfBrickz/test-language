@@ -1075,3 +1075,25 @@ func TestRefCopyIsKeywords(t *testing.T) {
 		}
 	}
 }
+
+func TestInAtOfKeywords(t *testing.T) {
+	input := "in at of"
+	l := New(input)
+	tests := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{TOK_IN, "in"},
+		{TOK_AT, "at"},
+		{TOK_OF, "of"},
+	}
+	for i, tt := range tests {
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("test[%d] - expected %s, got %s", i, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLiteral {
+			t.Errorf("test[%d] - expected literal %q, got %q", i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}

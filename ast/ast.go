@@ -212,6 +212,28 @@ type ForStmt struct {
 	Line      int
 }
 
+type ForInStmt struct {
+	VarName string
+	Iter    Expr
+	Body    *BlockStmt
+	Line    int
+}
+
+type ForAtStmt struct {
+	VarName string
+	Iter    Expr
+	Body    *BlockStmt
+	Line    int
+}
+
+type ForOfStmt struct {
+	VarName1 string
+	VarName2 string
+	Iter     Expr
+	Body     *BlockStmt
+	Line     int
+}
+
 type WhileStmt struct {
 	Condition Expr
 	Body      *BlockStmt

@@ -64,6 +64,79 @@ The init can be a `var` declaration or an assignment. The condition must be a `b
 
 The init, condition, and update share a scope. Each iteration creates a new scope for the body. Variables declared in the body are not visible in the condition or update.
 
+## For-In Loops
+
+```
+for (var elem in iterable) {
+    body;
+}
+```
+
+Iterates over the elements of an array, list, or string. For strings, each element is a single-character string.
+
+```
+var arr: array{size: 3}<int> = [10, 20, 30];
+for (var x in arr) {
+    print(x.toString());
+}
+// Output:
+// 10
+// 20
+// 30
+```
+
+Each iteration creates a new scope containing the loop variable.
+
+## For-At Loops
+
+```
+for (var index at iterable) {
+    body;
+}
+```
+
+Iterates over the indices (0-based integers) of an array, list, or string.
+
+```
+var arr: array{size: 3}<int> = [10, 20, 30];
+for (var i at arr) {
+    print(arr[i].toString());
+}
+// Output:
+// 10
+// 20
+// 30
+```
+
+Each iteration creates a new scope containing the loop variable.
+
+## For-Of Loops
+
+```
+for (var index, value of iterable) {
+    body;
+}
+```
+
+Iterates over both the index and value of an array, list, or string. The first variable receives the index (integer), the second receives the value (element or single-character string).
+
+```
+var arr: array{size: 3}<int> = [10, 20, 30];
+for (var i, v of arr) {
+    print((i).toString());
+    print((v).toString());
+}
+// Output:
+// 0
+// 10
+// 1
+// 20
+// 2
+// 30
+```
+
+Each iteration creates a new scope containing both loop variables.
+
 ## While Loops
 
 ```

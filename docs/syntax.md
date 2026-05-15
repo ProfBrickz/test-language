@@ -81,6 +81,36 @@ C-style for loop. All three parts are optional (`for (;;)` is an infinite loop).
 
 The init, condition, and update share a scope. Each iteration creates a new scope for the body. Variables declared in the body are not visible in the condition or update.
 
+## For-In Loops
+
+```
+for (var elem in iterable) {
+    body;
+}
+```
+
+Iterates over elements of an array, list, or string. For strings, each element is a single-character string.
+
+## For-At Loops
+
+```
+for (var index at iterable) {
+    body;
+}
+```
+
+Iterates over indices (0-based integers) of an array, list, or string.
+
+## For-Of Loops
+
+```
+for (var index, value of iterable) {
+    body;
+}
+```
+
+Iterates over both the index and value of an array, list, or string. The first variable receives the index (integer), the second receives the value.
+
 ## While Loops
 
 ```

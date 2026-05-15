@@ -4357,3 +4357,382 @@ func TestParseForUpdateModEq(t *testing.T) {
 		t.Fatalf("unexpected errors: %v", p.Errors())
 	}
 }
+
+func TestParseForInStmt(t *testing.T) {
+	input := `
+var arr: array{size: 3}<int> = [10, 20, 30];
+for (var x in arr) {
+	print(x.toString());
+}
+`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(program.Stmts))
+	}
+	forInStmt, ok := program.Stmts[1].(*ast.ForInStmt)
+	if !ok {
+		t.Fatalf("expected *ast.ForInStmt, got %T", program.Stmts[1])
+	}
+	if forInStmt.VarName != "x" {
+		t.Errorf("expected VarName 'x', got %q", forInStmt.VarName)
+	}
+	if forInStmt.Iter == nil {
+		t.Fatal("expected Iter, got nil")
+	}
+	if forInStmt.Body == nil {
+		t.Fatal("expected Body, got nil")
+	}
+	if len(forInStmt.Body.Stmts) != 1 {
+		t.Errorf("expected 1 statement in body, got %d", len(forInStmt.Body.Stmts))
+	}
+}
+
+func TestParseForAtStmt(t *testing.T) {
+	input := `
+var arr: array{size: 3}<int> = [10, 20, 30];
+for (var i at arr) {
+	print(arr[i].toString());
+}
+`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(program.Stmts))
+	}
+	forAtStmt, ok := program.Stmts[1].(*ast.ForAtStmt)
+	if !ok {
+		t.Fatalf("expected *ast.ForAtStmt, got %T", program.Stmts[1])
+	}
+	if forAtStmt.VarName != "i" {
+		t.Errorf("expected VarName 'i', got %q", forAtStmt.VarName)
+	}
+	if forAtStmt.Iter == nil {
+		t.Fatal("expected Iter, got nil")
+	}
+	if forAtStmt.Body == nil {
+		t.Fatal("expected Body, got nil")
+	}
+	if len(forAtStmt.Body.Stmts) != 1 {
+		t.Errorf("expected 1 statement in body, got %d", len(forAtStmt.Body.Stmts))
+	}
+}
+
+func TestParseForInString(t *testing.T) {
+	input := `for (var c in "abc") { print(c); }`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	forInStmt, ok := program.Stmts[0].(*ast.ForInStmt)
+	if !ok {
+		t.Fatalf("expected *ast.ForInStmt, got %T", program.Stmts[0])
+	}
+	if forInStmt.VarName != "c" {
+		t.Errorf("expected VarName 'c', got %q", forInStmt.VarName)
+	}
+}
+
+func TestParseForAtGeneric(t *testing.T) {
+	input := `for (var i at arr) { print(arr[i].toString()); }`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	_, ok := program.Stmts[0].(*ast.ForAtStmt)
+	if !ok {
+		t.Fatalf("expected *ast.ForAtStmt, got %T", program.Stmts[0])
+	}
+}
+
+func TestParseForInSingleStmt(t *testing.T) {
+	input := `for (var x in arr) print(x.toString());`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	_, ok := program.Stmts[0].(*ast.ForInStmt)
+	if !ok {
+		t.Fatalf("expected *ast.ForInStmt, got %T", program.Stmts[0])
+	}
+}
+
+func TestParseForInMissingRParen(t *testing.T) {
+	input := `for (var x in arr { print(x); }`
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ')'")
+	}
+}
+
+func TestParseForOfStmt(t *testing.T) {
+	input := `
+var arr: array{size: 3}<int> = [10, 20, 30];
+for (var i, v of arr) {
+	print((i).toString());
+	print((v).toString());
+}
+`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(program.Stmts))
+	}
+	forOfStmt, ok := program.Stmts[1].(*ast.ForOfStmt)
+	if !ok {
+		t.Fatalf("expected *ast.ForOfStmt, got %T", program.Stmts[1])
+	}
+	if forOfStmt.VarName1 != "i" {
+		t.Errorf("expected VarName1 'i', got %q", forOfStmt.VarName1)
+	}
+	if forOfStmt.VarName2 != "v" {
+		t.Errorf("expected VarName2 'v', got %q", forOfStmt.VarName2)
+	}
+	if forOfStmt.Iter == nil {
+		t.Fatal("expected Iter, got nil")
+	}
+	if forOfStmt.Body == nil {
+		t.Fatal("expected Body, got nil")
+	}
+	if len(forOfStmt.Body.Stmts) != 2 {
+		t.Errorf("expected 2 statements in body, got %d", len(forOfStmt.Body.Stmts))
+	}
+}
+
+func TestParseForOfMissingRParen(t *testing.T) {
+	input := `for (var i, v of arr { print(i); }`
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ')'")
+	}
+}
+
+func TestParseForOfMissingComma(t *testing.T) {
+	input := `for (var i v of arr) { print(i); }`
+	l := lexer.New(input)
+	p := New(l)
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ','")
+	}
+}
+
+func TestParseForOfMissingSecondVarName(t *testing.T) {
+	input := `for (var i, of arr) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing second variable name")
+	}
+}
+
+func TestParseForOfWrongKeyword(t *testing.T) {
+	input := `for (var i, v in arr) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for wrong keyword after comma + second var")
+	}
+}
+
+func TestParseForUnclosedForOfBody(t *testing.T) {
+	input := "for (var i, v of arr) {"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for unclosed for-of body")
+	}
+}
+
+func TestParseForUnclosedForInBody(t *testing.T) {
+	input := "for (var i in arr) {"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for unclosed for-in body")
+	}
+}
+
+func TestParseForVarDeclFloat(t *testing.T) {
+	input := `for (var x: float = 1.0; x < 5.0; x = x + 1.0) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseForVarDeclBool(t *testing.T) {
+	input := `for (var x: bool = true; x; x = false) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseForVarDeclString(t *testing.T) {
+	input := `for (var x: string = ""; x != "done"; x = "done") { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseForVarDeclMissingSemicolonAfterInit(t *testing.T) {
+	input := `for (var i: int{size: 32} = 0 i < 5; i = i + 1) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ';' after init")
+	}
+}
+
+func TestParseForVarDeclMissingSemicolonAfterCond(t *testing.T) {
+	input := `for (var i: int{size: 32} = 0; i < 5 i = i + 1) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ';' after condition")
+	}
+}
+
+func TestParseForVarDeclNonIdentUpdate(t *testing.T) {
+	input := `for (var i: int{size: 32} = 0; i < 10; 123) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for non-identifier in update")
+	}
+}
+
+func TestParseForVarDeclIncUpdate(t *testing.T) {
+	input := `for (var i: int{size: 32} = 0; i < 5; i++) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseForVarDeclDecUpdate(t *testing.T) {
+	input := `for (var i: int{size: 32} = 5; i >= 0; i--) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseForVarDeclPlusEqUpdate(t *testing.T) {
+	input := `for (var i: int{size: 32} = 0; i < 10; i += 1) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseForVarDeclMinusEqUpdate(t *testing.T) {
+	input := `for (var i: int{size: 32} = 10; i > 0; i -= 1) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseForVarDeclStarEqUpdate(t *testing.T) {
+	input := `for (var i: int{size: 32} = 1; i < 100; i *= 2) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseForVarDeclSlashEqUpdate(t *testing.T) {
+	input := `for (var i: int{size: 32} = 100; i > 1; i /= 2) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseForVarDeclModEqUpdate(t *testing.T) {
+	input := `for (var i: int{size: 32} = 10; i > 0; i %= 3) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+}
+
+func TestParseForVarDeclInvalidUpdateOp(t *testing.T) {
+	input := `for (var i: int{size: 32} = 0; i < 10; i == 1) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid update operator")
+	}
+}
+
+func TestParseForVarDeclMissingRParen(t *testing.T) {
+	input := "for (var i: int{size: 32} = 0; i < 10; i++ { }"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ')'")
+	}
+}
+
+func TestParseForVarDeclUnclosedBody(t *testing.T) {
+	input := "for (var i: int{size: 32} = 0; i < 10; i++) {"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for unclosed body")
+	}
+}
+
+func TestParseForVarInNonVarInitBranch(t *testing.T) {
+	input := "for (var ; ; ) { }"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for malformed var in non-var-init branch")
+	}
+}

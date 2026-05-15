@@ -76,6 +76,9 @@ const (
 	TOK_REF  TokenType = "REF"
 	TOK_COPY TokenType = "COPY"
 	TOK_IS   TokenType = "IS"
+	TOK_IN   TokenType = "IN"
+	TOK_AT   TokenType = "AT"
+	TOK_OF   TokenType = "OF"
 
 	TOK_EOF TokenType = "EOF"
 )
@@ -475,6 +478,12 @@ func (l *Lexer) readIdentifier() Token {
 		return Token{TOK_IS, word, l.line}
 	case "string":
 		return Token{TOK_STRING, word, l.line}
+	case "in":
+		return Token{TOK_IN, word, l.line}
+	case "at":
+		return Token{TOK_AT, word, l.line}
+	case "of":
+		return Token{TOK_OF, word, l.line}
 	case "NaN":
 		return Token{TOK_FLOAT_LIT, word, l.line}
 	case "infinity":

@@ -250,6 +250,12 @@ func (a *Analyzer) analyzeStmt(stmt ast.Stmt) {
 		a.analyzeIfStmt(s)
 	case *ast.ForStmt:
 		a.analyzeForStmt(s)
+	case *ast.ForInStmt:
+		a.analyzeForInStmt(s)
+	case *ast.ForAtStmt:
+		a.analyzeForAtStmt(s)
+	case *ast.ForOfStmt:
+		a.analyzeForOfStmt(s)
 	case *ast.WhileStmt:
 		a.analyzeWhileStmt(s)
 	case *ast.BlockStmt:
@@ -510,6 +516,21 @@ func (a *Analyzer) analyzeForStmt(s *ast.ForStmt) {
 		a.analyzeStmt(s.Update)
 	}
 	a.popScope()
+}
+
+func (a *Analyzer) analyzeForInStmt(s *ast.ForInStmt) {
+	a.analyzeExpr(s.Iter)
+	a.analyzeBlock(s.Body.Stmts)
+}
+
+func (a *Analyzer) analyzeForAtStmt(s *ast.ForAtStmt) {
+	a.analyzeExpr(s.Iter)
+	a.analyzeBlock(s.Body.Stmts)
+}
+
+func (a *Analyzer) analyzeForOfStmt(s *ast.ForOfStmt) {
+	a.analyzeExpr(s.Iter)
+	a.analyzeBlock(s.Body.Stmts)
 }
 
 func (a *Analyzer) analyzeWhileStmt(s *ast.WhileStmt) {

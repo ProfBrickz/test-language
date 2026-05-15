@@ -1178,3 +1178,46 @@ func TestNullGuardSuppressesNullWarningBinaryExprLeft(t *testing.T) {
 		t.Errorf("expected no warnings, got: %v", a.Warnings())
 	}
 }
+
+func TestAnalyzeForInStmt(t *testing.T) {
+	program := parseProgram(t, `
+var arr: array{size: 3}<int> = [1, 2, 3];
+for (var x in arr) {
+	print(x.toString());
+}
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}
+
+func TestAnalyzeForAtStmt(t *testing.T) {
+	program := parseProgram(t, `
+var arr: array{size: 3}<int> = [1, 2, 3];
+for (var i at arr) {
+	print(arr[i].toString());
+}
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}
+
+func TestAnalyzeForOfStmt(t *testing.T) {
+	program := parseProgram(t, `
+var arr: array{size: 3}<int> = [1, 2, 3];
+for (var i, v of arr) {
+	print((i).toString());
+	print((v).toString());
+}
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}
