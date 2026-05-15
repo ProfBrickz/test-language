@@ -63,11 +63,24 @@ func (p *Parser) parseStmt() ast.Stmt {
 		return p.parseRefDecl()
 	case lexer.TOK_PRINT:
 		return p.parsePrint()
+	case lexer.TOK_FUNCTION:
+		return p.parseFuncDecl()
+	case lexer.TOK_RETURN:
+		return p.parseReturn()
 	case lexer.TOK_IDENT:
 		if p.peekToken.Type == lexer.TOK_PLUS_PLUS || p.peekToken.Type == lexer.TOK_MINUS_MINUS {
 			return p.parseIncDec()
 		}
 		if p.peekToken.Type == lexer.TOK_DOT {
+			stmtLine := p.curToken.Line
+			expr := p.parsePostfix()
+			if p.curToken.Type != lexer.TOK_SEMICOLON {
+				p.addError("expected ';'")
+				return nil
+			}
+			return &ast.ExprStmt{Expr: expr, Line: stmtLine}
+		}
+		if p.peekToken.Type == lexer.TOK_LPAREN {
 			stmtLine := p.curToken.Line
 			expr := p.parsePostfix()
 			if p.curToken.Type != lexer.TOK_SEMICOLON {
@@ -127,6 +140,9 @@ func (p *Parser) parseType() ast.Type {
 func (p *Parser) parseTypeParams(validKeys map[string]bool) map[string]interface{} {
 	params := make(map[string]interface{})
 	if p.curToken.Type != lexer.TOK_LBRACE {
+		return params
+	}
+	if p.peekToken.Type != lexer.TOK_RBRACE && !validKeys[p.peekToken.Literal] {
 		return params
 	}
 	for {
@@ -606,6 +622,83 @@ func (p *Parser) parseBlock() *ast.BlockStmt {
 		block.Stmts = append(block.Stmts, stmt)
 	}
 	return block
+}
+
+func (p *Parser) parseFuncDecl() ast.Stmt {
+	line := p.curToken.Line
+	p.nextToken()
+	if p.curToken.Type != lexer.TOK_IDENT {
+		p.addError("expected function name, got %s", p.curToken.Type)
+		return nil
+	}
+	name := p.curToken.Literal
+	p.nextToken()
+
+	if p.curToken.Type != lexer.TOK_LPAREN {
+		p.addError("expected '(' after function name, got %s", p.curToken.Type)
+		return nil
+	}
+	p.nextToken()
+
+	params := make([]ast.Param, 0)
+	if p.curToken.Type != lexer.TOK_RPAREN {
+		params = append(params, p.parseParam())
+		for p.curToken.Type == lexer.TOK_COMMA {
+			p.nextToken()
+			params = append(params, p.parseParam())
+		}
+	}
+	if p.curToken.Type != lexer.TOK_RPAREN {
+		p.addError("expected ')' after parameters, got %s", p.curToken.Type)
+		return nil
+	}
+	p.nextToken()
+
+	var returnType ast.Type
+	if p.curToken.Type == lexer.TOK_COLON {
+		p.nextToken()
+		returnType = p.parseType()
+	}
+
+	body := p.parseBlock()
+	if body == nil {
+		return nil
+	}
+
+	return &ast.FuncDecl{Name: name, Parameters: params, ReturnType: returnType, Body: body, Line: line}
+}
+
+func (p *Parser) parseParam() ast.Param {
+	if p.curToken.Type != lexer.TOK_IDENT {
+		p.addError("expected parameter name, got %s", p.curToken.Type)
+		return ast.Param{}
+	}
+	name := p.curToken.Literal
+	p.nextToken()
+	if p.curToken.Type != lexer.TOK_COLON {
+		p.addError("expected ':' after parameter name, got %s", p.curToken.Type)
+		return ast.Param{}
+	}
+	p.nextToken()
+	typ := p.parseType()
+	return ast.Param{Name: name, Type: typ}
+}
+
+func (p *Parser) parseReturn() ast.Stmt {
+	line := p.curToken.Line
+	p.nextToken()
+
+	var value ast.Expr
+	if p.curToken.Type != lexer.TOK_SEMICOLON {
+		value = p.parseExpr()
+	}
+
+	if p.curToken.Type != lexer.TOK_SEMICOLON {
+		p.addError("expected ';' after return, got %s", p.curToken.Type)
+		return nil
+	}
+
+	return &ast.ReturnStmt{Value: value, Line: line}
 }
 
 func (p *Parser) parseIf() *ast.IfStmt {
@@ -1146,6 +1239,23 @@ func (p *Parser) parsePostfix() ast.Expr {
 			} else {
 				left = &ast.MemberAccess{Object: left, Member: name, Line: opLine}
 			}
+		case lexer.TOK_LPAREN:
+			opLine := p.curToken.Line
+			p.nextToken()
+			args := make([]ast.Expr, 0)
+			if p.curToken.Type != lexer.TOK_RPAREN {
+				args = append(args, p.parseExpr())
+				for p.curToken.Type == lexer.TOK_COMMA {
+					p.nextToken()
+					args = append(args, p.parseExpr())
+				}
+			}
+			if p.curToken.Type != lexer.TOK_RPAREN {
+				p.addError("expected ')' after arguments")
+				return left
+			}
+			p.nextToken()
+			left = &ast.CallExpr{Function: left, Args: args, Line: opLine}
 		default:
 			return left
 		}

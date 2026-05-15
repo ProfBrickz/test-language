@@ -13,6 +13,10 @@ go tool cover -html=coverage.out -o coverage.html    # HTML view
 - Full run: `coverage.out` / `coverage.html`
 - Targeted: `coverage_<purpose>.out` / `coverage_<purpose>.html` (e.g. `coverage_lexer.out`)
 
+## Temp Files
+
+Use `.opencode/tmp/` for any temporary files (instead of `/tmp`).
+
 ## Style
 
 Only use hyphens (-), never em dashes (—) or en dashes (–).

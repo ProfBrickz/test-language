@@ -4736,3 +4736,315 @@ func TestParseForVarInNonVarInitBranch(t *testing.T) {
 		t.Errorf("expected error for malformed var in non-var-init branch")
 	}
 }
+
+func TestParseFuncDecl(t *testing.T) {
+	input := "function add(x: int, y: int): int { return x + y; }"
+	p := New(lexer.New(input))
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	fn, ok := program.Stmts[0].(*ast.FuncDecl)
+	if !ok {
+		t.Fatalf("expected *ast.FuncDecl, got %T", program.Stmts[0])
+	}
+	if fn.Name != "add" {
+		t.Errorf("expected name 'add', got %q", fn.Name)
+	}
+	if len(fn.Parameters) != 2 {
+		t.Fatalf("expected 2 parameters, got %d", len(fn.Parameters))
+	}
+	if fn.Parameters[0].Name != "x" {
+		t.Errorf("expected param[0] name 'x', got %q", fn.Parameters[0].Name)
+	}
+	if fn.Parameters[1].Name != "y" {
+		t.Errorf("expected param[1] name 'y', got %q", fn.Parameters[1].Name)
+	}
+	if fn.Body == nil {
+		t.Fatal("expected non-nil body")
+	}
+	if len(fn.Body.Stmts) != 1 {
+		t.Fatalf("expected 1 body statement, got %d", len(fn.Body.Stmts))
+	}
+	ret, ok := fn.Body.Stmts[0].(*ast.ReturnStmt)
+	if !ok {
+		t.Fatalf("expected *ast.ReturnStmt, got %T", fn.Body.Stmts[0])
+	}
+	if ret.Value == nil {
+		t.Error("expected return value, got nil")
+	}
+}
+
+func TestParseFuncDeclNoParams(t *testing.T) {
+	input := "function foo(): int { return 42; }"
+	p := New(lexer.New(input))
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	fn, ok := program.Stmts[0].(*ast.FuncDecl)
+	if !ok {
+		t.Fatalf("expected *ast.FuncDecl, got %T", program.Stmts[0])
+	}
+	if len(fn.Parameters) != 0 {
+		t.Errorf("expected 0 parameters, got %d", len(fn.Parameters))
+	}
+	if fn.ReturnType == nil {
+		t.Error("expected non-nil return type")
+	}
+}
+
+func TestParseFuncDeclVoid(t *testing.T) {
+	input := "function log(msg: string) { print(msg); }"
+	p := New(lexer.New(input))
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	fn, ok := program.Stmts[0].(*ast.FuncDecl)
+	if !ok {
+		t.Fatalf("expected *ast.FuncDecl, got %T", program.Stmts[0])
+	}
+	if fn.ReturnType != nil {
+		t.Error("expected nil return type for void function")
+	}
+	if len(fn.Parameters) != 1 {
+		t.Fatalf("expected 1 parameter, got %d", len(fn.Parameters))
+	}
+	if fn.Parameters[0].Name != "msg" {
+		t.Errorf("expected param name 'msg', got %q", fn.Parameters[0].Name)
+	}
+}
+
+func TestParseFuncCall(t *testing.T) {
+	input := "foo(1, 2);"
+	p := New(lexer.New(input))
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(program.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(program.Stmts))
+	}
+	exprStmt, ok := program.Stmts[0].(*ast.ExprStmt)
+	if !ok {
+		t.Fatalf("expected *ast.ExprStmt, got %T", program.Stmts[0])
+	}
+	call, ok := exprStmt.Expr.(*ast.CallExpr)
+	if !ok {
+		t.Fatalf("expected *ast.CallExpr, got %T", exprStmt.Expr)
+	}
+	ref, ok := call.Function.(*ast.VarRef)
+	if !ok {
+		t.Fatalf("expected *ast.VarRef in call, got %T", call.Function)
+	}
+	if ref.Name != "foo" {
+		t.Errorf("expected function name 'foo', got %q", ref.Name)
+	}
+	if len(call.Args) != 2 {
+		t.Fatalf("expected 2 arguments, got %d", len(call.Args))
+	}
+}
+
+func TestParseFuncCallNoArgs(t *testing.T) {
+	input := "foo();"
+	p := New(lexer.New(input))
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	exprStmt := program.Stmts[0].(*ast.ExprStmt)
+	call := exprStmt.Expr.(*ast.CallExpr)
+	if len(call.Args) != 0 {
+		t.Errorf("expected 0 arguments, got %d", len(call.Args))
+	}
+}
+
+func TestParseFuncCallInExpr(t *testing.T) {
+	input := "var x: int{size: 32} = foo(42) + 1;"
+	p := New(lexer.New(input))
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	decl := program.Stmts[0].(*ast.VarDecl)
+	bin, ok := decl.Expr.(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected *ast.BinaryExpr, got %T", decl.Expr)
+	}
+	call, ok := bin.Left.(*ast.CallExpr)
+	if !ok {
+		t.Fatalf("expected *ast.CallExpr, got %T", bin.Left)
+	}
+	ref := call.Function.(*ast.VarRef)
+	if ref.Name != "foo" {
+		t.Errorf("expected 'foo', got %q", ref.Name)
+	}
+}
+
+func TestParseBareReturn(t *testing.T) {
+	input := "return;"
+	p := New(lexer.New(input))
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	_, ok := program.Stmts[0].(*ast.ReturnStmt)
+	if !ok {
+		t.Fatalf("expected *ast.ReturnStmt")
+	}
+}
+
+func TestParseReturnWithValue(t *testing.T) {
+	input := "return 42;"
+	p := New(lexer.New(input))
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	ret, ok := program.Stmts[0].(*ast.ReturnStmt)
+	if !ok {
+		t.Fatalf("expected *ast.ReturnStmt")
+	}
+	if ret.Value == nil {
+		t.Error("expected non-nil return value")
+	}
+}
+
+func TestParseFuncDeclNoName(t *testing.T) {
+	input := "function 123() {}"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing function name")
+	}
+}
+
+func TestParseFuncDeclNoParen(t *testing.T) {
+	input := "function foo {}"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '('")
+	}
+}
+
+func TestParseFuncDeclNoRParen(t *testing.T) {
+	input := "function foo(x: int { }"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ')'")
+	}
+}
+
+func TestParseFuncDeclNoBody(t *testing.T) {
+	input := "function foo(): int {"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for unclosed body")
+	}
+}
+
+func TestParseExprStmtCallNoSemicolon(t *testing.T) {
+	input := "foo()"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ';' after call")
+	}
+}
+
+func TestParseBoolInvalidParamForKey(t *testing.T) {
+	input := "var x: bool{nullable: true, size: 32};"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid param key in bool context")
+	}
+}
+
+func TestParseParamNoName(t *testing.T) {
+	input := "function foo(123: int) {}"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid parameter name")
+	}
+}
+
+func TestParseParamNoColon(t *testing.T) {
+	input := "function foo(x int) {}"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ':' after param name")
+	}
+}
+
+func TestParseReturnNoSemicolon(t *testing.T) {
+	input := "return"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ';' after return")
+	}
+}
+
+func TestParseReturnValueNoSemicolon(t *testing.T) {
+	input := "return 42"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ';' after return value")
+	}
+}
+
+func TestParseFuncCallNoRParen(t *testing.T) {
+	input := "foo(1;"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ')'")
+	}
+}
+
+func TestParseTypeParamsNoColon(t *testing.T) {
+	input := "var x: int{size 32};"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ':' in type param")
+	}
+}
+
+func TestParseTypeParamsNoCommaOrRbrace(t *testing.T) {
+	input := "var x: int{size: 32 nullable: true};"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ',' or '}' in type params")
+	}
+}
+
+func TestParsePostfixIndexNoRBracket(t *testing.T) {
+	input := "var x: int{size: 32} = a[0;"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ']'")
+	}
+}
+
+func TestParsePostfixDotInvalidMember(t *testing.T) {
+	input := "var x = a.123;"
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for invalid member name after '.'")
+	}
+}

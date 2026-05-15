@@ -198,17 +198,20 @@ type guardInfo struct {
 }
 
 type Analyzer struct {
-	env      map[string]AbsValue
-	errors   []string
-	warnings []string
-	guards   []guardInfo
-	nullMode NullMode
+	env        map[string]AbsValue
+	errors     []string
+	warnings   []string
+	guards     []guardInfo
+	nullMode   NullMode
+	funcs      map[string]*ast.FuncDecl
+	insideFunc *ast.FuncDecl
 }
 
 func New() *Analyzer {
 	return &Analyzer{
 		env:      make(map[string]AbsValue),
 		nullMode: NullWarn,
+		funcs:    make(map[string]*ast.FuncDecl),
 	}
 }
 
@@ -226,8 +229,53 @@ func (a *Analyzer) Warnings() []string {
 
 func (a *Analyzer) Analyze(program *ast.Program) {
 	for _, stmt := range program.Stmts {
+		a.collectFunc(stmt)
+	}
+	for _, stmt := range program.Stmts {
 		a.analyzeStmt(stmt)
 	}
+	for _, fn := range a.funcs {
+		a.analyzeFunc(fn)
+	}
+}
+
+func (a *Analyzer) collectFunc(stmt ast.Stmt) {
+	if fn, ok := stmt.(*ast.FuncDecl); ok {
+		if _, exists := a.funcs[fn.Name]; exists {
+			a.addError(fn.Line, "duplicate function: "+fn.Name)
+			return
+		}
+		a.funcs[fn.Name] = fn
+	}
+}
+
+func (a *Analyzer) analyzeFunc(fn *ast.FuncDecl) {
+	a.insideFunc = fn
+	a.pushScope()
+	for _, param := range fn.Parameters {
+		a.env[param.Name] = defaultValueForParam(param.Type)
+	}
+	a.analyzeBlock(fn.Body.Stmts)
+	a.popScope()
+	a.insideFunc = nil
+}
+
+func defaultValueForParam(t ast.Type) AbsValue {
+	switch typ := t.(type) {
+	case ast.IntegerType:
+		return anyIntValue(typ)
+	case ast.FloatType:
+		return anyFloatValue(typ)
+	case ast.BoolType:
+		return anyBoolValue(typ)
+	case ast.StringType:
+		return AbsValue{kind: AbsString, isAnyStr: true}
+	case ast.ArrayType:
+		return AbsValue{kind: AbsArray}
+	case ast.ListType:
+		return AbsValue{kind: AbsList}
+	}
+	return AbsValue{}
 }
 
 func (a *Analyzer) addError(line int, msg string) {
@@ -268,6 +316,27 @@ func (a *Analyzer) analyzeStmt(stmt ast.Stmt) {
 		a.analyzeIncDec(s)
 	case *ast.BreakStmt:
 	case *ast.SkipStmt:
+	case *ast.FuncDecl:
+	case *ast.ReturnStmt:
+		a.analyzeReturn(s)
+	}
+}
+
+func (a *Analyzer) analyzeReturn(s *ast.ReturnStmt) {
+	if a.insideFunc == nil {
+		a.addError(s.Line, "return outside function")
+		return
+	}
+	if a.insideFunc.ReturnType == nil && s.Value != nil {
+		a.addError(s.Line, "return with value in void function")
+		return
+	}
+	if a.insideFunc.ReturnType != nil && s.Value == nil {
+		a.addError(s.Line, "bare return in typed function")
+		return
+	}
+	if s.Value != nil {
+		a.analyzeExpr(s.Value)
 	}
 }
 
@@ -594,6 +663,29 @@ func (a *Analyzer) analyzeExpr(expr ast.Expr) AbsValue {
 		return a.analyzeExpr(e.Right)
 	case *ast.IsExpr:
 		return AbsValue{}
+	case *ast.CallExpr:
+		return a.analyzeCall(e)
+	}
+	return AbsValue{}
+}
+
+func (a *Analyzer) analyzeCall(e *ast.CallExpr) AbsValue {
+	if ref, ok := e.Function.(*ast.VarRef); ok {
+		decl, exists := a.funcs[ref.Name]
+		if !exists {
+			a.addError(e.Line, "undefined function: "+ref.Name)
+			return AbsValue{}
+		}
+		if len(e.Args) != len(decl.Parameters) {
+			a.addError(e.Line, fmt.Sprintf("function %s expects %d arguments, got %d", ref.Name, len(decl.Parameters), len(e.Args)))
+			return AbsValue{}
+		}
+		for _, arg := range e.Args {
+			a.analyzeExpr(arg)
+		}
+		if decl.ReturnType != nil {
+			return defaultValueForParam(decl.ReturnType)
+		}
 	}
 	return AbsValue{}
 }

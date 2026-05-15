@@ -1221,3 +1221,204 @@ for (var i, v of arr) {
 		t.Errorf("expected no errors, got: %v", a.Errors())
 	}
 }
+
+func TestAnalyzeFuncValid(t *testing.T) {
+	program := parseProgram(t, `
+function add(x: int, y: int): int {
+	return x + y;
+}
+var r: int{size: 32} = add(1, 2);
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}
+
+func TestAnalyzeFuncVoidValid(t *testing.T) {
+	program := parseProgram(t, `
+function greet(name: string) {
+	print(name);
+}
+greet("hi");
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}
+
+func TestAnalyzeFuncReturnOutsideError(t *testing.T) {
+	program := parseProgram(t, `return;`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) == 0 {
+		t.Errorf("expected error for return outside function")
+	}
+}
+
+func TestAnalyzeFuncVoidReturnValueError(t *testing.T) {
+	program := parseProgram(t, `
+function foo() {
+	return 42;
+}
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) == 0 {
+		t.Errorf("expected error for return with value in void function")
+	}
+}
+
+func TestAnalyzeFuncTypedBareReturnError(t *testing.T) {
+	program := parseProgram(t, `
+function foo(): int {
+	return;
+}
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) == 0 {
+		t.Errorf("expected error for bare return in typed function")
+	}
+}
+
+func TestAnalyzeFuncCallUndefinedError(t *testing.T) {
+	program := parseProgram(t, `foo();`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) == 0 {
+		t.Errorf("expected error for undefined function")
+	}
+}
+
+func TestAnalyzeFuncCallArgCountError(t *testing.T) {
+	program := parseProgram(t, `
+function add(x: int, y: int): int {
+	return x + y;
+}
+add(1);
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) == 0 {
+		t.Errorf("expected error for wrong argument count")
+	}
+}
+
+func TestAnalyzeFuncDuplicateError(t *testing.T) {
+	program := parseProgram(t, `
+function foo(): int { return 1; }
+function foo(): int { return 2; }
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) == 0 {
+		t.Errorf("expected error for duplicate function")
+	}
+}
+
+func TestAnalyzeFuncRecursion(t *testing.T) {
+	program := parseProgram(t, `
+function factorial(n: int): int {
+	if (n <= 1) {
+		return 1;
+	}
+	return n * factorial(n - 1);
+}
+print(factorial(5).toString());
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}
+
+func TestAnalyzeFuncFloatParam(t *testing.T) {
+	program := parseProgram(t, `
+function foo(x: float{size: 32}): int {
+	return 1;
+}
+foo(1.0);
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}
+
+func TestAnalyzeFuncBoolParam(t *testing.T) {
+	program := parseProgram(t, `
+function foo(x: bool): int {
+	return 1;
+}
+foo(true);
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}
+
+func TestAnalyzeFuncArrayParam(t *testing.T) {
+	program := parseProgram(t, `
+function foo(x: array<int{size: 32}>): int {
+	return 1;
+}
+var a: array{size: 3}<int{size: 32}> = [1, 2, 3];
+foo(a);
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}
+
+func TestAnalyzeFuncListParam(t *testing.T) {
+	program := parseProgram(t, `
+function foo(x: list<int{size: 32}>): int {
+	return 1;
+}
+var a: list<int{size: 32}> = [1, 2, 3];
+foo(a);
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}
+
+type unknownType struct{}
+
+func (unknownType) Kind() string { return "custom" }
+
+func TestDefaultValueForParamUnknownType(t *testing.T) {
+	result := defaultValueForParam(unknownType{})
+	if result != (AbsValue{}) {
+		t.Errorf("expected empty AbsValue for unknown type")
+	}
+}
+
+func TestAnalyzeFuncHoisting(t *testing.T) {
+	program := parseProgram(t, `
+function caller(): int {
+	return callee();
+}
+function callee(): int {
+	return 99;
+}
+caller();
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}

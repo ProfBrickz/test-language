@@ -66,12 +66,14 @@ const (
 	TOK_LPAREN   TokenType = "("
 	TOK_RPAREN   TokenType = ")"
 
-	TOK_IF    TokenType = "IF"
-	TOK_ELSE  TokenType = "ELSE"
-	TOK_FOR   TokenType = "FOR"
-	TOK_WHILE TokenType = "WHILE"
-	TOK_BREAK TokenType = "BREAK"
-	TOK_SKIP  TokenType = "SKIP"
+	TOK_IF       TokenType = "IF"
+	TOK_ELSE     TokenType = "ELSE"
+	TOK_FOR      TokenType = "FOR"
+	TOK_WHILE    TokenType = "WHILE"
+	TOK_BREAK    TokenType = "BREAK"
+	TOK_SKIP     TokenType = "SKIP"
+	TOK_FUNCTION TokenType = "FUNCTION"
+	TOK_RETURN   TokenType = "RETURN"
 
 	TOK_REF  TokenType = "REF"
 	TOK_COPY TokenType = "COPY"
@@ -482,6 +484,10 @@ func (l *Lexer) readIdentifier() Token {
 		return Token{TOK_IN, word, l.line}
 	case "at":
 		return Token{TOK_AT, word, l.line}
+	case "function":
+		return Token{TOK_FUNCTION, word, l.line}
+	case "return":
+		return Token{TOK_RETURN, word, l.line}
 	case "of":
 		return Token{TOK_OF, word, l.line}
 	case "NaN":

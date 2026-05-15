@@ -1097,3 +1097,24 @@ func TestInAtOfKeywords(t *testing.T) {
 		}
 	}
 }
+
+func TestFunctionAndReturnKeywords(t *testing.T) {
+	input := "function return"
+	l := New(input)
+	tests := []struct {
+		expectedType    TokenType
+		expectedLiteral string
+	}{
+		{TOK_FUNCTION, "function"},
+		{TOK_RETURN, "return"},
+	}
+	for i, tt := range tests {
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Errorf("test[%d] - expected %s, got %s", i, tt.expectedType, tok.Type)
+		}
+		if tok.Literal != tt.expectedLiteral {
+			t.Errorf("test[%d] - expected literal %q, got %q", i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}

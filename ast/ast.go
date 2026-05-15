@@ -254,6 +254,30 @@ type IncDecStmt struct {
 	Line int
 }
 
+type FuncDecl struct {
+	Name       string
+	Parameters []Param
+	ReturnType Type
+	Body       *BlockStmt
+	Line       int
+}
+
+type Param struct {
+	Name string
+	Type Type
+}
+
+type ReturnStmt struct {
+	Value Expr
+	Line  int
+}
+
+type CallExpr struct {
+	Function Expr
+	Args     []Expr
+	Line     int
+}
+
 type Program struct {
 	Stmts []Stmt
 }

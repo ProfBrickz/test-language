@@ -577,6 +577,14 @@ func (s LoopSignal) Error() string {
 	return "unknown loop control"
 }
 
+type ReturnSignal struct {
+	Value Value
+}
+
+func (r ReturnSignal) Error() string {
+	return "return"
+}
+
 type Environment struct {
 	variables map[string]*Value
 	outer     *Environment
@@ -658,10 +666,11 @@ type Interpreter struct {
 	env          *Environment
 	showWarnings ShowWhen
 	showErrors   ShowWhen
+	funcs        map[string]*ast.FuncDecl
 }
 
 func New() *Interpreter {
-	return &Interpreter{env: NewEnv(), showWarnings: ShowParse, showErrors: ShowBoth}
+	return &Interpreter{env: NewEnv(), showWarnings: ShowParse, showErrors: ShowBoth, funcs: make(map[string]*ast.FuncDecl)}
 }
 
 func (i *Interpreter) SetShowErrors(when ShowWhen) {
@@ -704,6 +713,11 @@ func (i *Interpreter) errorf(line int, format string, args ...interface{}) error
 
 func (i *Interpreter) Run(program *ast.Program) error {
 	for _, stmt := range program.Stmts {
+		if fn, ok := stmt.(*ast.FuncDecl); ok {
+			i.funcs[fn.Name] = fn
+		}
+	}
+	for _, stmt := range program.Stmts {
 		if err := i.executeStmt(stmt); err != nil {
 			return err
 		}
@@ -712,7 +726,11 @@ func (i *Interpreter) Run(program *ast.Program) error {
 }
 
 func (i *Interpreter) ExecuteStmt(stmt ast.Stmt) error {
-	return i.executeStmt(stmt)
+	err := i.executeStmt(stmt)
+	if _, ok := err.(ReturnSignal); ok {
+		return i.errorf(0, "return outside function")
+	}
+	return err
 }
 
 func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
@@ -793,6 +811,17 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 		if err != nil {
 			return err
 		}
+	case *ast.FuncDecl:
+		return nil
+	case *ast.ReturnStmt:
+		if s.Value != nil {
+			val, err := i.evalExpr(s.Value)
+			if err != nil {
+				return err
+			}
+			return ReturnSignal{Value: val}
+		}
+		return ReturnSignal{}
 	default:
 		return fmt.Errorf("unknown statement type")
 	}
@@ -1736,9 +1765,57 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 			return result, nil
 		}
 		return Value{}, i.errorf(e.Line, "value of type %s has no attribute %q", typeDescForVal(obj), e.Member)
+	case *ast.CallExpr:
+		return i.evalCall(e)
 	default:
 		return Value{}, fmt.Errorf("unknown expression type")
 	}
+}
+
+func (i *Interpreter) evalCall(e *ast.CallExpr) (Value, error) {
+	ref, ok := e.Function.(*ast.VarRef)
+	if !ok {
+		return Value{}, i.errorf(e.Line, "cannot call non-variable expression")
+	}
+	decl, exists := i.funcs[ref.Name]
+	if !exists {
+		return Value{}, i.errorf(e.Line, "undefined function: %s", ref.Name)
+	}
+	if len(e.Args) != len(decl.Parameters) {
+		return Value{}, i.errorf(e.Line, "function %s expects %d arguments, got %d", ref.Name, len(decl.Parameters), len(e.Args))
+	}
+
+	argVals := make([]Value, len(e.Args))
+	for idx, arg := range e.Args {
+		val, err := i.evalExpr(arg)
+		if err != nil {
+			return Value{}, err
+		}
+		argVals[idx] = val
+	}
+
+	i.pushScope()
+	for idx, param := range decl.Parameters {
+		i.env.Define(param.Name, argVals[idx])
+	}
+
+	err := i.executeStmt(decl.Body)
+	i.popScope()
+
+	if err != nil {
+		if rs, ok := err.(ReturnSignal); ok {
+			if decl.ReturnType == nil {
+				return Value{}, nil
+			}
+			return rs.Value, nil
+		}
+		return Value{}, err
+	}
+
+	if decl.ReturnType != nil {
+		return Value{}, i.errorf(e.Line, "function %s did not return a value", ref.Name)
+	}
+	return Value{}, nil
 }
 
 func (i *Interpreter) evalArrayMember(obj *Value, e *ast.MemberAccess) (Value, error) {

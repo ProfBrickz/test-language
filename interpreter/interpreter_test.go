@@ -27,6 +27,210 @@ func captureOutput(f func()) string {
 	return strings.TrimSpace(string(out))
 }
 
+func TestFuncSimple(t *testing.T) {
+	input := `
+function add(x: int, y: int): int {
+	return x + y;
+}
+print(add(2, 3).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "5") {
+		t.Errorf("expected output to contain '5', got %q", output)
+	}
+}
+
+func TestFuncVoid(t *testing.T) {
+	input := `
+function greet(name: string) {
+	print("hi " + name);
+}
+greet("world");
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	expected := "hi world"
+	if output != expected {
+		t.Errorf("expected %q, got %q", expected, output)
+	}
+}
+
+func TestFuncVoidReturn(t *testing.T) {
+	input := `
+function test(x: int) {
+	if (x == 0) {
+		return;
+	}
+	print(x.toString());
+}
+test(0);
+test(1);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestFuncMultiCall(t *testing.T) {
+	input := `
+function add(x: int, y: int): int {
+	return x + y;
+}
+var a: int{size: 32} = add(1, 2);
+var b: int{size: 32} = add(a, 3);
+print(b.toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "6") {
+		t.Errorf("expected output to contain '6', got %q", output)
+	}
+}
+
+func TestFuncRecursion(t *testing.T) {
+	input := `
+function factorial(n: int): int {
+	if (n <= 1) {
+		return 1;
+	}
+	return n * factorial(n - 1);
+}
+print(factorial(5).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "120") {
+		t.Errorf("expected output to contain '120', got %q", output)
+	}
+}
+
+func TestFuncHoisting(t *testing.T) {
+	input := `
+print(foo().toString());
+function foo(): int {
+	return 42;
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "42") {
+		t.Errorf("expected output to contain '42', got %q", output)
+	}
+}
+
+func TestFuncUndefinedError(t *testing.T) {
+	input := `foo();`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for undefined function")
+	}
+}
+
+func TestFuncReturnOutsideError(t *testing.T) {
+	input := `return;`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for return outside function")
+	}
+}
+
 func TestVarDeclAndPrint(t *testing.T) {
 	input := `
 var x: int{size: 32, signed: true, nullable: false} = 42;
@@ -12969,5 +13173,140 @@ func TestSetShowWarningsBoth(t *testing.T) {
 	}
 	if !i.ShowRunWarnings() {
 		t.Errorf("expected ShowRunWarnings to be true after setting ShowBoth")
+	}
+}
+
+func TestReturnSignalError(t *testing.T) {
+	rs := ReturnSignal{Value: Value{}}
+	if rs.Error() != "return" {
+		t.Errorf("expected 'return', got %q", rs.Error())
+	}
+}
+
+func TestExecuteStmtReturnOutsideError(t *testing.T) {
+	input := `return;`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(program.Stmts) == 0 {
+		t.Fatal("expected 1 statement")
+	}
+	i := New()
+	err := i.ExecuteStmt(program.Stmts[0])
+	if err == nil {
+		t.Errorf("expected error for return outside function")
+	}
+}
+
+func TestFuncArgCountMismatchError(t *testing.T) {
+	input := `
+function add(x: int, y: int): int {
+	return x + y;
+}
+print(add(1).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for argument count mismatch")
+	}
+}
+
+func TestFuncNoReturnValueError(t *testing.T) {
+	input := `
+function foo(): int {
+	var x: int{size: 32} = 1;
+}
+print(foo().toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for function not returning a value")
+	}
+}
+
+func TestFuncCallNonVarRefError(t *testing.T) {
+	i := New()
+	call := &ast.CallExpr{
+		Function: &ast.IntegerLit{Value: 42},
+		Line:     1,
+	}
+	_, err := i.evalExpr(call)
+	if err == nil {
+		t.Errorf("expected error for calling non-variable expression")
+	}
+}
+
+func TestFuncArgEvalError(t *testing.T) {
+	input := `
+function foo(x: int): int {
+	return x;
+}
+foo(10 / 0);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected runtime error in argument evaluation")
+	}
+}
+
+func TestReturnExprEvalError(t *testing.T) {
+	input := `
+function foo(): int {
+	return 10 / 0;
+}
+foo();
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected runtime error in return expression")
+	}
+}
+
+func TestFuncBodyError(t *testing.T) {
+	input := `
+function foo(): int {
+	var x: int{size: 32} = 10 / 0;
+	return x;
+}
+foo();
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected runtime error in function body")
 	}
 }
