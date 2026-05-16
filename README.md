@@ -2,6 +2,8 @@
 
 A vibe coded proof of concept programming language. Everything here is vibe coded - the code, the comments, the commits, the docs, even this sentence. I plan to make it properly once I have a design worked out, using LLVM as a backend.
 
+**Pull requests are closed.** This is vibe coded, so I don't know how it works and I can not check if a pull request works correctly, or if it could be dangerous. Feel free to open an issue if you have any suggestions.
+
 Inspired by **C**, **Java**, **JavaScript**, **C#**, and **Odin**, with some special features of its own:
 
 - **Configurable primitive types** - Integers with explicit size (8/16/32/64), signedness, and nullability; floats with configurable precision (16/32/64); booleans with nullability
