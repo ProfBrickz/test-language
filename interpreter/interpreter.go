@@ -38,6 +38,19 @@ func intToStr(data int64, itype ast.IntegerType, untyped bool) string {
 	return fmt.Sprintf("%d", data)
 }
 
+func valueToStr(v Value) Value {
+	if v.Null {
+		return Value{IsString: true, StringData: "null"}
+	}
+	if v.IsBool {
+		return Value{IsString: true, StringData: strconv.FormatBool(v.BData)}
+	}
+	if v.IsFloat {
+		return Value{IsString: true, StringData: formatFloat(v.FData)}
+	}
+	return Value{IsString: true, StringData: intToStr(v.Data, v.IType, v.Untyped)}
+}
+
 func formatFloat(val float64) string {
 	if math.IsInf(val, 1) {
 		return "infinity"
@@ -343,7 +356,10 @@ func typeDescForType(t ast.Type) string {
 	}
 }
 
-func typeDescFromVar(it ast.IntegerType, ft ast.FloatType, bt ast.BoolType, isFloat, isBool bool) string {
+func typeDescFromVar(it ast.IntegerType, ft ast.FloatType, bt ast.BoolType, isFloat, isBool bool, isString bool) string {
+	if isString {
+		return "string"
+	}
 	if isBool {
 		nullability := "non-nullable "
 		if bt.Nullable {
@@ -379,7 +395,7 @@ func typeDescForVal(v Value) string {
 	if v.Type != nil {
 		return typeDescForType(v.Type)
 	}
-	return typeDescFromVar(v.IType, v.FType, v.BType, v.IsFloat, v.IsBool)
+	return typeDescFromVar(v.IType, v.FType, v.BType, v.IsFloat, v.IsBool, v.IsString)
 }
 
 func typeDesc(t interface{}, isBool bool) string {
@@ -749,6 +765,8 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 		}
 	case *ast.IfStmt:
 		return i.execIf(s)
+	case *ast.SwitchStmt:
+		return i.execSwitch(s)
 	case *ast.ForStmt:
 		return i.execFor(s)
 	case *ast.ForInStmt:
@@ -900,16 +918,16 @@ func (i *Interpreter) execVarDecl(s *ast.VarDecl) error {
 		}
 		if rightVal.Null {
 			if !s.IsBool && !s.IType.Nullable && !s.FType.Nullable || (s.IsBool && !s.BType.Nullable) {
-				return i.errorf(s.Line, "cannot assign null to %s", typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
+				return i.errorf(s.Line, "cannot assign null to %s", typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool, false))
 			}
 			val.Null = true
 		} else {
 			if rightVal.IsBool {
 				if !s.IsBool {
-					return i.errorf(s.Line, "cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
+					return i.errorf(s.Line, "cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool, false))
 				}
 				if rightVal.BType.Nullable && !s.BType.Nullable {
-					return i.errorf(s.Line, "cannot assign nullable %s to non-nullable %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
+					return i.errorf(s.Line, "cannot assign nullable %s to non-nullable %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool, false))
 				}
 				val.BData = rightVal.BData
 			} else if rightVal.IsFloat {
@@ -917,20 +935,20 @@ func (i *Interpreter) execVarDecl(s *ast.VarDecl) error {
 					return i.errorf(s.Line, "cannot assign %s to int variable", typeDescForVal(rightVal))
 				}
 				if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, true, s.IType, s.FType, true) {
-					return i.errorf(s.Line, "type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, true, false))
+					return i.errorf(s.Line, "type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, true, false, false))
 				}
 				val.FData = convertFloat(rightVal.FData, s.FType)
 			} else {
 				if s.IsBool {
-					return i.errorf(s.Line, "cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool))
+					return i.errorf(s.Line, "cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool, false))
 				} else if s.IsFloat {
 					if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, ast.FloatType{}, false, ast.IntegerType{}, s.FType, true) {
-						return i.errorf(s.Line, "type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(ast.IntegerType{}, s.FType, ast.BoolType{}, true, false))
+						return i.errorf(s.Line, "type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(ast.IntegerType{}, s.FType, ast.BoolType{}, true, false, false))
 					}
 					val.FData = convertFloat(float64(rightVal.Data), s.FType)
 				} else {
 					if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, false, s.IType, s.FType, false) {
-						return i.errorf(s.Line, "type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, ast.BoolType{}, false, false))
+						return i.errorf(s.Line, "type mismatch: cannot convert %s to %s", typeDescForVal(rightVal), typeDescFromVar(s.IType, s.FType, ast.BoolType{}, false, false, false))
 					}
 					val.Data = convertInt(rightVal.Data, s.IType)
 				}
@@ -1191,7 +1209,7 @@ func (i *Interpreter) executeAssignment(stmt *ast.Assignment) error {
 		}
 	} else if val.IsFloat && !rightVal.IsFloat {
 		if !rightVal.Untyped && !canImplicitConvert(rightVal.IType, rightVal.FType, false, val.IType, val.FType, true) {
-			return i.errorf(stmt.Line, "type mismatch: cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(val.IType, val.FType, ast.BoolType{}, true, false))
+			return i.errorf(stmt.Line, "type mismatch: cannot assign %s to %s", typeDescForVal(rightVal), typeDescFromVar(val.IType, val.FType, ast.BoolType{}, true, false, false))
 		}
 		switch stmt.Op {
 		case "=":
@@ -1358,6 +1376,53 @@ func (i *Interpreter) execElse(stmt ast.Stmt) error {
 	default:
 		return fmt.Errorf("unexpected else type: %T", stmt)
 	}
+}
+
+func (i *Interpreter) execSwitch(s *ast.SwitchStmt) error {
+	switchVal, err := i.evalExpr(s.Value)
+	if err != nil {
+		return err
+	}
+
+	for _, c := range s.Cases {
+		if c.Default {
+			i.pushScope()
+			err = i.executeStmt(c.Body)
+			i.popScope()
+			return err
+		}
+
+		caseVal, err := i.evalExpr(c.Value)
+		if err != nil {
+			return err
+		}
+
+		var matched Value
+		op := c.Op
+		if op == "" {
+			op = "=="
+		}
+		switch op {
+		case "==", "!=":
+			matched, err = i.evalEquality(switchVal, caseVal, op, c.Line)
+		case "<", ">", "<=", ">=":
+			matched, err = i.evalComparison(switchVal, caseVal, op, c.Line)
+		default:
+			return i.errorf(c.Line, "unknown case operator: %s", op)
+		}
+		if err != nil {
+			return err
+		}
+
+		if matched.BData {
+			i.pushScope()
+			err = i.executeStmt(c.Body)
+			i.popScope()
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (i *Interpreter) execFor(s *ast.ForStmt) error {
@@ -2036,8 +2101,11 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 
 	// String concatenation
 	if expr.Op == "+" && (left.IsString || right.IsString) {
-		if !left.IsString || !right.IsString {
-			return Value{}, i.errorf(expr.Line, "cannot concatenate %s and %s", typeDescForVal(left), typeDescForVal(right))
+		if !left.IsString {
+			left = valueToStr(left)
+		}
+		if !right.IsString {
+			right = valueToStr(right)
 		}
 		return Value{IsString: true, StringData: left.StringData + right.StringData}, nil
 	}

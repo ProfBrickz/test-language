@@ -99,6 +99,14 @@ func (p *Parser) parseStmt() ast.Stmt {
 		return p.parseFor()
 	case lexer.TOK_WHILE:
 		return p.parseWhile()
+	case lexer.TOK_SWITCH:
+		return p.parseSwitch()
+	case lexer.TOK_CASE:
+		p.addError("case outside switch")
+		return nil
+	case lexer.TOK_DEFAULT:
+		p.addError("default outside switch")
+		return nil
 	case lexer.TOK_BREAK:
 		return p.parseBreak()
 	case lexer.TOK_SKIP:
@@ -1014,6 +1022,123 @@ func (p *Parser) parseWhile() *ast.WhileStmt {
 	}
 
 	return &ast.WhileStmt{Condition: cond, Body: body, Line: line}
+}
+
+func (p *Parser) parseSwitch() *ast.SwitchStmt {
+	line := p.curToken.Line
+	p.nextToken()
+
+	if p.curToken.Type != lexer.TOK_LPAREN {
+		p.addError("expected '(' after switch, got %s", p.curToken.Type)
+		return nil
+	}
+	p.nextToken()
+
+	value := p.parseExpr()
+
+	if p.curToken.Type != lexer.TOK_RPAREN {
+		p.addError("expected ')' after switch expression, got %s", p.curToken.Type)
+		return nil
+	}
+	p.nextToken()
+
+	if p.curToken.Type != lexer.TOK_LBRACE {
+		p.addError("expected '{' after switch expression, got %s", p.curToken.Type)
+		return nil
+	}
+	p.nextToken()
+
+	cases := make([]ast.CaseClause, 0)
+
+	for p.curToken.Type != lexer.TOK_RBRACE && p.curToken.Type != lexer.TOK_EOF {
+		if p.curToken.Type == lexer.TOK_CASE {
+			caseLine := p.curToken.Line
+			p.nextToken()
+
+			if p.curToken.Type != lexer.TOK_LPAREN {
+				p.addError("expected '(' after case, got %s", p.curToken.Type)
+				return nil
+			}
+			p.nextToken()
+
+			var op string
+			var caseExpr ast.Expr
+
+			switch p.curToken.Type {
+			case lexer.TOK_EQ:
+				op = "=="
+				p.nextToken()
+				caseExpr = p.parseExpr()
+			case lexer.TOK_NOT_EQ:
+				op = "!="
+				p.nextToken()
+				caseExpr = p.parseExpr()
+			case lexer.TOK_LT:
+				op = "<"
+				p.nextToken()
+				caseExpr = p.parseExpr()
+			case lexer.TOK_GT:
+				op = ">"
+				p.nextToken()
+				caseExpr = p.parseExpr()
+			case lexer.TOK_LTE:
+				op = "<="
+				p.nextToken()
+				caseExpr = p.parseExpr()
+			case lexer.TOK_GTE:
+				op = ">="
+				p.nextToken()
+				caseExpr = p.parseExpr()
+			default:
+				op = ""
+				caseExpr = p.parseExpr()
+			}
+
+			if p.curToken.Type != lexer.TOK_RPAREN {
+				p.addError("expected ')' after case expression, got %s", p.curToken.Type)
+				return nil
+			}
+			p.nextToken()
+
+			body := p.parseBlock()
+			if body == nil {
+				return nil
+			}
+
+			cases = append(cases, ast.CaseClause{
+				Op:    op,
+				Value: caseExpr,
+				Body:  body,
+				Line:  caseLine,
+			})
+		} else if p.curToken.Type == lexer.TOK_DEFAULT {
+			caseLine := p.curToken.Line
+			p.nextToken()
+
+			body := p.parseBlock()
+			if body == nil {
+				return nil
+			}
+
+			cases = append(cases, ast.CaseClause{
+				Default: true,
+				Body:    body,
+				Line:    caseLine,
+			})
+		} else {
+			p.addError("expected case or default in switch, got %s", p.curToken.Type)
+			return nil
+		}
+
+		p.nextToken()
+	}
+
+	if p.curToken.Type == lexer.TOK_EOF {
+		p.addError("expected '}' to close switch")
+		return nil
+	}
+
+	return &ast.SwitchStmt{Value: value, Cases: cases, Line: line}
 }
 
 func (p *Parser) parseBreak() *ast.BreakStmt {

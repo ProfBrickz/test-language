@@ -72,6 +72,9 @@ const (
 	TOK_WHILE    TokenType = "WHILE"
 	TOK_BREAK    TokenType = "BREAK"
 	TOK_SKIP     TokenType = "SKIP"
+	TOK_SWITCH   TokenType = "SWITCH"
+	TOK_CASE     TokenType = "CASE"
+	TOK_DEFAULT  TokenType = "DEFAULT"
 	TOK_FUNCTION TokenType = "FUNCTION"
 	TOK_RETURN   TokenType = "RETURN"
 
@@ -488,6 +491,12 @@ func (l *Lexer) readIdentifier() Token {
 		return Token{TOK_FUNCTION, word, l.line}
 	case "return":
 		return Token{TOK_RETURN, word, l.line}
+	case "switch":
+		return Token{TOK_SWITCH, word, l.line}
+	case "case":
+		return Token{TOK_CASE, word, l.line}
+	case "default":
+		return Token{TOK_DEFAULT, word, l.line}
 	case "of":
 		return Token{TOK_OF, word, l.line}
 	case "NaN":

@@ -240,6 +240,20 @@ type WhileStmt struct {
 	Line      int
 }
 
+type SwitchStmt struct {
+	Value Expr
+	Cases []CaseClause
+	Line  int
+}
+
+type CaseClause struct {
+	Op      string // "", "<", ">", "<=", ">=", "!="  (empty = ==)
+	Value   Expr   // nil for default
+	Body    *BlockStmt
+	Default bool
+	Line    int
+}
+
 type BreakStmt struct {
 	Line int
 }

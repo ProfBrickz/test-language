@@ -294,6 +294,8 @@ func (a *Analyzer) analyzeStmt(stmt ast.Stmt) {
 		a.analyzeAssignment(s)
 	case *ast.RefDecl:
 		a.analyzeRefDecl(s)
+	case *ast.SwitchStmt:
+		a.analyzeSwitchStmt(s)
 	case *ast.IfStmt:
 		a.analyzeIfStmt(s)
 	case *ast.ForStmt:
@@ -497,6 +499,31 @@ func (a *Analyzer) analyzeBlock(stmts []ast.Stmt) {
 		a.analyzeStmt(stmt)
 	}
 	a.popScope()
+}
+
+func (a *Analyzer) analyzeSwitchStmt(s *ast.SwitchStmt) {
+	switchExpr := a.analyzeExpr(s.Value)
+
+	for _, c := range s.Cases {
+		if c.Default {
+			a.analyzeBlock(c.Body.Stmts)
+			continue
+		}
+
+		if c.Op == "==" || c.Op == "!=" || c.Op == "" {
+			a.analyzeExpr(c.Value)
+		} else {
+			caseVal := a.analyzeExpr(c.Value)
+			if caseVal.kind == AbsBool {
+				a.addError(c.Line, "relational case expression cannot be bool")
+			}
+			if switchExpr.kind != AbsInt && switchExpr.kind != AbsFloat && caseVal.kind != AbsInt && caseVal.kind != AbsFloat {
+				a.addWarning(c.Line, "relational comparison may not work with non-numeric types")
+			}
+		}
+
+		a.analyzeBlock(c.Body.Stmts)
+	}
 }
 
 func (a *Analyzer) analyzeIfStmt(s *ast.IfStmt) {

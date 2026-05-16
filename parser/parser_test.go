@@ -5048,3 +5048,290 @@ func TestParsePostfixDotInvalidMember(t *testing.T) {
 		t.Errorf("expected error for invalid member name after '.'")
 	}
 }
+
+func TestParseSwitchBasic(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 1;
+switch (x) {
+	case (1) {
+		print(10);
+	}
+	case (2) {
+		print(20);
+	}
+}
+`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(program.Stmts))
+	}
+
+	swStmt, ok := program.Stmts[1].(*ast.SwitchStmt)
+	if !ok {
+		t.Fatalf("expected *ast.SwitchStmt, got %T", program.Stmts[1])
+	}
+
+	if swStmt.Value == nil {
+		t.Fatal("expected switch value, got nil")
+	}
+
+	if len(swStmt.Cases) != 2 {
+		t.Fatalf("expected 2 cases, got %d", len(swStmt.Cases))
+	}
+
+	if swStmt.Cases[0].Default {
+		t.Error("expected case 0 to be non-default")
+	}
+	if swStmt.Cases[0].Op != "" {
+		t.Errorf("expected empty op (implicit ==), got %q", swStmt.Cases[0].Op)
+	}
+	if swStmt.Cases[0].Value == nil {
+		t.Error("expected case 0 value, got nil")
+	}
+	if swStmt.Cases[0].Body == nil {
+		t.Error("expected case 0 body, got nil")
+	}
+
+	if swStmt.Cases[1].Default {
+		t.Error("expected case 1 to be non-default")
+	}
+	if swStmt.Cases[1].Op != "" {
+		t.Errorf("expected empty op (implicit ==), got %q", swStmt.Cases[1].Op)
+	}
+	if swStmt.Cases[1].Value == nil {
+		t.Error("expected case 1 value, got nil")
+	}
+	if swStmt.Cases[1].Body == nil {
+		t.Error("expected case 1 body, got nil")
+	}
+}
+
+func TestParseSwitchWithDefault(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 5;
+switch (x) {
+	case (1) { print(10); }
+	default { print(99); }
+}
+`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	if len(program.Stmts) != 2 {
+		t.Fatalf("expected 2 statements, got %d", len(program.Stmts))
+	}
+
+	swStmt, ok := program.Stmts[1].(*ast.SwitchStmt)
+	if !ok {
+		t.Fatalf("expected *ast.SwitchStmt, got %T", program.Stmts[1])
+	}
+
+	if len(swStmt.Cases) != 2 {
+		t.Fatalf("expected 2 cases, got %d", len(swStmt.Cases))
+	}
+
+	if swStmt.Cases[0].Default {
+		t.Error("expected case 0 to be non-default")
+	}
+	if !swStmt.Cases[1].Default {
+		t.Error("expected case 1 to be default")
+	}
+	if swStmt.Cases[1].Value != nil {
+		t.Error("expected nil value for default")
+	}
+}
+
+func TestParseSwitchRelOps(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 5;
+switch (x) {
+	case (< 10) { print(1); }
+	case (> 100) { print(2); }
+	case (<= 50) { print(3); }
+	case (>= 200) { print(4); }
+	case (!= 0) { print(5); }
+	case (== 5) { print(6); }
+}
+`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	swStmt, ok := program.Stmts[1].(*ast.SwitchStmt)
+	if !ok {
+		t.Fatalf("expected *ast.SwitchStmt, got %T", program.Stmts[1])
+	}
+
+	if len(swStmt.Cases) != 6 {
+		t.Fatalf("expected 6 cases, got %d", len(swStmt.Cases))
+	}
+
+	expectedOps := []string{"<", ">", "<=", ">=", "!=", "=="}
+	for i, expected := range expectedOps {
+		if swStmt.Cases[i].Op != expected {
+			t.Errorf("case %d: expected op %q, got %q", i, expected, swStmt.Cases[i].Op)
+		}
+		if swStmt.Cases[i].Value == nil {
+			t.Errorf("case %d: expected non-nil value", i)
+		}
+	}
+}
+
+func TestParseSwitchOnlyDefault(t *testing.T) {
+	input := `switch (x) { default { print(0); } }`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	swStmt, ok := program.Stmts[0].(*ast.SwitchStmt)
+	if !ok {
+		t.Fatalf("expected *ast.SwitchStmt, got %T", program.Stmts[0])
+	}
+
+	if len(swStmt.Cases) != 1 {
+		t.Fatalf("expected 1 case, got %d", len(swStmt.Cases))
+	}
+
+	if !swStmt.Cases[0].Default {
+		t.Error("expected default case")
+	}
+}
+
+func TestParseSwitchEmptyBody(t *testing.T) {
+	input := `switch (x) { }`
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	swStmt, ok := program.Stmts[0].(*ast.SwitchStmt)
+	if !ok {
+		t.Fatalf("expected *ast.SwitchStmt, got %T", program.Stmts[0])
+	}
+
+	if len(swStmt.Cases) != 0 {
+		t.Fatalf("expected 0 cases, got %d", len(swStmt.Cases))
+	}
+}
+
+func TestParseSwitchCaseOutside(t *testing.T) {
+	input := `case (5) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for case outside switch")
+	}
+}
+
+func TestParseSwitchDefaultOutside(t *testing.T) {
+	input := `default { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for default outside switch")
+	}
+}
+
+func TestParseSwitchMissingLParen(t *testing.T) {
+	input := `switch x { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '(' after switch")
+	}
+}
+
+func TestParseSwitchMissingOpenBrace(t *testing.T) {
+	input := `switch (x) }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '{'")
+	}
+}
+
+func TestParseSwitchExpectedCaseOrDefault(t *testing.T) {
+	input := `switch (x) { print(1); }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for unexpected token in switch body")
+	}
+}
+
+func TestParseSwitchMissingCaseParen(t *testing.T) {
+	input := `switch (x) { case 5 { } }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '(' after case")
+	}
+}
+
+func TestParseSwitchMissingCaseRParen(t *testing.T) {
+	input := `switch (x) { case (5 { } }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ')' after case expression")
+	}
+}
+
+func TestParseSwitchMissingSwitchRParen(t *testing.T) {
+	input := `switch (x { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing ')' after switch expression")
+	}
+}
+
+func TestParseSwitchMissingCloseBrace(t *testing.T) {
+	input := `switch (x) { case (5) { }`
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for missing '}' to close switch")
+	}
+}
+
+func TestParseSwitchCaseBlockFail(t *testing.T) {
+	input := `switch (x) { case (5) { `
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for failing to parse case block")
+	}
+}
+
+func TestParseSwitchDefaultBlockFail(t *testing.T) {
+	input := `switch (x) { default { `
+	p := New(lexer.New(input))
+	p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for failing to parse default block")
+	}
+}

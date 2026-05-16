@@ -1422,3 +1422,126 @@ caller();
 		t.Errorf("expected no errors, got: %v", a.Errors())
 	}
 }
+
+func TestAnalyzeSwitchBasic(t *testing.T) {
+	program := parseProgram(t, `
+var x: int{size: 32} = 5;
+switch (x) {
+	case (1) { print(10); }
+	case (2) { print(20); }
+	default { print(99); }
+}
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}
+
+func TestAnalyzeSwitchRelOps(t *testing.T) {
+	program := parseProgram(t, `
+var x: int{size: 32} = 5;
+switch (x) {
+	case (< 10) { print(1); }
+	case (> 100) { print(2); }
+	case (<= 50) { print(3); }
+	case (>= 200) { print(4); }
+	case (!= 0) { print(5); }
+	case (== 5) { print(6); }
+}
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}
+
+func TestAnalyzeSwitchOnlyDefault(t *testing.T) {
+	program := parseProgram(t, `
+var x: int{size: 32} = 5;
+switch (x) {
+	default { print(99); }
+}
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}
+
+func TestAnalyzeSwitchEmpty(t *testing.T) {
+	program := parseProgram(t, `switch (x) { }`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}
+
+func TestAnalyzeSwitchNested(t *testing.T) {
+	program := parseProgram(t, `
+var x: int{size: 32} = 5;
+switch (x) {
+	case (1) {
+		var y: int{size: 32} = 10;
+		switch (y) {
+			case (10) { print(100); }
+			default { print(200); }
+		}
+	}
+	default { print(99); }
+}
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}
+
+func TestAnalyzeSwitchString(t *testing.T) {
+	program := parseProgram(t, `
+var x: string{size: 10} = "hello";
+switch (x) {
+	case ("hello") { print(1); }
+	case ("world") { print(2); }
+	default { print(0); }
+}
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
+	}
+}
+
+func TestAnalyzeSwitchRelOpWithBool(t *testing.T) {
+	program := parseProgram(t, `
+var x: int{size: 32} = 5;
+switch (x) {
+	case (< true) { print(1); }
+}
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Errors()) == 0 {
+		t.Errorf("expected error for relational case with bool expression")
+	}
+}
+
+func TestAnalyzeSwitchRelOpNonNumeric(t *testing.T) {
+	program := parseProgram(t, `
+var x: string{size: 10} = "hello";
+switch (x) {
+	case (< "world") { print(1); }
+}
+`)
+	a := New()
+	a.Analyze(program)
+	if len(a.Warnings()) == 0 {
+		t.Errorf("expected warning for relational comparison with non-numeric types")
+	}
+}

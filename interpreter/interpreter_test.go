@@ -479,10 +479,17 @@ func TestTypeDesc(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := typeDescFromVar(tt.itype, tt.ftype, ast.BoolType{}, tt.isFloat, false)
+		result := typeDescFromVar(tt.itype, tt.ftype, ast.BoolType{}, tt.isFloat, false, false)
 		if result != tt.expected {
 			t.Errorf("typeDesc(%v, %v, %v) = %q, expected %q", tt.itype, tt.ftype, tt.isFloat, result, tt.expected)
 		}
+	}
+}
+
+func TestTypeDescFromVarString(t *testing.T) {
+	result := typeDescFromVar(ast.IntegerType{}, ast.FloatType{}, ast.BoolType{}, false, false, true)
+	if result != "string" {
+		t.Errorf("expected 'string', got %q", result)
 	}
 }
 
@@ -3387,7 +3394,7 @@ func TestConvertFloatAllSizes(t *testing.T) {
 }
 
 func TestTypeDescUntypedInteger(t *testing.T) {
-	result := typeDescFromVar(ast.IntegerType{Size: 0}, ast.FloatType{}, ast.BoolType{}, false, false)
+	result := typeDescFromVar(ast.IntegerType{Size: 0}, ast.FloatType{}, ast.BoolType{}, false, false, false)
 	if result != "untyped int literal" {
 		t.Errorf("expected 'untyped integer literal', got %q", result)
 	}
@@ -3814,7 +3821,7 @@ print((b).toString());`
 }
 
 func TestTypeDescFromVarNullableFloat(t *testing.T) {
-	result := typeDescFromVar(ast.IntegerType{}, ast.FloatType{Size: 32, Nullable: true}, ast.BoolType{}, true, false)
+	result := typeDescFromVar(ast.IntegerType{}, ast.FloatType{Size: 32, Nullable: true}, ast.BoolType{}, true, false, false)
 	if !strings.Contains(result, "nullable") {
 		t.Errorf("expected 'nullable' in %q", result)
 	}
@@ -11729,16 +11736,82 @@ func TestEvalStringMemberConcatEvalError(t *testing.T) {
 	}
 }
 
-func TestEvalBinaryStringConcatTypeMismatchError(t *testing.T) {
+func TestEvalBinaryStringConcatAutoConvert(t *testing.T) {
 	i := New()
 	expr := &ast.BinaryExpr{
 		Left:  &ast.StringLit{Value: "hello", Untyped: true},
 		Op:    "+",
 		Right: &ast.IntegerLit{Value: 5, Untyped: true},
 	}
-	_, err := i.evalBinary(expr)
-	if err == nil {
-		t.Errorf("expected type mismatch error for concat")
+	val, err := i.evalBinary(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsString || val.StringData != "hello5" {
+		t.Errorf("expected 'hello5', got %q", val.StringData)
+	}
+}
+
+func TestEvalBinaryStringConcatLeftConvert(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.IntegerLit{Value: 42, Untyped: true},
+		Op:    "+",
+		Right: &ast.StringLit{Value: " is the answer", Untyped: true},
+	}
+	val, err := i.evalBinary(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsString || val.StringData != "42 is the answer" {
+		t.Errorf("expected '42 is the answer', got %q", val.StringData)
+	}
+}
+
+func TestEvalBinaryStringConcatBool(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.StringLit{Value: "value is ", Untyped: true},
+		Op:    "+",
+		Right: &ast.BoolLit{Value: true, Untyped: true},
+	}
+	val, err := i.evalBinary(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsString || val.StringData != "value is true" {
+		t.Errorf("expected 'value is true', got %q", val.StringData)
+	}
+}
+
+func TestEvalBinaryStringConcatFloat(t *testing.T) {
+	i := New()
+	expr := &ast.BinaryExpr{
+		Left:  &ast.FloatLit{Value: 3.14, Untyped: true},
+		Op:    "+",
+		Right: &ast.StringLit{Value: " pi", Untyped: true},
+	}
+	val, err := i.evalBinary(expr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !val.IsString || val.StringData != "3.14 pi" {
+		t.Errorf("expected '3.14 pi', got %q", val.StringData)
+	}
+}
+
+func TestValueToStr(t *testing.T) {
+	val := valueToStr(Value{Null: true})
+	if !val.IsString || val.StringData != "null" {
+		t.Errorf("expected 'null', got %q", val.StringData)
+	}
+	val = valueToStr(Value{IsBool: true, BData: true})
+	if !val.IsString || val.StringData != "true" {
+		t.Errorf("expected 'true', got %q", val.StringData)
+	}
+	val = valueToStr(Value{IsFloat: true, FData: 3.14})
+	if !val.IsString || val.StringData != "3.14" {
+		t.Errorf("expected '3.14', got %q", val.StringData)
 	}
 }
 
@@ -13308,5 +13381,486 @@ foo();
 	err := i.Run(program)
 	if err == nil {
 		t.Errorf("expected runtime error in function body")
+	}
+}
+
+func TestSwitchEqualityMatch(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 2;
+switch (x) {
+	case (1) { print("10"); }
+	case (2) { print("20"); }
+	case (3) { print("30"); }
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "20" {
+		t.Errorf("expected '20', got %q", output)
+	}
+}
+
+func TestSwitchEqualityNoMatchNoDefault(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 99;
+switch (x) {
+	case (1) { print("10"); }
+	case (2) { print("20"); }
+}
+print("999");
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "999" {
+		t.Errorf("expected '999', got %q", output)
+	}
+}
+
+func TestSwitchDefaultMatches(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 99;
+switch (x) {
+	case (1) { print("10"); }
+	case (2) { print("20"); }
+	default { print("999"); }
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "999" {
+		t.Errorf("expected '999', got %q", output)
+	}
+}
+
+func TestSwitchDefaultFirst(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 2;
+switch (x) {
+	default { print("99"); }
+	case (2) { print("20"); }
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	// default is first, so it always matches first
+	if output != "99" {
+		t.Errorf("expected '99', got %q", output)
+	}
+}
+
+func TestSwitchLessThan(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 5;
+switch (x) {
+	case (< 10) { print("1"); }
+	case (> 100) { print("2"); }
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestSwitchGreaterThan(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 200;
+switch (x) {
+	case (< 10) { print("1"); }
+	case (> 100) { print("2"); }
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "2" {
+		t.Errorf("expected '2', got %q", output)
+	}
+}
+
+func TestSwitchLessThanEqual(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 50;
+switch (x) {
+	case (<= 50) { print("1"); }
+	case (> 50) { print("2"); }
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestSwitchGreaterThanEqual(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 200;
+switch (x) {
+	case (>= 200) { print("1"); }
+	case (< 200) { print("2"); }
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestSwitchNotEqual(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 99;
+switch (x) {
+	case (!= 99) { print("1"); }
+	case (!= 100) { print("2"); }
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	// 99 != 99 is false, but 99 != 100 is true
+	if output != "2" {
+		t.Errorf("expected '2', got %q", output)
+	}
+}
+
+func TestSwitchExplicitEqual(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 5;
+switch (x) {
+	case (== 5) { print("1"); }
+	case (== 10) { print("2"); }
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestSwitchStringMatch(t *testing.T) {
+	input := `
+var x: string{size: 5} = "hello";
+switch (x) {
+	case ("hello") { print("1"); }
+	case ("world") { print("2"); }
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestSwitchBoolMatch(t *testing.T) {
+	input := `
+var x: bool{nullable: false} = true;
+switch (x) {
+	case (true) { print("1"); }
+	case (false) { print("2"); }
+}
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "1" {
+		t.Errorf("expected '1', got %q", output)
+	}
+}
+
+func TestSwitchNoSideEffectsOnNoMatch(t *testing.T) {
+	input := `
+var x: int{size: 32, signed: true, nullable: false} = 0;
+var y: int{size: 32, signed: true, nullable: false} = 100;
+switch (x) {
+	case (1) { y = 200; }
+	case (2) { y = 300; }
+}
+print((y).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "100" {
+		t.Errorf("expected '100', got %q", output)
+	}
+}
+
+func TestSwitchExprEvalError(t *testing.T) {
+	i := New()
+	i.env.Define("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 10})
+	stmt := &ast.SwitchStmt{
+		Value: &ast.VarRef{Name: "undefinedVar"},
+		Cases: []ast.CaseClause{
+			{Value: &ast.IntegerLit{Value: 5, Untyped: true}, Body: &ast.BlockStmt{}, Line: 1},
+		},
+		Line: 1,
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error for undefined switch expression variable")
+	}
+}
+
+func TestSwitchCaseExprEvalError(t *testing.T) {
+	i := New()
+	i.env.Define("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 10})
+	stmt := &ast.SwitchStmt{
+		Value: &ast.VarRef{Name: "x"},
+		Cases: []ast.CaseClause{
+			{Value: &ast.VarRef{Name: "undefinedVar"}, Body: &ast.BlockStmt{}, Line: 2},
+		},
+		Line: 1,
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error for undefined case expression variable")
+	}
+}
+
+func TestSwitchUnknownOperator(t *testing.T) {
+	i := New()
+	i.env.Define("x", Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 10})
+	stmt := &ast.SwitchStmt{
+		Value: &ast.VarRef{Name: "x"},
+		Cases: []ast.CaseClause{
+			{Op: "??", Value: &ast.IntegerLit{Value: 5, Untyped: true}, Body: &ast.BlockStmt{}, Line: 2},
+		},
+		Line: 1,
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error for unknown case operator")
+	}
+}
+
+func TestSwitchTypeErrorInEquality(t *testing.T) {
+	i := New()
+	i.env.Define("x", Value{IsBool: true, BData: true})
+	stmt := &ast.SwitchStmt{
+		Value: &ast.VarRef{Name: "x"},
+		Cases: []ast.CaseClause{
+			{Value: &ast.IntegerLit{Value: 5, Untyped: true}, Body: &ast.BlockStmt{}, Line: 2},
+		},
+		Line: 1,
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected type error when comparing bool with int")
+	}
+}
+
+func TestSwitchTypeErrorInComparison(t *testing.T) {
+	i := New()
+	i.env.Define("x", Value{IsBool: true, BData: true})
+	stmt := &ast.SwitchStmt{
+		Value: &ast.VarRef{Name: "x"},
+		Cases: []ast.CaseClause{
+			{Op: "<", Value: &ast.IntegerLit{Value: 5, Untyped: true}, Body: &ast.BlockStmt{}, Line: 2},
+		},
+		Line: 1,
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected type error when using comparison on bool")
+	}
+}
+func TestSwitchInsideFunction(t *testing.T) {
+	input := `
+function classify(x: int{size: 32}): string {
+	switch (x) {
+		case (1) { return "one"; }
+		case (2) { return "two"; }
+		default { return "other"; }
+	}
+}
+print(classify(2));
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if output != "two" {
+		t.Errorf("expected 'two', got %q", output)
 	}
 }
