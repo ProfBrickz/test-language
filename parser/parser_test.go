@@ -5335,3 +5335,130 @@ func TestParseSwitchDefaultBlockFail(t *testing.T) {
 		t.Errorf("expected error for failing to parse default block")
 	}
 }
+
+func TestParseUnionTypeVar(t *testing.T) {
+	input := `var x: int | string = 5;`
+	p := New(lexer.New(input))
+	prog := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	vd, ok := prog.Stmts[0].(*ast.VarDecl)
+	if !ok {
+		t.Fatalf("expected VarDecl")
+	}
+	ut, ok := vd.Type.(ast.UnionType)
+	if !ok {
+		t.Fatalf("expected UnionType, got %T", vd.Type)
+	}
+	if len(ut.Types) != 2 {
+		t.Fatalf("expected 2 types in union, got %d", len(ut.Types))
+	}
+	if _, ok := ut.Types[0].(ast.IntegerType); !ok {
+		t.Errorf("expected first type to be IntegerType")
+	}
+	if _, ok := ut.Types[1].(ast.StringType); !ok {
+		t.Errorf("expected second type to be StringType")
+	}
+	if !vd.IsUnion {
+		t.Errorf("expected IsUnion true")
+	}
+	if len(vd.UnionType.Types) != 2 {
+		t.Errorf("expected 2 types in VarDecl.UnionType")
+	}
+}
+
+func TestParseUnionTypeFuncParam(t *testing.T) {
+	input := `function foo(x: int | float): int { return 5; }`
+	p := New(lexer.New(input))
+	prog := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	fd, ok := prog.Stmts[0].(*ast.FuncDecl)
+	if !ok {
+		t.Fatalf("expected FuncDecl")
+	}
+	if len(fd.Parameters) != 1 {
+		t.Fatalf("expected 1 param")
+	}
+	ut, ok := fd.Parameters[0].Type.(ast.UnionType)
+	if !ok {
+		t.Fatalf("expected UnionType parameter, got %T", fd.Parameters[0].Type)
+	}
+	if len(ut.Types) != 2 {
+		t.Fatalf("expected 2 types, got %d", len(ut.Types))
+	}
+}
+
+func TestParseIsWithType(t *testing.T) {
+	input := `print(5 is int);`
+	p := New(lexer.New(input))
+	prog := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	ps, ok := prog.Stmts[0].(*ast.PrintStmt)
+	if !ok {
+		t.Fatalf("expected PrintStmt")
+	}
+	ie, ok := ps.Expr.(*ast.IsExpr)
+	if !ok {
+		t.Fatalf("expected IsExpr, got %T", ps.Expr)
+	}
+	if _, ok := ie.Right.(*ast.TypeRef); !ok {
+		t.Fatalf("expected TypeRef on right side, got %T", ie.Right)
+	}
+}
+
+func TestParseIsWithUnionType(t *testing.T) {
+	input := `print(5 is int | string);`
+	p := New(lexer.New(input))
+	prog := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	ps, ok := prog.Stmts[0].(*ast.PrintStmt)
+	if !ok {
+		t.Fatalf("expected PrintStmt")
+	}
+	ie, ok := ps.Expr.(*ast.IsExpr)
+	if !ok {
+		t.Fatalf("expected IsExpr, got %T", ps.Expr)
+	}
+	tr, ok := ie.Right.(*ast.TypeRef)
+	if !ok {
+		t.Fatalf("expected TypeRef on right side, got %T", ie.Right)
+	}
+	ut, ok := tr.Type.(ast.UnionType)
+	if !ok {
+		t.Fatalf("expected UnionType inside TypeRef, got %T", tr.Type)
+	}
+	if len(ut.Types) != 2 {
+		t.Fatalf("expected 2 types, got %d", len(ut.Types))
+	}
+}
+
+func TestParseIsWithVariable(t *testing.T) {
+	// `is` with a variable should still work as pointer identity
+	input := `print(x is y);`
+	p := New(lexer.New(input))
+	prog := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	ps, ok := prog.Stmts[0].(*ast.PrintStmt)
+	if !ok {
+		t.Fatalf("expected PrintStmt")
+	}
+	ie, ok := ps.Expr.(*ast.IsExpr)
+	if !ok {
+		t.Fatalf("expected IsExpr, got %T", ps.Expr)
+	}
+	if _, ok := ie.Left.(*ast.VarRef); !ok {
+		t.Fatalf("expected VarRef on left, got %T", ie.Left)
+	}
+	if _, ok := ie.Right.(*ast.VarRef); !ok {
+		t.Fatalf("expected VarRef on right (variable), got %T", ie.Right)
+	}
+}

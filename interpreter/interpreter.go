@@ -171,24 +171,161 @@ func floatTypeMaxExponent(size int) int {
 	}
 }
 
+func applyTypeToValue(val Value, t ast.Type) Value {
+	if t == nil {
+		return val
+	}
+	switch typ := t.(type) {
+	case ast.IntegerType:
+		val.IType = typ
+		val.Untyped = false
+		val.Type = t
+	case ast.FloatType:
+		val.FType = typ
+		val.IsFloat = true
+		val.Untyped = false
+		val.Type = t
+	case ast.BoolType:
+		val.BType = typ
+		val.IsBool = true
+		val.Untyped = false
+		val.Type = t
+	case ast.StringType:
+		val.SType = typ
+		val.IsString = true
+		val.Untyped = false
+		val.Type = t
+	case ast.ArrayType:
+		val.Type = t
+	case ast.ListType:
+		val.Type = t
+	case ast.UnionType:
+		val.Type = t
+	}
+	return val
+}
+
 func valueToTypeDesc(val Value) Value {
 	td := Value{IsType: true}
+	if val.Type != nil {
+		td.Type = val.Type
+		return td
+	}
 	if val.IsArray {
 		td.Type = val.Type
 		td.IsArray = true
 	} else if val.IsString {
+		td.Type = val.SType
 		td.IsString = true
 		td.SType = val.SType
 	} else if val.IsFloat {
+		td.Type = val.FType
 		td.IsFloat = true
 		td.FType = val.FType
 	} else if val.IsBool {
+		td.Type = val.BType
 		td.IsBool = true
 		td.BType = val.BType
 	} else {
+		td.Type = val.IType
 		td.IType = val.IType
 	}
 	return td
+}
+
+// valueMatchesType checks if a runtime value matches/is-assignable-to a type reference.
+// The rightVal must have IsType==true.
+func valueMatchesType(leftVal Value, rightVal Value) bool {
+	if leftVal.Type != nil {
+		return typeMatchesType(leftVal.Type, rightVal.Type)
+	}
+	return typeMatchesType(valueToTypeDesc(leftVal).Type, rightVal.Type)
+}
+
+// typeMatchesType checks if left type is assignable to right type (implicit conversion).
+func typeMatchesType(left, right ast.Type) bool {
+	if left == nil || right == nil {
+		return false
+	}
+	// If right is union, check if left matches any member
+	if u, ok := right.(ast.UnionType); ok {
+		for _, t := range u.Types {
+			if typeMatchesType(left, t) {
+				return true
+			}
+		}
+		return false
+	}
+	// If left is union, check if ALL members match right
+	if u, ok := left.(ast.UnionType); ok {
+		for _, t := range u.Types {
+			if !typeMatchesType(t, right) {
+				return false
+			}
+		}
+		return true
+	}
+
+	switch r := right.(type) {
+	case ast.IntegerType:
+		l, ok := left.(ast.IntegerType)
+		if !ok {
+			return false
+		}
+		if r.Size == 0 && r.Signed == false && r.Nullable == false {
+			// Category check: any int matches bare `int`
+			return true
+		}
+		// Check implicit conversion
+		return canImplicitConvert(l, ast.FloatType{}, false, r, ast.FloatType{}, false)
+	case ast.FloatType:
+		l, ok := left.(ast.FloatType)
+		if !ok {
+			lInt, okInt := left.(ast.IntegerType)
+			if !okInt {
+				return false
+			}
+			if r.Size == 0 && r.Nullable == false {
+				// Any int is a float in category sense
+				return true
+			}
+			// Check int-to-float implicit conversion
+			return canImplicitConvert(lInt, ast.FloatType{}, false, ast.IntegerType{}, r, true)
+		}
+		if r.Size == 0 && r.Nullable == false {
+			return true
+		}
+		return canImplicitConvert(ast.IntegerType{}, l, true, ast.IntegerType{}, r, true)
+	case ast.BoolType:
+		_, ok := left.(ast.BoolType)
+		if !ok {
+			return false
+		}
+		return true
+	case ast.StringType:
+		_, ok := left.(ast.StringType)
+		if !ok {
+			return false
+		}
+		return true
+	case ast.ArrayType:
+		l, ok := left.(ast.ArrayType)
+		if !ok {
+			return false
+		}
+		if r.ElemType == nil {
+			return true
+		}
+		return typeMatchesType(l.ElemType, r.ElemType)
+	case ast.ListType:
+		_, ok := left.(ast.ListType)
+		if !ok {
+			// array can be treated as list? For now, strict.
+			return false
+		}
+		return true
+	}
+	return false
 }
 
 func (i *Interpreter) evalTypeMember(td Value, member string) (Value, error) {
@@ -682,11 +819,11 @@ type Interpreter struct {
 	env          *Environment
 	showWarnings ShowWhen
 	showErrors   ShowWhen
-	funcs        map[string]*ast.FuncDecl
+	funcs        map[string][]*ast.FuncDecl
 }
 
 func New() *Interpreter {
-	return &Interpreter{env: NewEnv(), showWarnings: ShowParse, showErrors: ShowBoth, funcs: make(map[string]*ast.FuncDecl)}
+	return &Interpreter{env: NewEnv(), showWarnings: ShowParse, showErrors: ShowBoth, funcs: make(map[string][]*ast.FuncDecl)}
 }
 
 func (i *Interpreter) SetShowErrors(when ShowWhen) {
@@ -730,7 +867,7 @@ func (i *Interpreter) errorf(line int, format string, args ...interface{}) error
 func (i *Interpreter) Run(program *ast.Program) error {
 	for _, stmt := range program.Stmts {
 		if fn, ok := stmt.(*ast.FuncDecl); ok {
-			i.funcs[fn.Name] = fn
+			i.funcs[fn.Name] = append(i.funcs[fn.Name], fn)
 		}
 	}
 	for _, stmt := range program.Stmts {
@@ -898,6 +1035,18 @@ func (i *Interpreter) execVarDecl(s *ast.VarDecl) error {
 	}
 	if st, ok := s.Type.(ast.StringType); ok {
 		return i.execStringDecl(s, st)
+	}
+	if s.IsUnion {
+		if s.Expr != nil {
+			rightVal, err := i.evalExpr(s.Expr)
+			if err != nil {
+				return err
+			}
+			i.env.Define(s.Name, rightVal)
+			return nil
+		}
+		i.env.Define(s.Name, Value{Null: true})
+		return nil
 	}
 
 	val := Value{IType: s.IType, FType: s.FType, BType: s.BType, IsFloat: s.IsFloat, IsBool: s.IsBool}
@@ -1684,14 +1833,19 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 		}
 		return val, nil
 	case *ast.IsExpr:
-		_, err := i.evalExpr(e.Left)
+		leftVal, err := i.evalExpr(e.Left)
 		if err != nil {
 			return Value{}, err
 		}
-		_, err = i.evalExpr(e.Right)
+		rightVal, err := i.evalExpr(e.Right)
 		if err != nil {
 			return Value{}, err
 		}
+		// If right side is a type reference, do type checking
+		if rightVal.IsType {
+			return Value{Untyped: true, BData: valueMatchesType(leftVal, rightVal), IsBool: true}, nil
+		}
+		// Otherwise, pointer identity (reference comparison)
 		var leftPtr, rightPtr *Value
 		if ref, ok := e.Left.(*ast.VarRef); ok {
 			leftPtr = i.env.GetPtr(ref.Name)
@@ -1728,6 +1882,8 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 			val.Type = t
 			val.IsString = true
 			val.SType = t
+		case ast.UnionType:
+			val.Type = t
 		}
 		return val, nil
 	case *ast.ArrayLit:
@@ -1842,12 +1998,9 @@ func (i *Interpreter) evalCall(e *ast.CallExpr) (Value, error) {
 	if !ok {
 		return Value{}, i.errorf(e.Line, "cannot call non-variable expression")
 	}
-	decl, exists := i.funcs[ref.Name]
-	if !exists {
+	overloads, exists := i.funcs[ref.Name]
+	if !exists || len(overloads) == 0 {
 		return Value{}, i.errorf(e.Line, "undefined function: %s", ref.Name)
-	}
-	if len(e.Args) != len(decl.Parameters) {
-		return Value{}, i.errorf(e.Line, "function %s expects %d arguments, got %d", ref.Name, len(decl.Parameters), len(e.Args))
 	}
 
 	argVals := make([]Value, len(e.Args))
@@ -1857,6 +2010,16 @@ func (i *Interpreter) evalCall(e *ast.CallExpr) (Value, error) {
 			return Value{}, err
 		}
 		argVals[idx] = val
+	}
+
+	// Check for ambiguous null literal calls
+	if hasNullLiteralArgExpr(e.Args) && countMatchingOverloadsRuntime(overloads, argVals) > 1 {
+		return Value{}, i.errorf(e.Line, "ambiguous call to %s: multiple overloads accept null", ref.Name)
+	}
+
+	decl := resolveOverload(overloads, argVals)
+	if decl == nil {
+		return Value{}, i.errorf(e.Line, "no matching overload for %s", ref.Name)
 	}
 
 	i.pushScope()
@@ -1872,7 +2035,7 @@ func (i *Interpreter) evalCall(e *ast.CallExpr) (Value, error) {
 			if decl.ReturnType == nil {
 				return Value{}, nil
 			}
-			return rs.Value, nil
+			return applyTypeToValue(rs.Value, decl.ReturnType), nil
 		}
 		return Value{}, err
 	}
@@ -1881,6 +2044,227 @@ func (i *Interpreter) evalCall(e *ast.CallExpr) (Value, error) {
 		return Value{}, i.errorf(e.Line, "function %s did not return a value", ref.Name)
 	}
 	return Value{}, nil
+}
+
+func hasNullLiteralArgExpr(args []ast.Expr) bool {
+	for _, arg := range args {
+		if _, ok := arg.(*ast.NullLit); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func countMatchingOverloadsRuntime(overloads []*ast.FuncDecl, args []Value) int {
+	count := 0
+	for _, fn := range overloads {
+		if len(fn.Parameters) != len(args) {
+			continue
+		}
+		if argsExactMatch(fn.Parameters, args) {
+			count++
+		} else if argsMatchCategory(fn.Parameters, args, true) {
+			count++
+		} else if argsMatchCategory(fn.Parameters, args, false) {
+			count++
+		}
+	}
+	return count
+}
+
+func resolveOverload(overloads []*ast.FuncDecl, args []Value) *ast.FuncDecl {
+	// Pass 1: exact match
+	for _, fn := range overloads {
+		if len(fn.Parameters) != len(args) {
+			continue
+		}
+		if argsExactMatch(fn.Parameters, args) {
+			return fn
+		}
+	}
+	// Pass 2: same-category implicit conversion
+	for _, fn := range overloads {
+		if len(fn.Parameters) != len(args) {
+			continue
+		}
+		if argsMatchCategory(fn.Parameters, args, true) {
+			return fn
+		}
+	}
+	// Pass 3: cross-category implicit conversion
+	for _, fn := range overloads {
+		if len(fn.Parameters) != len(args) {
+			continue
+		}
+		if argsMatchCategory(fn.Parameters, args, false) {
+			return fn
+		}
+	}
+	return nil
+}
+
+func argsExactMatch(params []ast.Param, args []Value) bool {
+	for i, p := range params {
+		if !argExactTypeMatch(p.Type, args[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func nullArgMatchesType(paramType ast.Type, arg Value) bool {
+	hasDeclaredType := arg.IsFloat || arg.IsBool || arg.IsString || arg.IsArray
+	if !hasDeclaredType {
+		hasDeclaredType = arg.IType.Size != 0 || arg.FType.Size != 0 || arg.SType.Size != 0
+	}
+	if !hasDeclaredType {
+		return true
+	}
+	switch pt := paramType.(type) {
+	case ast.IntegerType:
+		return !arg.IsFloat && !arg.IsBool && !arg.IsString && !arg.IsArray
+	case ast.FloatType:
+		return arg.IsFloat
+	case ast.BoolType:
+		return arg.IsBool
+	case ast.StringType:
+		return arg.IsString
+	case ast.ArrayType:
+		return arg.IsArray
+	case ast.ListType:
+		return arg.IsArray
+	case ast.UnionType:
+		for _, t := range pt.Types {
+			if argExactTypeMatch(t, arg) {
+				return true
+			}
+		}
+		return false
+	}
+	return false
+}
+
+func argExactTypeMatch(paramType ast.Type, arg Value) bool {
+	if arg.Null {
+		if !typeIsNullableRuntime(paramType) {
+			return false
+		}
+		return nullArgMatchesType(paramType, arg)
+	}
+	if arg.Untyped {
+		switch pt := paramType.(type) {
+		case ast.IntegerType:
+			return !arg.IsFloat && !arg.IsBool && !arg.IsString && !arg.IsArray
+		case ast.FloatType:
+			return arg.IsFloat
+		case ast.BoolType:
+			return arg.IsBool
+		case ast.StringType:
+			return arg.IsString
+		case ast.UnionType:
+			for _, t := range pt.Types {
+				if argExactTypeMatch(t, arg) {
+					return true
+				}
+			}
+			return false
+		}
+		return false
+	}
+	switch pt := paramType.(type) {
+	case ast.IntegerType:
+		return !arg.IsFloat && !arg.IsBool && !arg.IsString && !arg.IsArray && arg.IType == pt
+	case ast.FloatType:
+		return arg.IsFloat && arg.FType == pt
+	case ast.BoolType:
+		return arg.IsBool && arg.BType == pt
+	case ast.StringType:
+		return arg.IsString
+	case ast.UnionType:
+		for _, t := range pt.Types {
+			if argExactTypeMatch(t, arg) {
+				return true
+			}
+		}
+		return false
+	}
+	return false
+}
+
+func typeIsNullableRuntime(t ast.Type) bool {
+	switch typ := t.(type) {
+	case ast.IntegerType:
+		return typ.Nullable
+	case ast.FloatType:
+		return typ.Nullable
+	case ast.BoolType:
+		return typ.Nullable
+	case ast.UnionType:
+		for _, m := range typ.Types {
+			if typeIsNullableRuntime(m) {
+				return true
+			}
+		}
+		return false
+	}
+	return false
+}
+
+func argsMatchCategory(params []ast.Param, args []Value, sameCategory bool) bool {
+	for i, p := range params {
+		if !argMatchCategory(p.Type, args[i], sameCategory) {
+			return false
+		}
+	}
+	return true
+}
+
+func argMatchCategory(paramType ast.Type, arg Value, sameCategory bool) bool {
+	if arg.Null {
+		if !typeIsNullableRuntime(paramType) {
+			return false
+		}
+		return nullArgMatchesType(paramType, arg)
+	}
+	switch pt := paramType.(type) {
+	case ast.IntegerType:
+		if arg.IsFloat {
+			if sameCategory {
+				return false
+			}
+			return canImplicitConvert(ast.IntegerType{}, arg.FType, true, pt, ast.FloatType{}, false)
+		}
+		if arg.IsBool || arg.IsString || arg.IsArray || arg.Null {
+			return false
+		}
+		return canImplicitConvert(arg.IType, ast.FloatType{}, false, pt, ast.FloatType{}, false)
+	case ast.FloatType:
+		if arg.IsFloat {
+			return canImplicitConvert(ast.IntegerType{}, arg.FType, true, ast.IntegerType{}, pt, true)
+		}
+		if !arg.IsFloat && !arg.IsBool && !arg.IsString && !arg.IsArray && !arg.Null {
+			if sameCategory {
+				return false
+			}
+			return canImplicitConvert(arg.IType, ast.FloatType{}, false, ast.IntegerType{}, pt, true)
+		}
+		return false
+	case ast.BoolType:
+		if sameCategory {
+			return arg.IsBool
+		}
+		return arg.IsBool
+	case ast.StringType:
+		return arg.IsString
+	case ast.UnionType:
+		for _, t := range pt.Types {
+			if argMatchCategory(t, arg, sameCategory) {
+				return true
+			}
+		}
+		return false
+	}
+	return false
 }
 
 func (i *Interpreter) evalArrayMember(obj *Value, e *ast.MemberAccess) (Value, error) {

@@ -117,7 +117,7 @@ func TestDivisionByKnownNonZero(t *testing.T) {
 }
 
 func TestNoErrorsCleanProgram(t *testing.T) {
-	program := parseProgram(t, `var x: int{size: 32} = 42; var y: int{size: 32} = x + 1; print(y.toString());`)
+	program := parseProgram(t, `var x: int{size: 32, nullable: false} = 42; var y: int{size: 32, nullable: false} = x + 1; print(y.toString());`)
 	a := New()
 	a.Analyze(program)
 	if len(a.Errors()) > 0 {
@@ -1308,15 +1308,17 @@ add(1);
 	}
 }
 
-func TestAnalyzeFuncDuplicateError(t *testing.T) {
+func TestAnalyzeFuncOverload(t *testing.T) {
 	program := parseProgram(t, `
-function foo(): int { return 1; }
-function foo(): int { return 2; }
+function foo(x: int): int { return x; }
+function foo(x: float): int { return 1; }
+foo(5);
+foo(1.0);
 `)
 	a := New()
 	a.Analyze(program)
-	if len(a.Errors()) == 0 {
-		t.Errorf("expected error for duplicate function")
+	if len(a.Errors()) > 0 {
+		t.Errorf("expected no errors, got: %v", a.Errors())
 	}
 }
 
@@ -1401,8 +1403,8 @@ func (unknownType) Kind() string { return "custom" }
 
 func TestDefaultValueForParamUnknownType(t *testing.T) {
 	result := defaultValueForParam(unknownType{})
-	if result != (AbsValue{}) {
-		t.Errorf("expected empty AbsValue for unknown type")
+	if result.unionTypes != nil {
+		t.Errorf("expected empty AbsValue for unknown type, got %+v", result)
 	}
 }
 

@@ -16,6 +16,7 @@ const (
 	AbsString
 	AbsArray
 	AbsList
+	AbsUnion
 	AbsNull
 )
 
@@ -49,6 +50,7 @@ type AbsValue struct {
 	stringType ast.StringType
 	arrayType  ast.ArrayType
 	listType   ast.ListType
+	unionTypes []ast.Type
 }
 
 func knownIntValue(v int64, t ast.IntegerType) AbsValue {
@@ -203,7 +205,7 @@ type Analyzer struct {
 	warnings   []string
 	guards     []guardInfo
 	nullMode   NullMode
-	funcs      map[string]*ast.FuncDecl
+	funcs      map[string][]*ast.FuncDecl
 	insideFunc *ast.FuncDecl
 }
 
@@ -211,7 +213,7 @@ func New() *Analyzer {
 	return &Analyzer{
 		env:      make(map[string]AbsValue),
 		nullMode: NullWarn,
-		funcs:    make(map[string]*ast.FuncDecl),
+		funcs:    make(map[string][]*ast.FuncDecl),
 	}
 }
 
@@ -234,18 +236,16 @@ func (a *Analyzer) Analyze(program *ast.Program) {
 	for _, stmt := range program.Stmts {
 		a.analyzeStmt(stmt)
 	}
-	for _, fn := range a.funcs {
-		a.analyzeFunc(fn)
+	for _, overloads := range a.funcs {
+		for _, fn := range overloads {
+			a.analyzeFunc(fn)
+		}
 	}
 }
 
 func (a *Analyzer) collectFunc(stmt ast.Stmt) {
 	if fn, ok := stmt.(*ast.FuncDecl); ok {
-		if _, exists := a.funcs[fn.Name]; exists {
-			a.addError(fn.Line, "duplicate function: "+fn.Name)
-			return
-		}
-		a.funcs[fn.Name] = fn
+		a.funcs[fn.Name] = append(a.funcs[fn.Name], fn)
 	}
 }
 
@@ -274,16 +274,30 @@ func defaultValueForParam(t ast.Type) AbsValue {
 		return AbsValue{kind: AbsArray}
 	case ast.ListType:
 		return AbsValue{kind: AbsList}
+	case ast.UnionType:
+		return AbsValue{kind: AbsUnion, unionTypes: typ.Types}
 	}
 	return AbsValue{}
 }
 
 func (a *Analyzer) addError(line int, msg string) {
-	a.errors = append(a.errors, fmt.Sprintf("line %d: %s", line, msg))
+	full := fmt.Sprintf("line %d: %s", line, msg)
+	for _, e := range a.errors {
+		if e == full {
+			return
+		}
+	}
+	a.errors = append(a.errors, full)
 }
 
 func (a *Analyzer) addWarning(line int, msg string) {
-	a.warnings = append(a.warnings, fmt.Sprintf("line %d: %s", line, msg))
+	full := fmt.Sprintf("line %d: %s", line, msg)
+	for _, w := range a.warnings {
+		if w == full {
+			return
+		}
+	}
+	a.warnings = append(a.warnings, full)
 }
 
 func (a *Analyzer) analyzeStmt(stmt ast.Stmt) {
@@ -366,6 +380,12 @@ func (a *Analyzer) analyzeVarDecl(d *ast.VarDecl) {
 	} else {
 		val = a.defaultValue(d)
 	}
+	// Use declared type to improve kind resolution (e.g., AbsArray -> AbsList)
+	if d.Type != nil && val.kind == AbsArray {
+		if _, isList := d.Type.(ast.ListType); isList {
+			val = absValueFromType(d.Type)
+		}
+	}
 	a.checkAssignmentType(d.Line, d.Name, val, d)
 	val.nullable = isNullableDecl(d)
 	a.env[d.Name] = val
@@ -419,6 +439,14 @@ func (a *Analyzer) checkAssignmentType(line int, name string, rhs AbsValue, decl
 }
 
 func isNullableDecl(d *ast.VarDecl) bool {
+	if d.IsUnion {
+		for _, t := range d.UnionType.Types {
+			if typeIsNullable(t) {
+				return true
+			}
+		}
+		return false
+	}
 	if d.IType.Nullable {
 		return true
 	}
@@ -434,6 +462,25 @@ func isNullableDecl(d *ast.VarDecl) bool {
 	return false
 }
 
+func typeIsNullable(t ast.Type) bool {
+	switch typ := t.(type) {
+	case ast.IntegerType:
+		return typ.Nullable
+	case ast.FloatType:
+		return typ.Nullable
+	case ast.BoolType:
+		return typ.Nullable
+	case ast.UnionType:
+		for _, m := range typ.Types {
+			if typeIsNullable(m) {
+				return true
+			}
+		}
+		return false
+	}
+	return false
+}
+
 func typeDescFromAbs(v AbsValue) string {
 	switch v.kind {
 	case AbsInt:
@@ -444,12 +491,46 @@ func typeDescFromAbs(v AbsValue) string {
 		return fmt.Sprintf("bool{nullable: %v}", v.nullable)
 	case AbsString:
 		return "string"
+	case AbsUnion:
+		s := ""
+		for i, t := range v.unionTypes {
+			if i > 0 {
+				s += " | "
+			}
+			s += typeDescFromType(t)
+		}
+		return s
 	default:
 		return "unknown"
 	}
 }
 
+func typeDescFromType(t ast.Type) string {
+	switch typ := t.(type) {
+	case ast.IntegerType:
+		return fmt.Sprintf("int{size: %d, signed: %v, nullable: %v}", typ.Size, typ.Signed, typ.Nullable)
+	case ast.FloatType:
+		return fmt.Sprintf("float{size: %d, nullable: %v}", typ.Size, typ.Nullable)
+	case ast.BoolType:
+		return fmt.Sprintf("bool{nullable: %v}", typ.Nullable)
+	case ast.StringType:
+		return "string"
+	default:
+		return fmt.Sprintf("%T", t)
+	}
+}
+
 func typeDescFromDecl(d *ast.VarDecl) string {
+	if d.IsUnion {
+		s := ""
+		for i, t := range d.UnionType.Types {
+			if i > 0 {
+				s += " | "
+			}
+			s += typeDescFromType(t)
+		}
+		return s
+	}
 	if d.IsFloat {
 		return fmt.Sprintf("float{size: %d, nullable: %v}", d.FType.Size, d.FType.Nullable)
 	}
@@ -463,6 +544,9 @@ func typeDescFromDecl(d *ast.VarDecl) string {
 }
 
 func (a *Analyzer) defaultValue(d *ast.VarDecl) AbsValue {
+	if d.IsUnion {
+		return AbsValue{kind: AbsUnion, unionTypes: d.UnionType.Types}
+	}
 	if d.IsFloat {
 		return anyFloatValue(d.FType)
 	}
@@ -473,6 +557,26 @@ func (a *Analyzer) defaultValue(d *ast.VarDecl) AbsValue {
 		return anyIntValue(d.IType)
 	}
 	return anyIntValue(ast.IntegerType{Size: 64, Signed: true, Nullable: true})
+}
+
+func absValueFromType(t ast.Type) AbsValue {
+	switch typ := t.(type) {
+	case ast.IntegerType:
+		return anyIntValue(typ)
+	case ast.FloatType:
+		return anyFloatValue(typ)
+	case ast.BoolType:
+		return anyBoolValue(typ)
+	case ast.StringType:
+		return AbsValue{kind: AbsString, isAnyStr: true}
+	case ast.ArrayType:
+		return AbsValue{kind: AbsArray, arrayType: typ}
+	case ast.ListType:
+		return AbsValue{kind: AbsList, listType: typ}
+	case ast.UnionType:
+		return AbsValue{kind: AbsUnion, unionTypes: typ.Types}
+	}
+	return AbsValue{}
 }
 
 func (a *Analyzer) isGuardedNotZero(name string) bool {
@@ -681,8 +785,10 @@ func (a *Analyzer) analyzeExpr(expr ast.Expr) AbsValue {
 		a.analyzeExpr(e.Index)
 		return AbsValue{}
 	case *ast.MemberAccess:
+		a.analyzeExpr(e.Object)
 		return AbsValue{}
 	case *ast.TypeOfExpr:
+		a.analyzeExpr(e.Expr)
 		return AbsValue{}
 	case *ast.CopyExpr:
 		return a.analyzeExpr(e.Right)
@@ -698,23 +804,169 @@ func (a *Analyzer) analyzeExpr(expr ast.Expr) AbsValue {
 
 func (a *Analyzer) analyzeCall(e *ast.CallExpr) AbsValue {
 	if ref, ok := e.Function.(*ast.VarRef); ok {
-		decl, exists := a.funcs[ref.Name]
-		if !exists {
+		overloads, exists := a.funcs[ref.Name]
+		if !exists || len(overloads) == 0 {
 			a.addError(e.Line, "undefined function: "+ref.Name)
 			return AbsValue{}
 		}
-		if len(e.Args) != len(decl.Parameters) {
-			a.addError(e.Line, fmt.Sprintf("function %s expects %d arguments, got %d", ref.Name, len(decl.Parameters), len(e.Args)))
+
+		argTypes := make([]AbsValue, len(e.Args))
+		for i, arg := range e.Args {
+			argTypes[i] = a.analyzeExpr(arg)
+		}
+
+		// Check for ambiguous null literal calls
+		if hasNullLiteralArg(e.Args, argTypes) && countMatchingOverloads(overloads, argTypes) > 1 {
+			a.addError(e.Line, fmt.Sprintf("ambiguous call to %s: multiple overloads accept null", ref.Name))
 			return AbsValue{}
 		}
-		for _, arg := range e.Args {
-			a.analyzeExpr(arg)
+
+		decl := resolveOverloadStatic(overloads, argTypes)
+		if decl == nil {
+			a.addError(e.Line, fmt.Sprintf("no matching overload for %s", ref.Name))
+			return AbsValue{}
 		}
+
 		if decl.ReturnType != nil {
 			return defaultValueForParam(decl.ReturnType)
 		}
 	}
 	return AbsValue{}
+}
+
+func hasNullLiteralArg(args []ast.Expr, argTypes []AbsValue) bool {
+	for i, arg := range args {
+		if _, ok := arg.(*ast.NullLit); ok {
+			_ = argTypes[i]
+			return true
+		}
+	}
+	return false
+}
+
+func countMatchingOverloads(overloads []*ast.FuncDecl, argTypes []AbsValue) int {
+	count := 0
+	for _, fn := range overloads {
+		if len(fn.Parameters) != len(argTypes) {
+			continue
+		}
+		if argsExactMatchStatic(fn.Parameters, argTypes) {
+			count++
+		} else if argsMatchCategoryStatic(fn.Parameters, argTypes, true) {
+			count++
+		} else if argsMatchCategoryStatic(fn.Parameters, argTypes, false) {
+			count++
+		}
+	}
+	return count
+}
+
+func resolveOverloadStatic(overloads []*ast.FuncDecl, argTypes []AbsValue) *ast.FuncDecl {
+	for _, fn := range overloads {
+		if len(fn.Parameters) != len(argTypes) {
+			continue
+		}
+		if argsExactMatchStatic(fn.Parameters, argTypes) {
+			return fn
+		}
+	}
+	for _, fn := range overloads {
+		if len(fn.Parameters) != len(argTypes) {
+			continue
+		}
+		if argsMatchCategoryStatic(fn.Parameters, argTypes, true) {
+			return fn
+		}
+	}
+	for _, fn := range overloads {
+		if len(fn.Parameters) != len(argTypes) {
+			continue
+		}
+		if argsMatchCategoryStatic(fn.Parameters, argTypes, false) {
+			return fn
+		}
+	}
+	return nil
+}
+
+func argsExactMatchStatic(params []ast.Param, argTypes []AbsValue) bool {
+	for i, p := range params {
+		if !argExactTypeMatchStatic(p.Type, argTypes[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func argExactTypeMatchStatic(paramType ast.Type, arg AbsValue) bool {
+	if arg.kind == AbsNull || arg.definitelyNull {
+		return typeIsNullable(paramType)
+	}
+	switch pt := paramType.(type) {
+	case ast.IntegerType:
+		return arg.kind == AbsInt
+	case ast.FloatType:
+		return arg.kind == AbsFloat
+	case ast.BoolType:
+		return arg.kind == AbsBool
+	case ast.StringType:
+		return arg.kind == AbsString
+	case ast.ArrayType:
+		return arg.kind == AbsArray
+	case ast.ListType:
+		return arg.kind == AbsList
+	case ast.UnionType:
+		for _, t := range pt.Types {
+			if argExactTypeMatchStatic(t, arg) {
+				return true
+			}
+		}
+		return false
+	}
+	return false
+}
+
+func argsMatchCategoryStatic(params []ast.Param, argTypes []AbsValue, sameCategory bool) bool {
+	for i, p := range params {
+		if !argMatchCategoryStatic(p.Type, argTypes[i], sameCategory) {
+			return false
+		}
+	}
+	return true
+}
+
+func argMatchCategoryStatic(paramType ast.Type, arg AbsValue, sameCategory bool) bool {
+	if arg.kind == AbsNull || arg.definitelyNull {
+		return typeIsNullable(paramType)
+	}
+	switch pt := paramType.(type) {
+	case ast.IntegerType:
+		if sameCategory {
+			return arg.kind == AbsInt
+		}
+		return arg.kind == AbsInt || arg.kind == AbsFloat
+	case ast.FloatType:
+		if sameCategory {
+			return arg.kind == AbsFloat
+		}
+		return arg.kind == AbsFloat || arg.kind == AbsInt
+	case ast.BoolType:
+		return arg.kind == AbsBool
+	case ast.StringType:
+		return arg.kind == AbsString
+	case ast.ArrayType:
+		return arg.kind == AbsArray
+	case ast.ListType:
+		return arg.kind == AbsList
+	case ast.UnionType:
+		for _, t := range pt.Types {
+			if argMatchCategoryStatic(t, arg, sameCategory) {
+				return true
+			}
+		}
+		return false
+	}
+	return false
 }
 
 func (a *Analyzer) analyzeBinaryExpr(e *ast.BinaryExpr) AbsValue {
@@ -724,7 +976,9 @@ func (a *Analyzer) analyzeBinaryExpr(e *ast.BinaryExpr) AbsValue {
 	switch e.Op {
 	case "/", "%":
 		a.checkDivisionByZero(e.Line, e.Right, right, e.Op)
+		a.checkNullArith(e, left, right)
 	case "+", "-", "*":
+		a.checkNullArith(e, left, right)
 		if left.kind == AbsInt && right.kind == AbsInt {
 			return a.foldIntArith(left, right, e.Op)
 		}
@@ -735,20 +989,27 @@ func (a *Analyzer) analyzeBinaryExpr(e *ast.BinaryExpr) AbsValue {
 	}
 
 	if a.nullMode != NullNone && isArithmeticOp(e.Op) {
-		leftNullable := left.canBeNull()
-		rightNullable := right.canBeNull()
-		if ref, ok := e.Left.(*ast.VarRef); ok && leftNullable {
-			leftNullable = !a.isGuardedNotNull(ref.Name)
-		}
-		if ref, ok := e.Right.(*ast.VarRef); ok && rightNullable {
-			rightNullable = !a.isGuardedNotNull(ref.Name)
-		}
-		if leftNullable || rightNullable {
-			a.addNullMessage(e.Line, e.Op)
-		}
+		a.checkNullArith(e, left, right)
 	}
 
 	return AbsValue{}
+}
+
+func (a *Analyzer) checkNullArith(e *ast.BinaryExpr, left, right AbsValue) {
+	if a.nullMode == NullNone {
+		return
+	}
+	leftNullable := left.canBeNull()
+	rightNullable := right.canBeNull()
+	if ref, ok := e.Left.(*ast.VarRef); ok && leftNullable {
+		leftNullable = !a.isGuardedNotNull(ref.Name)
+	}
+	if ref, ok := e.Right.(*ast.VarRef); ok && rightNullable {
+		rightNullable = !a.isGuardedNotNull(ref.Name)
+	}
+	if leftNullable || rightNullable {
+		a.addNullMessage(e.Line, e.Op)
+	}
 }
 
 func isArithmeticOp(op string) bool {

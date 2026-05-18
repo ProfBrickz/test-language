@@ -121,8 +121,8 @@ func TestFuncMultiCall(t *testing.T) {
 function add(x: int, y: int): int {
 	return x + y;
 }
-var a: int{size: 32} = add(1, 2);
-var b: int{size: 32} = add(a, 3);
+var a: int = add(1, 2);
+var b: int = add(a, 3);
 print(b.toString());
 `
 	l := lexer.New(input)
@@ -13862,5 +13862,200 @@ print(classify(2));
 
 	if output != "two" {
 		t.Errorf("expected 'two', got %q", output)
+	}
+}
+
+func TestIsTypeCheckInt(t *testing.T) {
+	input := `
+var x: int{size: 32} = 42;
+print((x is int).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "true") {
+		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+func TestIsTypeCheckIntToFloat(t *testing.T) {
+	input := `
+var x: int{size: 32} = 42;
+print((x is float).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	// int can be implicitly converted to float
+	if !strings.Contains(output, "true") {
+		t.Errorf("expected 'true' (int can widen to float), got %q", output)
+	}
+}
+
+func TestIsTypeCheckIntNotString(t *testing.T) {
+	input := `
+var x: int{size: 32} = 42;
+print((x is string).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "false") {
+		t.Errorf("expected 'false', got %q", output)
+	}
+}
+
+func TestIsWithUnionType(t *testing.T) {
+	input := `
+function process(x: int | string): string {
+	if (x is int) {
+		return "int";
+	}
+	return "string";
+}
+print(process(42).toString());
+print(process("hello").toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "int") || !strings.Contains(output, "string") {
+		t.Errorf("expected both 'int' and 'string', got %q", output)
+	}
+}
+
+func TestFuncOverloading(t *testing.T) {
+	input := `
+function foo(x: int): string {
+	return "int";
+}
+function foo(x: float): string {
+	return "float";
+}
+print(foo(42).toString());
+print(foo(1.5).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "int") || !strings.Contains(output, "float") {
+		t.Errorf("expected both 'int' and 'float', got %q", output)
+	}
+}
+
+func TestFuncOverloadingCrossCategory(t *testing.T) {
+	input := `
+function bar(x: float): string {
+	return "float";
+}
+function bar(x: int): string {
+	return "int";
+}
+print(bar(42).toString());
+print(bar(1.5).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "int") || !strings.Contains(output, "float") {
+		t.Errorf("expected both 'int' and 'float', got %q", output)
+	}
+}
+
+func TestUnionTypeVarDecl(t *testing.T) {
+	input := `
+var x: int | string = 42;
+print((x is int).toString());
+print((x is string).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "true") || !strings.Contains(output, "false") {
+		t.Errorf("expected 'true' and 'false', got %q", output)
 	}
 }

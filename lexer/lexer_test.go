@@ -708,11 +708,11 @@ func TestSingleAmpersandAsIntLit(t *testing.T) {
 	}
 }
 
-func TestSinglePipeAsIntLit(t *testing.T) {
+func TestSinglePipe(t *testing.T) {
 	l := New("|")
 	tok := l.NextToken()
-	if tok.Type != TOK_INT_LIT {
-		t.Errorf("expected INT_LIT, got %s", tok.Type)
+	if tok.Type != TOK_PIPE {
+		t.Errorf("expected PIPE, got %s", tok.Type)
 	}
 }
 

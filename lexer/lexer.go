@@ -84,6 +84,7 @@ const (
 	TOK_IN   TokenType = "IN"
 	TOK_AT   TokenType = "AT"
 	TOK_OF   TokenType = "OF"
+	TOK_PIPE TokenType = "PIPE"
 
 	TOK_EOF TokenType = "EOF"
 )
@@ -200,7 +201,7 @@ func (l *Lexer) NextToken() Token {
 		if l.peekNext() == '|' {
 			return l.makeToken(TOK_OR, 2)
 		}
-		return l.makeToken(TOK_INT_LIT, 1)
+		return l.makeToken(TOK_PIPE, 1)
 	case '"':
 		return l.readString()
 	case '.':

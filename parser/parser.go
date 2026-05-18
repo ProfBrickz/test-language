@@ -36,10 +36,50 @@ func (p *Parser) ParseProgram() *ast.Program {
 		stmt := p.parseStmt()
 		if stmt != nil {
 			program.Stmts = append(program.Stmts, stmt)
+			p.nextToken()
+		} else if len(p.errors) > 0 {
+			p.synchronize()
+		} else {
+			p.nextToken()
+		}
+	}
+	return program
+}
+
+func (p *Parser) synchronize() {
+	p.nextToken()
+	for p.curToken.Type != lexer.TOK_EOF {
+		if p.curToken.Type == lexer.TOK_SEMICOLON {
+			p.nextToken()
+			return
+		}
+		switch p.curToken.Type {
+		case lexer.TOK_VAR, lexer.TOK_REF, lexer.TOK_PRINT, lexer.TOK_FUNCTION,
+			lexer.TOK_RETURN, lexer.TOK_IDENT, lexer.TOK_IF, lexer.TOK_FOR,
+			lexer.TOK_WHILE, lexer.TOK_SWITCH, lexer.TOK_BREAK, lexer.TOK_SKIP,
+			lexer.TOK_TYPEOF, lexer.TOK_RBRACE:
+			return
 		}
 		p.nextToken()
 	}
-	return program
+}
+
+func (p *Parser) synchronizeInBlock() {
+	p.nextToken()
+	for p.curToken.Type != lexer.TOK_EOF && p.curToken.Type != lexer.TOK_RBRACE {
+		if p.curToken.Type == lexer.TOK_SEMICOLON {
+			p.nextToken()
+			return
+		}
+		switch p.curToken.Type {
+		case lexer.TOK_VAR, lexer.TOK_REF, lexer.TOK_PRINT, lexer.TOK_FUNCTION,
+			lexer.TOK_RETURN, lexer.TOK_IDENT, lexer.TOK_IF, lexer.TOK_FOR,
+			lexer.TOK_WHILE, lexer.TOK_SWITCH, lexer.TOK_BREAK, lexer.TOK_SKIP,
+			lexer.TOK_TYPEOF:
+			return
+		}
+		p.nextToken()
+	}
 }
 
 func (p *Parser) ParseSingleStmt() (ast.Stmt, []string, []string) {
@@ -126,6 +166,18 @@ func (p *Parser) parseStmt() ast.Stmt {
 }
 
 func (p *Parser) parseType() ast.Type {
+	types := []ast.Type{p.parseAtomType()}
+	for p.curToken.Type == lexer.TOK_PIPE {
+		p.nextToken()
+		types = append(types, p.parseAtomType())
+	}
+	if len(types) == 1 {
+		return types[0]
+	}
+	return ast.UnionType{Types: types}
+}
+
+func (p *Parser) parseAtomType() ast.Type {
 	switch p.curToken.Type {
 	case lexer.TOK_INT:
 		return p.parseIntegerType()
@@ -441,9 +493,11 @@ func (p *Parser) parseVarDecl() *ast.VarDecl {
 	var fType ast.FloatType
 	var bType ast.BoolType
 	var sType ast.StringType
+	var uType ast.UnionType
 	isFloat := false
 	isBool := false
 	isString := false
+	isUnion := false
 
 	switch typ := t.(type) {
 	case ast.IntegerType:
@@ -457,6 +511,9 @@ func (p *Parser) parseVarDecl() *ast.VarDecl {
 	case ast.StringType:
 		sType = typ
 		isString = true
+	case ast.UnionType:
+		uType = typ
+		isUnion = true
 	}
 
 	var expr ast.Expr
@@ -470,7 +527,7 @@ func (p *Parser) parseVarDecl() *ast.VarDecl {
 		return nil
 	}
 
-	return &ast.VarDecl{Name: name, Type: t, IType: iType, FType: fType, BType: bType, SType: sType, Expr: expr, IsFloat: isFloat, IsBool: isBool, IsString: isString, Line: line}
+	return &ast.VarDecl{Name: name, Type: t, IType: iType, FType: fType, BType: bType, SType: sType, UnionType: uType, Expr: expr, IsFloat: isFloat, IsBool: isBool, IsString: isString, IsUnion: isUnion, Line: line}
 }
 
 func (p *Parser) parseRefDecl() *ast.RefDecl {
@@ -613,8 +670,12 @@ func (p *Parser) parseBlock() *ast.BlockStmt {
 			stmt := p.parseStmt()
 			if stmt != nil {
 				block.Stmts = append(block.Stmts, stmt)
+				p.nextToken()
+			} else if len(p.errors) > 0 {
+				p.synchronizeInBlock()
+			} else {
+				p.nextToken()
 			}
-			p.nextToken()
 		}
 
 		if p.curToken.Type == lexer.TOK_EOF {
@@ -824,9 +885,11 @@ func (p *Parser) parseFor() ast.Stmt {
 		var fType ast.FloatType
 		var bType ast.BoolType
 		var sType ast.StringType
+		var uType ast.UnionType
 		isFloat := false
 		isBool := false
 		isString := false
+		isUnion := false
 		switch typ := t.(type) {
 		case ast.IntegerType:
 			iType = typ
@@ -839,6 +902,9 @@ func (p *Parser) parseFor() ast.Stmt {
 		case ast.StringType:
 			sType = typ
 			isString = true
+		case ast.UnionType:
+			uType = typ
+			isUnion = true
 		}
 
 		var expr ast.Expr
@@ -852,7 +918,7 @@ func (p *Parser) parseFor() ast.Stmt {
 			return nil
 		}
 
-		init := &ast.VarDecl{Name: name1, Type: t, IType: iType, FType: fType, BType: bType, SType: sType, Expr: expr, IsFloat: isFloat, IsBool: isBool, IsString: isString, Line: varLine}
+		init := &ast.VarDecl{Name: name1, Type: t, IType: iType, FType: fType, BType: bType, SType: sType, UnionType: uType, Expr: expr, IsFloat: isFloat, IsBool: isBool, IsString: isString, IsUnion: isUnion, Line: varLine}
 		p.nextToken()
 
 		var cond ast.Expr
@@ -1224,7 +1290,13 @@ func (p *Parser) parseEquality() ast.Expr {
 		if p.curToken.Type == lexer.TOK_IS {
 			isLine := p.curToken.Line
 			p.nextToken()
-			right := p.parseComparison()
+			var right ast.Expr
+			if isTypeToken(p.curToken.Type) {
+				t := p.parseType()
+				right = &ast.TypeRef{Type: t, IsType: true, Line: isLine}
+			} else {
+				right = p.parseComparison()
+			}
 			left = &ast.IsExpr{Left: left, Right: right, Line: isLine}
 		} else {
 			op := p.curToken.Literal
@@ -1235,6 +1307,11 @@ func (p *Parser) parseEquality() ast.Expr {
 		}
 	}
 	return left
+}
+
+func isTypeToken(tok lexer.TokenType) bool {
+	return tok == lexer.TOK_INT || tok == lexer.TOK_FLOAT || tok == lexer.TOK_BOOL ||
+		tok == lexer.TOK_STRING || tok == lexer.TOK_ARRAY || tok == lexer.TOK_LIST
 }
 
 func (p *Parser) parseComparison() ast.Expr {
