@@ -37,10 +37,8 @@ func (p *Parser) ParseProgram() *ast.Program {
 		if stmt != nil {
 			program.Stmts = append(program.Stmts, stmt)
 			p.nextToken()
-		} else if len(p.errors) > 0 {
-			p.synchronize()
 		} else {
-			p.nextToken()
+			p.synchronize()
 		}
 	}
 	return program
@@ -98,18 +96,30 @@ func (p *Parser) ParseSingleStmt() (ast.Stmt, []string, []string) {
 func (p *Parser) parseStmt() ast.Stmt {
 	switch p.curToken.Type {
 	case lexer.TOK_VAR:
-		return p.parseVarDecl()
+		if s := p.parseVarDecl(); s != nil {
+			return s
+		}
+		return nil
 	case lexer.TOK_REF:
-		return p.parseRefDecl()
+		if s := p.parseRefDecl(); s != nil {
+			return s
+		}
+		return nil
 	case lexer.TOK_PRINT:
-		return p.parsePrint()
+		if s := p.parsePrint(); s != nil {
+			return s
+		}
+		return nil
 	case lexer.TOK_FUNCTION:
 		return p.parseFuncDecl()
 	case lexer.TOK_RETURN:
 		return p.parseReturn()
 	case lexer.TOK_IDENT:
 		if p.peekToken.Type == lexer.TOK_PLUS_PLUS || p.peekToken.Type == lexer.TOK_MINUS_MINUS {
-			return p.parseIncDec()
+			if s := p.parseIncDec(); s != nil {
+				return s
+			}
+			return nil
 		}
 		if p.peekToken.Type == lexer.TOK_DOT {
 			stmtLine := p.curToken.Line
@@ -130,17 +140,32 @@ func (p *Parser) parseStmt() ast.Stmt {
 			return &ast.ExprStmt{Expr: expr, Line: stmtLine}
 		}
 		if p.peekToken.Type == lexer.TOK_LBRACKET {
-			return p.parseIndexedAssign()
+			if s := p.parseIndexedAssign(); s != nil {
+				return s
+			}
+			return nil
 		}
-		return p.parseAssignment()
+		if s := p.parseAssignment(); s != nil {
+			return s
+		}
+		return nil
 	case lexer.TOK_IF:
-		return p.parseIf()
+		if s := p.parseIf(); s != nil {
+			return s
+		}
+		return nil
 	case lexer.TOK_FOR:
 		return p.parseFor()
 	case lexer.TOK_WHILE:
-		return p.parseWhile()
+		if s := p.parseWhile(); s != nil {
+			return s
+		}
+		return nil
 	case lexer.TOK_SWITCH:
-		return p.parseSwitch()
+		if s := p.parseSwitch(); s != nil {
+			return s
+		}
+		return nil
 	case lexer.TOK_CASE:
 		p.addError("case outside switch")
 		return nil
@@ -148,9 +173,15 @@ func (p *Parser) parseStmt() ast.Stmt {
 		p.addError("default outside switch")
 		return nil
 	case lexer.TOK_BREAK:
-		return p.parseBreak()
+		if s := p.parseBreak(); s != nil {
+			return s
+		}
+		return nil
 	case lexer.TOK_SKIP:
-		return p.parseSkip()
+		if s := p.parseSkip(); s != nil {
+			return s
+		}
+		return nil
 	case lexer.TOK_TYPEOF:
 		stmtLine := p.curToken.Line
 		expr := p.parseExpr()
@@ -671,10 +702,8 @@ func (p *Parser) parseBlock() *ast.BlockStmt {
 			if stmt != nil {
 				block.Stmts = append(block.Stmts, stmt)
 				p.nextToken()
-			} else if len(p.errors) > 0 {
-				p.synchronizeInBlock()
 			} else {
-				p.nextToken()
+				p.synchronizeInBlock()
 			}
 		}
 

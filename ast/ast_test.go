@@ -13,6 +13,7 @@ func TestTypeKind(t *testing.T) {
 		{ArrayType{}, "array"},
 		{ListType{}, "list"},
 		{StringType{}, "string"},
+		{UnionType{}, "union"},
 	}
 
 	for _, tt := range tests {

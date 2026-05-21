@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -356,8 +357,10 @@ func TestRunMainNoArgs(t *testing.T) {
 func TestMainBinarySmokeTest(t *testing.T) {
 	tmpDir := t.TempDir()
 	binPath := filepath.Join(tmpDir, "test-lang")
+	if runtime.GOOS == "windows" {
+		binPath += ".exe"
+	}
 	cmd := exec.Command("go", "build", "-o", binPath, ".")
-	cmd.Dir = "/home/Ryan/GitHub/test-language"
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("failed to build binary: %v", err)
 	}
@@ -379,8 +382,10 @@ func TestMainBinarySmokeTest(t *testing.T) {
 func TestMainErrorExit(t *testing.T) {
 	tmpDir := t.TempDir()
 	binPath := filepath.Join(tmpDir, "test-lang")
+	if runtime.GOOS == "windows" {
+		binPath += ".exe"
+	}
 	cmd := exec.Command("go", "build", "-o", binPath, ".")
-	cmd.Dir = "/home/Ryan/GitHub/test-language"
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("failed to build binary: %v", err)
 	}

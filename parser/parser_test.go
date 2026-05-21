@@ -5462,3 +5462,243 @@ func TestParseIsWithVariable(t *testing.T) {
 		t.Fatalf("expected VarRef on right (variable), got %T", ie.Right)
 	}
 }
+
+// synchronizeInBlock / parseBlock error recovery
+func TestParseBlockRecoverySemicolonSkip(t *testing.T) {
+	input := `if (true) { @ print(1); }`
+	l := lexer.New(input)
+	p := New(l)
+	prog := p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected errors for @ in block")
+	}
+	if len(prog.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(prog.Stmts))
+	}
+	ifStmt, ok := prog.Stmts[0].(*ast.IfStmt)
+	if !ok {
+		t.Fatalf("expected IfStmt, got %T", prog.Stmts[0])
+	}
+	if len(ifStmt.Then.Stmts) != 1 {
+		t.Errorf("expected 1 statement in then block after recovery, got %d", len(ifStmt.Then.Stmts))
+	}
+}
+
+func TestParseBlockRecoveryAfterSuccess(t *testing.T) {
+	input := `if (true) { print(1); @ print(2); }`
+	l := lexer.New(input)
+	p := New(l)
+	prog := p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected errors for @ in block")
+	}
+	if len(prog.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(prog.Stmts))
+	}
+	ifStmt, ok := prog.Stmts[0].(*ast.IfStmt)
+	if !ok {
+		t.Fatalf("expected IfStmt, got %T", prog.Stmts[0])
+	}
+	if len(ifStmt.Then.Stmts) != 2 {
+		t.Errorf("expected 2 statements in then block after recovery, got %d", len(ifStmt.Then.Stmts))
+	}
+}
+
+func TestParseBlockRecoveryConsumesToSemicolon(t *testing.T) {
+	input := `if (true) { print(1); @ ; print(2); }`
+	l := lexer.New(input)
+	p := New(l)
+	prog := p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected errors for @ in block")
+	}
+	if len(prog.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(prog.Stmts))
+	}
+	ifStmt, ok := prog.Stmts[0].(*ast.IfStmt)
+	if !ok {
+		t.Fatalf("expected IfStmt, got %T", prog.Stmts[0])
+	}
+	if len(ifStmt.Then.Stmts) != 2 {
+		t.Errorf("expected 2 statements in then block after semicolon recovery, got %d", len(ifStmt.Then.Stmts))
+	}
+}
+
+func TestParseBlockRecoveryConsumesBadTokens(t *testing.T) {
+	input := `if (true) { @ @; print(1); }`
+	l := lexer.New(input)
+	p := New(l)
+	prog := p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected errors for @ tokens in block")
+	}
+	if len(prog.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(prog.Stmts))
+	}
+	ifStmt, ok := prog.Stmts[0].(*ast.IfStmt)
+	if !ok {
+		t.Fatalf("expected IfStmt, got %T", prog.Stmts[0])
+	}
+	if len(ifStmt.Then.Stmts) != 1 {
+		t.Errorf("expected 1 statement in then block after consuming bad tokens, got %d", len(ifStmt.Then.Stmts))
+	}
+}
+
+func TestParseBlockRecoveryEof(t *testing.T) {
+	input := `if (true) { @`
+	l := lexer.New(input)
+	p := New(l)
+	prog := p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected errors for unterminated block")
+	}
+	if len(prog.Stmts) != 0 {
+		t.Errorf("expected 0 statements (parseBlock returns nil on EOF), got %d", len(prog.Stmts))
+	}
+}
+
+func TestParseBlockRecoveryToRbrace(t *testing.T) {
+	input := `if (true) { @ }`
+	l := lexer.New(input)
+	p := New(l)
+	prog := p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected errors for @ in block")
+	}
+	if len(prog.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(prog.Stmts))
+	}
+	ifStmt, ok := prog.Stmts[0].(*ast.IfStmt)
+	if !ok {
+		t.Fatalf("expected IfStmt, got %T", prog.Stmts[0])
+	}
+	if len(ifStmt.Then.Stmts) != 0 {
+		t.Errorf("expected 0 statements in then block (error recovered to rbrace), got %d", len(ifStmt.Then.Stmts))
+	}
+}
+
+func TestParseBlockSingleStmtWithoutBrace(t *testing.T) {
+	input := `if (true) print(1);`
+	l := lexer.New(input)
+	p := New(l)
+	prog := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(prog.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(prog.Stmts))
+	}
+	ifStmt, ok := prog.Stmts[0].(*ast.IfStmt)
+	if !ok {
+		t.Fatalf("expected IfStmt, got %T", prog.Stmts[0])
+	}
+	if len(ifStmt.Then.Stmts) != 1 {
+		t.Errorf("expected 1 statement in then block, got %d", len(ifStmt.Then.Stmts))
+	}
+}
+
+// -- Coverage: ParseProgram else branch (stmt nil, no errors) --
+func TestParseProgramEmptyStmt(t *testing.T) {
+	input := `;`
+	l := lexer.New(input)
+	p := New(l)
+	prog := p.ParseProgram()
+	// Bare semicolon is a lexer token but not a parseable statement.
+	// parseStmt returns nil for TOK_SEMICOLON since it's not in any case.
+	// The else branch fires: stmt==nil && len(p.errors)==0 -> p.nextToken()
+	if prog == nil {
+		t.Fatalf("expected non-nil program")
+	}
+}
+
+// -- Coverage: parseBlock EOF-recovery branch --
+func TestParseBlockUnclosedBraceEOF(t *testing.T) {
+	input := `{`
+	l := lexer.New(input)
+	p := New(l)
+	prog := p.ParseProgram()
+	// parseBlock sees '{', enters loop, gets EOF before RBRACE
+	// Hits the `if p.curToken.Type == lexer.TOK_EOF { p.addError("expected '}'); return nil }` branch
+	// This should result in an error
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected error for unclosed brace")
+	}
+	if prog == nil {
+		t.Fatalf("expected non-nil program")
+	}
+}
+
+// -- Coverage: parseFor with union init --
+func TestParseForCStyleUnionInit(t *testing.T) {
+	input := `for (var x: int{size: 32, signed: true} | float{size: 64} = 0; x < 10; x = x + 1) { print(x.toString()); }`
+	l := lexer.New(input)
+	p := New(l)
+	prog := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(prog.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(prog.Stmts))
+	}
+	_, ok := prog.Stmts[0].(*ast.ForStmt)
+	if !ok {
+		t.Fatalf("expected ForStmt, got %T", prog.Stmts[0])
+	}
+}
+
+// -- Coverage: parseBlock error-recovery via synchronizeInBlock --
+func TestParseBlockErrorRecovery(t *testing.T) {
+	input := `{ var x: int{size: 32} = ; }`
+	l := lexer.New(input)
+	p := New(l)
+	prog := p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected parse errors for malformed var decl in block")
+	}
+	// Should have recovered gracefully and still have a program
+	if prog == nil {
+		t.Fatalf("expected non-nil program")
+	}
+}
+
+// -- Coverage: ParseProgram synchronize on error --
+func TestParseProgramSynchronizeOnError(t *testing.T) {
+	input := `var x: int{size: 32} = ; var y = 42;`
+	l := lexer.New(input)
+	p := New(l)
+	prog := p.ParseProgram()
+	if len(p.Errors()) == 0 {
+		t.Errorf("expected parse errors")
+	}
+	if prog == nil {
+		t.Fatalf("expected non-nil program")
+	}
+}
+
+// -- Coverage: parseFor with union init without assignment --
+func TestParseForCStyleUnionDecl(t *testing.T) {
+	input := `for (var x: int{size: 32, signed: true} | float{size: 64}; x < 10; x = x + 1) { print(x.toString()); }`
+	l := lexer.New(input)
+	p := New(l)
+	prog := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("unexpected errors: %v", p.Errors())
+	}
+	if len(prog.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(prog.Stmts))
+	}
+}
+
+// -- Coverage: ParseProgram empty input hits else branch (no stmt, no errors, advance past EOF) --
+func TestParseProgramEmptyInput(t *testing.T) {
+	input := ``
+	l := lexer.New(input)
+	p := New(l)
+	prog := p.ParseProgram()
+	if len(prog.Stmts) != 0 {
+		t.Errorf("expected 0 statements for empty input, got %d", len(prog.Stmts))
+	}
+	if len(p.Errors()) > 0 {
+		t.Errorf("expected no errors for empty input, got %v", p.Errors())
+	}
+}

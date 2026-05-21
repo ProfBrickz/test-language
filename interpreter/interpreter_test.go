@@ -14059,3 +14059,2264 @@ print((x is string).toString());
 		t.Errorf("expected 'true' and 'false', got %q", output)
 	}
 }
+
+// -- Coverage: valueForType --
+func TestValueForTypeAllPaths(t *testing.T) {
+	forName := func(name string, typ ast.Type) {
+		t.Run(name, func(t *testing.T) {
+			v := valueForType(typ)
+			if v.Null {
+				t.Errorf("expected non-null value")
+			}
+		})
+	}
+	forName("int", ast.IntegerType{Size: 32, Signed: true})
+	forName("float", ast.FloatType{Size: 64})
+	forName("bool", ast.BoolType{})
+	forName("string", ast.StringType{})
+	forName("array", ast.ArrayType{ElemType: ast.IntegerType{Size: 32, Signed: true}})
+	forName("list", ast.ListType{ElemType: ast.IntegerType{Size: 32, Signed: true}})
+}
+
+// -- Coverage: typeIsNullableRuntime --
+func TestTypeIsNullableRuntimeAllPaths(t *testing.T) {
+	tests := []struct {
+		name string
+		typ  ast.Type
+		want bool
+	}{
+		{"nullable int", ast.IntegerType{Nullable: true}, true},
+		{"non-nullable int", ast.IntegerType{Nullable: false}, false},
+		{"nullable float", ast.FloatType{Nullable: true}, true},
+		{"non-nullable float", ast.FloatType{Nullable: false}, false},
+		{"nullable bool", ast.BoolType{Nullable: true}, true},
+		{"non-nullable bool", ast.BoolType{Nullable: false}, false},
+		{"union all nullable", ast.UnionType{Types: []ast.Type{ast.IntegerType{Nullable: true}}}, true},
+		{"union none nullable", ast.UnionType{Types: []ast.Type{ast.IntegerType{Nullable: false}}}, false},
+		{"string (non-nullable fallthrough)", ast.StringType{}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := typeIsNullableRuntime(tt.typ); got != tt.want {
+				t.Errorf("typeIsNullableRuntime(%v) = %v, want %v", tt.typ, got, tt.want)
+			}
+		})
+	}
+}
+
+// -- Coverage: opToVerb --
+func TestOpToVerbRuntime(t *testing.T) {
+	tests := []struct{ op, want string }{
+		{"+", "add"},
+		{"-", "subtract"},
+		{"*", "multiply"},
+		{"/", "divide"},
+		{"%", "modulo"},
+		{"unknown", "unknown"},
+	}
+	for _, tt := range tests {
+		if got := opToVerb(tt.op); got != tt.want {
+			t.Errorf("opToVerb(%q) = %q, want %q", tt.op, got, tt.want)
+		}
+	}
+}
+
+// -- Coverage: binaryRuntimeOpResult --
+func TestBinaryRuntimeOpResult(t *testing.T) {
+	tests := []struct {
+		name  string
+		left  ast.Type
+		right ast.Type
+		op    string
+		want  ast.Type
+	}{
+		{"int32+int32", ast.IntegerType{Size: 32, Signed: true}, ast.IntegerType{Size: 32, Signed: true}, "+", ast.IntegerType{Size: 32, Signed: true}},
+		{"int32+int64", ast.IntegerType{Size: 32, Signed: true}, ast.IntegerType{Size: 64, Signed: true}, "+", ast.IntegerType{Size: 64, Signed: true}},
+		{"int64+int32", ast.IntegerType{Size: 64, Signed: true}, ast.IntegerType{Size: 32, Signed: true}, "+", ast.IntegerType{Size: 64, Signed: true}},
+		{"int32+float64", ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{Size: 64}, "+", ast.FloatType{Size: 64}},
+		{"float64+int32", ast.FloatType{Size: 64}, ast.IntegerType{Size: 32, Signed: true}, "+", ast.FloatType{Size: 64}},
+		{"float64+float32", ast.FloatType{Size: 64}, ast.FloatType{Size: 32}, "+", ast.FloatType{Size: 64}},
+		{"float32+float64", ast.FloatType{Size: 32}, ast.FloatType{Size: 64}, "+", ast.FloatType{Size: 64}},
+		{"int64+float32 invalid", ast.IntegerType{Size: 64, Signed: true}, ast.FloatType{Size: 32}, "+", nil},
+		{"bool+int invalid", ast.BoolType{}, ast.IntegerType{Size: 32, Signed: true}, "+", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := binaryRuntimeOpResult(tt.left, tt.right, tt.op)
+			if tt.want == nil {
+				if got != nil {
+					t.Errorf("expected nil, got %v", got)
+				}
+				return
+			}
+			if got != tt.want {
+				t.Errorf("binaryRuntimeOpResult = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// -- Coverage: countMatchingOverloadsRuntime, nullArgMatchesType, argsMatchCategory, argMatchCategory --
+func TestCountMatchingOverloadsRuntimeVariants(t *testing.T) {
+	intParam := ast.Param{Name: "x", Type: ast.IntegerType{Size: 32, Signed: true}}
+	overloads := []*ast.FuncDecl{
+		{Parameters: []ast.Param{intParam}},
+	}
+	t.Run("no match", func(t *testing.T) {
+		args := []Value{{IsBool: true, BData: true}}
+		count := countMatchingOverloadsRuntime(overloads, args)
+		if count != 0 {
+			t.Errorf("expected 0, got %d", count)
+		}
+	})
+	t.Run("nil overloads", func(t *testing.T) {
+		if count := countMatchingOverloadsRuntime(nil, nil); count != 0 {
+			t.Errorf("expected 0, got %d", count)
+		}
+	})
+}
+
+func TestNullArgMatchesTypeAllPaths(t *testing.T) {
+	tests := []struct {
+		name string
+		typ  ast.Type
+		arg  Value
+		want bool
+	}{
+		{"int param, int arg", ast.IntegerType{Size: 32, Signed: true}, Value{IType: ast.IntegerType{Size: 32, Signed: true}}, true},
+		{"int param, bool arg", ast.IntegerType{Size: 32, Signed: true}, Value{IsBool: true}, false},
+		{"int param, float arg", ast.IntegerType{Size: 32, Signed: true}, Value{IsFloat: true}, false},
+		{"int param, string arg", ast.IntegerType{Size: 32, Signed: true}, Value{IsString: true}, false},
+		{"int param, array arg", ast.IntegerType{Size: 32, Signed: true}, Value{IsArray: true}, false},
+		{"float param, float arg", ast.FloatType{}, Value{IsFloat: true}, true},
+		{"float param, int arg", ast.FloatType{}, Value{IType: ast.IntegerType{Size: 32, Signed: true}}, false},
+		{"bool param, bool arg", ast.BoolType{}, Value{IsBool: true}, true},
+		{"bool param, int arg", ast.BoolType{}, Value{IType: ast.IntegerType{Size: 32, Signed: true}}, false},
+		{"string param, string arg", ast.StringType{}, Value{IsString: true}, true},
+		{"array param, array arg", ast.ArrayType{}, Value{IsArray: true}, true},
+		{"list param, array arg", ast.ListType{}, Value{IsArray: true}, true},
+		{"union param, no match", ast.UnionType{Types: []ast.Type{ast.BoolType{}}}, Value{IType: ast.IntegerType{Size: 32, Signed: true}}, false},
+		{"no declared type", ast.IntegerType{}, Value{}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := nullArgMatchesType(tt.typ, tt.arg); got != tt.want {
+				t.Errorf("nullArgMatchesType(%v, %v) = %v, want %v", tt.typ, tt.arg, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestArgExactTypeMatchRuntimeAllPaths(t *testing.T) {
+	tests := []struct {
+		name string
+		pt   ast.Type
+		arg  Value
+		want bool
+	}{
+		// Null arg paths
+		{"null to nullable int", ast.IntegerType{Size: 32, Signed: true, Nullable: true}, Value{Null: true}, true},
+		{"null to non-nullable int", ast.IntegerType{Size: 32, Signed: true, Nullable: false}, Value{Null: true}, false},
+
+		// Untyped arg paths
+		{"untyped to int param", ast.IntegerType{Size: 32, Signed: true}, Value{Untyped: true}, true},
+		{"untyped to float param", ast.FloatType{}, Value{Untyped: true, IsFloat: true}, true},
+		{"untyped to bool param", ast.BoolType{}, Value{Untyped: true, IsBool: true}, true},
+		{"untyped to string param", ast.StringType{}, Value{Untyped: true, IsString: true}, true},
+		{"untyped to union param", ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}}, Value{Untyped: true}, true},
+
+		// Typed arg paths
+		{"int arg exact", ast.IntegerType{Size: 32, Signed: true}, Value{IType: ast.IntegerType{Size: 32, Signed: true}}, true},
+		{"float arg exact", ast.FloatType{Size: 64}, Value{IsFloat: true, FType: ast.FloatType{Size: 64}}, true},
+		{"bool arg exact", ast.BoolType{Nullable: false}, Value{IsBool: true, BType: ast.BoolType{Nullable: false}}, true},
+		{"string arg exact", ast.StringType{}, Value{IsString: true}, true},
+		{"union match via member", ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}}, Value{IType: ast.IntegerType{Size: 32, Signed: true}}, true},
+		{"no match default", ast.BoolType{}, Value{Null: true}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := argExactTypeMatch(tt.pt, tt.arg); got != tt.want {
+				t.Errorf("argExactTypeMatch(%v, %v) = %v, want %v", tt.pt, tt.arg, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestArgsMatchCategoryAndArgMatchCategory(t *testing.T) {
+	t.Run("all match", func(t *testing.T) {
+		params := []ast.Param{{Name: "x", Type: ast.IntegerType{Size: 32, Signed: true}}}
+		args := []Value{{IType: ast.IntegerType{Size: 32, Signed: true}}}
+		if !argsMatchCategory(params, args, false) {
+			t.Errorf("expected match")
+		}
+	})
+	t.Run("one fails", func(t *testing.T) {
+		params := []ast.Param{{Name: "x", Type: ast.IntegerType{Size: 32, Signed: true}}}
+		args := []Value{{IsBool: true}}
+		if argsMatchCategory(params, args, false) {
+			t.Errorf("expected no match")
+		}
+	})
+}
+
+func TestArgMatchCategoryAllPaths(t *testing.T) {
+	tests := []struct {
+		name         string
+		paramType    ast.Type
+		arg          Value
+		sameCategory bool
+		want         bool
+	}{
+		// Null arg
+		{"null to nullable int", ast.IntegerType{Size: 32, Signed: true, Nullable: true}, Value{Null: true}, false, true},
+		{"null to non-nullable int", ast.IntegerType{Size: 32, Signed: true, Nullable: false}, Value{Null: true}, false, false},
+
+		// IntegerType param
+		{"float arg same cat false", ast.IntegerType{Size: 32, Signed: true}, Value{IsFloat: true, FType: ast.FloatType{Size: 64}}, false, false},
+		{"float arg same cat true", ast.IntegerType{Size: 32, Signed: true}, Value{IsFloat: true, FType: ast.FloatType{Size: 64}}, true, false},
+		{"bool arg", ast.IntegerType{Size: 32, Signed: true}, Value{IsBool: true}, false, false},
+		{"int arg same size", ast.IntegerType{Size: 32, Signed: true}, Value{IType: ast.IntegerType{Size: 32, Signed: true}}, false, true},
+
+		// FloatType param
+		{"float arg cat", ast.FloatType{Size: 32}, Value{IsFloat: true, FType: ast.FloatType{Size: 16}}, false, true},
+		{"int arg cross cat false", ast.FloatType{Size: 64}, Value{IType: ast.IntegerType{Size: 32, Signed: true}}, false, true},
+		{"int arg cross cat true", ast.FloatType{Size: 64}, Value{IType: ast.IntegerType{Size: 32, Signed: true}}, true, false},
+		{"bool arg to float", ast.FloatType{Size: 64}, Value{IsBool: true}, false, false},
+
+		// BoolType param
+		{"bool param, bool arg", ast.BoolType{}, Value{IsBool: true}, false, true},
+		{"bool param, bool arg same cat", ast.BoolType{}, Value{IsBool: true}, true, true},
+		{"bool param, int arg", ast.BoolType{}, Value{IType: ast.IntegerType{Size: 32, Signed: true}}, false, false},
+
+		// StringType param
+		{"string param, string arg", ast.StringType{}, Value{IsString: true}, false, true},
+
+		// UnionType param
+		{"union param match member", ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}}, Value{IType: ast.IntegerType{Size: 32, Signed: true}}, false, true},
+		{"union param no match", ast.UnionType{Types: []ast.Type{ast.BoolType{}}}, Value{IType: ast.IntegerType{Size: 32, Signed: true}}, false, false},
+
+		// Default fallthrough
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := argMatchCategory(tt.paramType, tt.arg, tt.sameCategory); got != tt.want {
+				t.Errorf("argMatchCategory(%v, %v, %v) = %v, want %v", tt.paramType, tt.arg, tt.sameCategory, got, tt.want)
+			}
+		})
+	}
+}
+
+// -- Coverage: applyTypeToValue --
+func TestApplyTypeToValueAllPaths(t *testing.T) {
+	t.Run("nil type", func(t *testing.T) {
+		v := applyTypeToValue(Value{}, nil)
+		if v.Type != nil {
+			t.Errorf("expected nil type")
+		}
+	})
+	t.Run("int type", func(t *testing.T) {
+		v := applyTypeToValue(Value{}, ast.IntegerType{Size: 32, Signed: true})
+		if v.IType.Size != 32 {
+			t.Errorf("expected size 32")
+		}
+	})
+	t.Run("float type", func(t *testing.T) {
+		v := applyTypeToValue(Value{}, ast.FloatType{Size: 64})
+		if !v.IsFloat {
+			t.Errorf("expected IsFloat")
+		}
+	})
+	t.Run("bool type", func(t *testing.T) {
+		v := applyTypeToValue(Value{}, ast.BoolType{Nullable: true})
+		if !v.IsBool {
+			t.Errorf("expected IsBool")
+		}
+	})
+	t.Run("string type", func(t *testing.T) {
+		v := applyTypeToValue(Value{}, ast.StringType{Size: 10})
+		if !v.IsString {
+			t.Errorf("expected IsString")
+		}
+	})
+	t.Run("array type", func(t *testing.T) {
+		v := applyTypeToValue(Value{}, ast.ArrayType{ElemType: ast.IntegerType{Size: 32, Signed: true}, Size: 5})
+		if v.Type == nil {
+			t.Errorf("expected non-nil type")
+		}
+	})
+	t.Run("list type", func(t *testing.T) {
+		v := applyTypeToValue(Value{}, ast.ListType{ElemType: ast.IntegerType{Size: 32, Signed: true}})
+		if v.Type == nil {
+			t.Errorf("expected non-nil type")
+		}
+	})
+	t.Run("union type", func(t *testing.T) {
+		v := applyTypeToValue(Value{}, ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}})
+		if v.Type == nil {
+			t.Errorf("expected non-nil type")
+		}
+	})
+}
+
+// -- Coverage: typeMatchesType --
+func TestTypeMatchesTypeAllPaths(t *testing.T) {
+	tests := []struct {
+		name  string
+		left  ast.Type
+		right ast.Type
+		want  bool
+	}{
+		{"nil left", nil, ast.IntegerType{Size: 32, Signed: true}, false},
+		{"nil right", ast.IntegerType{Size: 32, Signed: true}, nil, false},
+		{"right union match", ast.IntegerType{Size: 32, Signed: true}, ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}}, true},
+		{"right union no match", ast.FloatType{Size: 64}, ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}}, false},
+		{"left union all match", ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}}, ast.IntegerType{Size: 32, Signed: true}, true},
+		{"left union some mismatch", ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{Size: 64}}}, ast.IntegerType{Size: 32, Signed: true}, false},
+		{"int bare matches any", ast.IntegerType{Size: 32, Signed: true}, ast.IntegerType{Size: 0, Signed: false}, true},
+		{"float bare matches any", ast.FloatType{Size: 64}, ast.FloatType{Size: 0}, true},
+		{"int matches float category", ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{Size: 0}, true},
+		{"int64 to float32 fails", ast.IntegerType{Size: 64, Signed: true}, ast.FloatType{Size: 32}, false},
+		{"bool to bool", ast.BoolType{}, ast.BoolType{}, true},
+		{"int to bool", ast.IntegerType{Size: 32, Signed: true}, ast.BoolType{}, false},
+		{"string to string", ast.StringType{}, ast.StringType{}, true},
+		{"array to array bare elem", ast.ArrayType{ElemType: ast.IntegerType{Size: 32, Signed: true}}, ast.ArrayType{}, true},
+		{"array to array strict elem", ast.ArrayType{ElemType: ast.IntegerType{Size: 32, Signed: true}}, ast.ArrayType{ElemType: ast.IntegerType{Size: 32, Signed: true}}, true},
+		{"array to wrong type", ast.ArrayType{}, ast.IntegerType{Size: 32, Signed: true}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := typeMatchesType(tt.left, tt.right); got != tt.want {
+				t.Errorf("typeMatchesType(%v, %v) = %v, want %v", tt.left, tt.right, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTypeMatchesTypeList(t *testing.T) {
+	if !typeMatchesType(ast.ListType{}, ast.ListType{}) {
+		t.Errorf("expected list to match list")
+	}
+	if typeMatchesType(ast.ArrayType{}, ast.ListType{}) {
+		t.Errorf("expected array to not match list")
+	}
+}
+
+func TestTypeMatchesTypeFloatExact(t *testing.T) {
+	if !typeMatchesType(ast.FloatType{Size: 32}, ast.FloatType{Size: 32}) {
+		t.Errorf("expected float32 to match float32")
+	}
+	if !typeMatchesType(ast.FloatType{Size: 32}, ast.FloatType{Size: 64}) {
+		t.Errorf("expected float32 to match float64 (via implicit conversion)")
+	}
+}
+
+func TestTypeMatchesTypeIntToFloatExplicit(t *testing.T) {
+	if !typeMatchesType(ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{Size: 64}) {
+		t.Errorf("expected int32 to convert to float64")
+	}
+}
+
+// -- Coverage: valueMatchesType --
+func TestValueMatchesTypeAllPaths(t *testing.T) {
+	t.Run("with declared type", func(t *testing.T) {
+		leftVal := Value{Type: ast.IntegerType{Size: 32, Signed: true}}
+		rightVal := Value{IsType: true, Type: ast.IntegerType{Size: 32, Signed: true}}
+		if !valueMatchesType(leftVal, rightVal) {
+			t.Errorf("expected match")
+		}
+	})
+	t.Run("without declared type", func(t *testing.T) {
+		leftVal := Value{IType: ast.IntegerType{Size: 32, Signed: true}}
+		rightVal := Value{IsType: true, Type: ast.IntegerType{Size: 32, Signed: true}}
+		if !valueMatchesType(leftVal, rightVal) {
+			t.Errorf("expected match")
+		}
+	})
+}
+
+// -- Coverage: checkUnionBinaryOp --
+func TestCheckUnionBinaryOpAllPaths(t *testing.T) {
+	i := New()
+	t.Run("single types each side - no error", func(t *testing.T) {
+		left := Value{IType: ast.IntegerType{Size: 32, Signed: true}}
+		right := Value{IType: ast.IntegerType{Size: 32, Signed: true}}
+		if err := i.checkUnionBinaryOp(1, left, right, "+"); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+	t.Run("union types incompatible", func(t *testing.T) {
+		// Use unions with 2+ members to bypass the single-type guard
+		left := Value{Type: ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}, ast.BoolType{}}}}
+		right := Value{Type: ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}, ast.BoolType{}}}}
+		if err := i.checkUnionBinaryOp(1, left, right, "+"); err == nil {
+			t.Errorf("expected error for union bool + bool")
+		}
+	})
+}
+
+// -- Coverage: valueRuntimeTypes --
+func TestValueRuntimeTypesVariants(t *testing.T) {
+	tests := []struct {
+		name string
+		v    Value
+		n    int
+	}{
+		{"union", Value{Type: ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}}}, 1},
+		{"float", Value{IsFloat: true, FType: ast.FloatType{Size: 64}}, 1},
+		{"string", Value{IsString: true, SType: ast.StringType{}}, 1},
+		{"array", Value{IsArray: true, Type: ast.ArrayType{}}, 1},
+		{"int typed", Value{IType: ast.IntegerType{Size: 32, Signed: true}}, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := valueRuntimeTypes(tt.v); len(got) != tt.n {
+				t.Errorf("expected %d types, got %d: %v", tt.n, len(got), got)
+			}
+		})
+	}
+}
+
+// -- Coverage: evalCall ambiguous null --
+func TestEvalCallAmbiguousNull(t *testing.T) {
+	input := `
+function foo(x: int): int { return x; }
+function foo(x: float): int { return 1; }
+foo(null);
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	err := i.Run(program)
+	if err == nil {
+		t.Errorf("expected error for ambiguous null call")
+	}
+}
+
+// -- Coverage: resolveOverload all passes --
+func TestResolveOverloadMultiplePasses(t *testing.T) {
+	float32Param := ast.Param{Name: "x", Type: ast.FloatType{Size: 32}}
+	float64Param := ast.Param{Name: "x", Type: ast.FloatType{Size: 64}}
+	overloads := []*ast.FuncDecl{
+		{Parameters: []ast.Param{float64Param}},
+		{Parameters: []ast.Param{float32Param}},
+	}
+	// int arg -> cross-category match should pick float32 (first cross-category)
+	args := []Value{{IType: ast.IntegerType{Size: 32, Signed: true}}}
+	decl := resolveOverload(overloads, args)
+	if decl == nil {
+		t.Errorf("expected a match for int to float cross-category")
+	}
+}
+
+// -- Coverage: execVarDecl string type path --
+func TestExecVarDeclStringType(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{Name: "s", Type: ast.StringType{Size: 5}, Expr: &ast.StringLit{Value: "hello", Untyped: true, Line: 1}, Line: 1}
+	if err := i.executeStmt(stmt); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExecVarDeclStringNoExpr(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{Name: "s", Type: ast.StringType{Size: 5}, Line: 1}
+	if err := i.executeStmt(stmt); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// -- Coverage: applyTypeToValue in evalCall return --
+func TestEvalCallTypedReturn(t *testing.T) {
+	input := `
+function foo(): int { return 42; }
+print(foo().toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		if err := i.Run(program); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "42") {
+		t.Errorf("expected output to contain '42', got %q", output)
+	}
+}
+
+func TestEvalCallUntypedReturn(t *testing.T) {
+	input := `
+function foo(): int { var x: int{size: 32} = 99; return x; }
+print(foo().toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		if err := i.Run(program); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "99") {
+		t.Errorf("expected output to contain '99', got %q", output)
+	}
+}
+
+// -- Coverage: typeDescForType union --
+func TestTypeDescForTypeUnion(t *testing.T) {
+	result := typeDescForType(ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{Size: 64}}})
+	if !strings.Contains(result, "|") {
+		t.Errorf("expected union description with '|', got %q", result)
+	}
+}
+
+// -- Coverage: execVarDecl union --
+func TestExecVarDeclUnionWithExpr(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{Name: "u", IsUnion: true, Expr: &ast.IntegerLit{Value: 42, Untyped: true, Line: 1}, Line: 1}
+	if err := i.executeStmt(stmt); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExecVarDeclUnionNoExpr(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{Name: "u", IsUnion: true, Line: 1}
+	if err := i.executeStmt(stmt); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// -- Coverage: execVarDecl nullable init --
+func TestExecVarDeclNullableBoolInit(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{Name: "b", IsBool: true, BType: ast.BoolType{Nullable: true}, Line: 1}
+	if err := i.executeStmt(stmt); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExecVarDeclNonNullableBoolInit(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{Name: "b", IsBool: true, BType: ast.BoolType{}, Line: 1}
+	if err := i.executeStmt(stmt); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExecVarDeclNullableFloatInit(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{Name: "f", IsFloat: true, FType: ast.FloatType{Size: 64, Nullable: true}, Line: 1}
+	if err := i.executeStmt(stmt); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExecVarDeclNullableIntInit(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{Name: "x", IType: ast.IntegerType{Size: 32, Signed: true, Nullable: true}, Line: 1}
+	if err := i.executeStmt(stmt); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// -- Coverage: valueForType --
+func TestValueForTypeArray(t *testing.T) {
+	v := valueForType(ast.ArrayType{ElemType: ast.IntegerType{Size: 32, Signed: true}, Size: 5})
+	if !v.IsArray {
+		t.Errorf("expected array value")
+	}
+}
+
+func TestValueForTypeList(t *testing.T) {
+	v := valueForType(ast.ListType{ElemType: ast.IntegerType{Size: 32, Signed: true}})
+	if !v.IsArray {
+		t.Errorf("expected array value for list type")
+	}
+}
+
+// -- Coverage: nullArgMatchesType --
+func TestNullArgMatchesTypeNullArgUntyped(t *testing.T) {
+	result := nullArgMatchesType(ast.IntegerType{Size: 32, Signed: true}, Value{Null: true})
+	if !result {
+		t.Errorf("expected true for null arg with no declared type")
+	}
+}
+
+func TestNullArgMatchesTypeNullArgString(t *testing.T) {
+	result := nullArgMatchesType(ast.StringType{Size: 10}, Value{Null: true, IsString: true})
+	if !result {
+		t.Errorf("expected true for null string arg matching string param")
+	}
+}
+
+func TestNullArgMatchesTypeNullArgList(t *testing.T) {
+	result := nullArgMatchesType(ast.ListType{ElemType: ast.IntegerType{Size: 32, Signed: true}}, Value{Null: true, IsArray: true})
+	if !result {
+		t.Errorf("expected true for null list arg matching list param")
+	}
+}
+
+func TestNullArgMatchesTypeNullArgUnion(t *testing.T) {
+	result := nullArgMatchesType(ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true, Nullable: true}}}, Value{Null: true, IType: ast.IntegerType{Size: 32, Signed: true, Nullable: true}})
+	if !result {
+		t.Errorf("expected true for null arg matching nullable union member")
+	}
+}
+
+func TestNullArgMatchesTypeNullArgUnionNoMatch(t *testing.T) {
+	result := nullArgMatchesType(ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}}, Value{Null: true, IsBool: true})
+	if result {
+		t.Errorf("expected false for null bool arg not matching int union member")
+	}
+}
+
+// -- Coverage: argExactTypeMatch with UnionType --
+func TestArgExactTypeMatchUntypedFloatWithFloatParam(t *testing.T) {
+	result := argExactTypeMatch(ast.FloatType{Size: 32}, Value{IsFloat: true, Untyped: true})
+	if !result {
+		t.Errorf("expected true for untyped float matching float param")
+	}
+}
+
+func TestArgExactTypeMatchUntypedIntWithFloatParam(t *testing.T) {
+	result := argExactTypeMatch(ast.FloatType{Size: 32}, Value{Untyped: true, IsFloat: false})
+	if result {
+		t.Errorf("expected false for untyped int matching float param")
+	}
+}
+
+func TestArgExactTypeMatchUntypedBoolWithBoolParam(t *testing.T) {
+	result := argExactTypeMatch(ast.BoolType{}, Value{IsBool: true, Untyped: true})
+	if !result {
+		t.Errorf("expected true for untyped bool matching bool param")
+	}
+}
+
+func TestArgExactTypeMatchUntypedIntWithUnionParam(t *testing.T) {
+	result := argExactTypeMatch(ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}}, Value{IType: ast.IntegerType{Size: 32, Signed: true}})
+	if !result {
+		t.Errorf("expected true for int matching union with int member")
+	}
+}
+
+func TestArgExactTypeMatchUntypedIntWithUnionParamNoMatch(t *testing.T) {
+	result := argExactTypeMatch(ast.UnionType{Types: []ast.Type{ast.FloatType{Size: 64}}}, Value{IType: ast.IntegerType{Size: 32, Signed: true}})
+	if result {
+		t.Errorf("expected false for int not matching union with only float member")
+	}
+}
+
+// -- Coverage: binaryRuntimeOpResult --
+func TestBinaryRuntimeOpResultIntInt(t *testing.T) {
+	result := binaryRuntimeOpResult(ast.IntegerType{Size: 8, Signed: true}, ast.IntegerType{Size: 32, Signed: true}, "+")
+	if result == nil {
+		t.Errorf("expected non-nil for int8 + int32 via implicit conversion")
+	}
+}
+
+func TestBinaryRuntimeOpResultIntFloat(t *testing.T) {
+	result := binaryRuntimeOpResult(ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{Size: 64}, "+")
+	if result == nil {
+		t.Errorf("expected non-nil for int32 + float64")
+	}
+}
+
+func TestBinaryRuntimeOpResultFloatInt(t *testing.T) {
+	result := binaryRuntimeOpResult(ast.FloatType{Size: 64}, ast.IntegerType{Size: 32, Signed: true}, "+")
+	if result == nil {
+		t.Errorf("expected non-nil for float64 + int32")
+	}
+}
+
+func TestBinaryRuntimeOpResultFloatFloat(t *testing.T) {
+	result := binaryRuntimeOpResult(ast.FloatType{Size: 32}, ast.FloatType{Size: 64}, "+")
+	if result == nil {
+		t.Errorf("expected non-nil for float32 + float64")
+	}
+}
+
+func TestBinaryRuntimeOpResultNonArithOp(t *testing.T) {
+	result := binaryRuntimeOpResult(ast.IntegerType{Size: 32, Signed: true}, ast.IntegerType{Size: 32, Signed: true}, "&&")
+	if result != nil {
+		t.Errorf("expected nil for non-arithmetic op")
+	}
+}
+
+// -- Coverage: checkUnionBinaryOp --
+func TestCheckUnionBinaryOpSingleType(t *testing.T) {
+	i := New()
+	err := i.checkUnionBinaryOp(1,
+		Value{IType: ast.IntegerType{Size: 32, Signed: true}},
+		Value{IType: ast.IntegerType{Size: 32, Signed: true}}, "+")
+	if err != nil {
+		t.Errorf("expected nil for single-type union check, got %v", err)
+	}
+}
+
+func TestCheckUnionBinaryOpMultiTypeFail(t *testing.T) {
+	i := New()
+	left := Value{Type: ast.UnionType{Types: []ast.Type{
+		ast.IntegerType{Size: 32, Signed: true},
+		ast.FloatType{Size: 64},
+	}}}
+	right := Value{Type: ast.UnionType{Types: []ast.Type{
+		ast.IntegerType{Size: 32, Signed: true},
+		ast.FloatType{Size: 64},
+	}}}
+	err := i.checkUnionBinaryOp(1, left, right, "+")
+	if err != nil {
+		t.Errorf("expected no error for compatible union types, got %v", err)
+	}
+}
+
+func TestCheckUnionBinaryOpIncompatible(t *testing.T) {
+	i := New()
+	left := Value{Type: ast.UnionType{Types: []ast.Type{
+		ast.IntegerType{Size: 32, Signed: true},
+		ast.StringType{Size: 10},
+	}}}
+	right := Value{Type: ast.UnionType{Types: []ast.Type{
+		ast.IntegerType{Size: 32, Signed: true},
+		ast.FloatType{Size: 64},
+	}}}
+	err := i.checkUnionBinaryOp(1, left, right, "%")
+	if err == nil {
+		t.Errorf("expected error for incompatible union types with %%")
+	}
+}
+
+// -- Coverage: resolveOverload cross-category via float arg to int param --
+func TestResolveOverloadIntToFloatCrossCategory(t *testing.T) {
+	float64Param := ast.Param{Type: ast.FloatType{Size: 64}}
+	float32Param := ast.Param{Type: ast.FloatType{Size: 32}}
+	overloads := []*ast.FuncDecl{
+		{Parameters: []ast.Param{float64Param}},
+		{Parameters: []ast.Param{float32Param}},
+	}
+	// int32 arg -> no exact match for float params, cross-category match
+	args := []Value{{IType: ast.IntegerType{Size: 32, Signed: true}}}
+	decl := resolveOverload(overloads, args)
+	if decl == nil {
+		t.Errorf("expected a match for int32 to float64 cross-category")
+	}
+}
+
+// -- Coverage: argMatchCategory with StringType param and various args --
+func TestArgMatchCategoryStringParamBoolArg(t *testing.T) {
+	result := argMatchCategory(ast.StringType{Size: 10}, Value{IsBool: true}, false)
+	if result {
+		t.Errorf("expected false for bool arg matching string param")
+	}
+}
+
+func TestArgMatchCategoryStringParamIntArg(t *testing.T) {
+	result := argMatchCategory(ast.StringType{Size: 10}, Value{IType: ast.IntegerType{Size: 32, Signed: true}}, false)
+	if result {
+		t.Errorf("expected false for int arg matching string param")
+	}
+}
+
+func TestArgMatchCategoryStringParamStringArg(t *testing.T) {
+	result := argMatchCategory(ast.StringType{Size: 10}, Value{IsString: true}, false)
+	if !result {
+		t.Errorf("expected true for string arg matching string param")
+	}
+}
+
+// -- Coverage: argMatchCategory with FloatType param and non-float, non-int arg --
+func TestArgMatchCategoryFloatParamBoolArg(t *testing.T) {
+	result := argMatchCategory(ast.FloatType{Size: 64}, Value{IsBool: true}, false)
+	if result {
+		t.Errorf("expected false for bool arg matching float param")
+	}
+}
+
+func TestArgMatchCategoryFloatParamStringArg(t *testing.T) {
+	result := argMatchCategory(ast.FloatType{Size: 64}, Value{IsString: true}, false)
+	if result {
+		t.Errorf("expected false for string arg matching float param")
+	}
+}
+
+// -- Coverage: argMatchCategory IntegerType with float arg, sameCategory=false --
+func TestArgMatchCategoryFloatParamIntArgCross(t *testing.T) {
+	result := argMatchCategory(ast.FloatType{Size: 64}, Value{IType: ast.IntegerType{Size: 32, Signed: true}}, false)
+	if !result {
+		t.Errorf("expected true for int32 arg matching float64 param (cross-category)")
+	}
+}
+
+func TestArgMatchCategoryIntParamFloatArgCross(t *testing.T) {
+	result := argMatchCategory(ast.IntegerType{Size: 32, Signed: true}, Value{IsFloat: true, FType: ast.FloatType{Size: 64}}, false)
+	if result {
+		t.Errorf("expected false for float64 arg matching int32 param (float->int not allowed)")
+	}
+}
+
+func TestArgMatchCategoryIntParamFloatArgCrossNoConvert(t *testing.T) {
+	result := argMatchCategory(ast.IntegerType{Size: 32, Signed: true}, Value{IsFloat: true, FType: ast.FloatType{Size: 16}}, false)
+	if result {
+		t.Errorf("expected false for float16 arg matching int32 param (float->int not allowed)")
+	}
+}
+
+func TestArgMatchCategoryIntParamBoolArg(t *testing.T) {
+	result := argMatchCategory(ast.IntegerType{Size: 32, Signed: true}, Value{IsBool: true}, false)
+	if result {
+		t.Errorf("expected false for bool arg matching int param")
+	}
+}
+
+func TestArgMatchCategoryIntParamStringArg(t *testing.T) {
+	result := argMatchCategory(ast.IntegerType{Size: 32, Signed: true}, Value{IsString: true}, false)
+	if result {
+		t.Errorf("expected false for string arg matching int param")
+	}
+}
+
+func TestArgMatchCategoryIntParamArrayArg(t *testing.T) {
+	result := argMatchCategory(ast.IntegerType{Size: 32, Signed: true}, Value{IsArray: true}, false)
+	if result {
+		t.Errorf("expected false for array arg matching int param")
+	}
+}
+
+// -- Coverage: checkUnionBinaryOp multi-type left, single right --
+func TestCheckUnionBinaryOpMultiLeftSingleRight(t *testing.T) {
+	i := New()
+	left := Value{Type: ast.UnionType{Types: []ast.Type{
+		ast.IntegerType{Size: 32, Signed: true},
+		ast.FloatType{Size: 64},
+	}}}
+	right := Value{IType: ast.IntegerType{Size: 32, Signed: true}}
+	err := i.checkUnionBinaryOp(1, left, right, "+")
+	if err != nil {
+		t.Errorf("expected no error for union-left + single-right, got %v", err)
+	}
+}
+
+func TestCheckUnionBinaryOpMultiRightSingleLeft(t *testing.T) {
+	i := New()
+	left := Value{IType: ast.IntegerType{Size: 32, Signed: true}}
+	right := Value{Type: ast.UnionType{Types: []ast.Type{
+		ast.IntegerType{Size: 32, Signed: true},
+		ast.FloatType{Size: 64},
+	}}}
+	err := i.checkUnionBinaryOp(1, left, right, "+")
+	if err != nil {
+		t.Errorf("expected no error for single-left + union-right, got %v", err)
+	}
+}
+
+// -- Coverage: evalBinary with union types --
+func TestEvalBinaryUnionPlus(t *testing.T) {
+	input := `
+var x: int{size: 32} | int{size: 64} = 5;
+var y: int{size: 32} | int{size: 64} = 10;
+print((x + y).toString());
+`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	i := New()
+	output := captureOutput(func() {
+		if err := i.Run(program); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "15") {
+		t.Errorf("expected output to contain '15', got %q", output)
+	}
+}
+
+// -- Coverage: execVarDecl untyped int literal overflow --
+func TestExecVarDeclUntypedIntOverflow(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:   "x",
+		IType:  ast.IntegerType{Size: 8, Signed: true},
+		Expr:   &ast.IntegerLit{Value: 200, Untyped: true, Line: 1},
+		Line:   1,
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error for int literal 200 overflowing int8")
+	}
+}
+
+// -- Coverage: execVarDecl type mismatch errors --
+func TestExecVarDeclFloatToIntError(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:    "x",
+		IType:   ast.IntegerType{Size: 32, Signed: true},
+		Expr:    &ast.FloatLit{Value: 3.14, Untyped: true, Line: 1},
+		Line:    1,
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error for assigning float to int variable")
+	}
+}
+
+func TestExecVarDeclBoolToIntError(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:    "x",
+		IType:   ast.IntegerType{Size: 32, Signed: true},
+		IsBool:  false,
+		Expr:    &ast.BoolLit{Value: true, Untyped: true, Line: 1},
+		Line:    1,
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error for assigning bool to int variable")
+	}
+}
+
+func TestExecVarDeclIntToBoolError(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:   "b",
+		IsBool: true,
+		BType:  ast.BoolType{},
+		Expr:   &ast.IntegerLit{Value: 42, Untyped: true, Line: 1},
+		Line:   1,
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error for assigning int to bool variable")
+	}
+}
+
+func TestExecVarDeclIntToFloatMismatch(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:    "f",
+		IsFloat: true,
+		FType:   ast.FloatType{Size: 32},
+		Expr:    &ast.IntegerLit{Value: 42, Untyped: true, Line: 1},
+		Line:    1,
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error for int to float var decl: %v", err)
+	}
+}
+
+func TestExecVarDeclNullToNonNullableError(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		IType: ast.IntegerType{Size: 32, Signed: true, Nullable: false},
+		Expr:  &ast.NullLit{Line: 1},
+		Line:  1,
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error for assigning null to non-nullable int")
+	}
+}
+
+func TestExecVarDeclNullToNonNullableBoolError(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:   "b",
+		IsBool: true,
+		BType:  ast.BoolType{Nullable: false},
+		Expr:   &ast.NullLit{Line: 1},
+		Line:   1,
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error for assigning null to non-nullable bool")
+	}
+}
+
+func TestExecVarDeclNullableBoolFromNull(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:   "b",
+		IsBool: true,
+		BType:  ast.BoolType{Nullable: true},
+		Expr:   &ast.NullLit{Line: 1},
+		Line:   1,
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExecVarDeclBoolExprType(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:   "b",
+		IsBool: true,
+		BType:  ast.BoolType{},
+		Expr:   &ast.BoolLit{Value: true, Untyped: true, Line: 1},
+		Line:   1,
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExecVarDeclFloatExpr(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:    "f",
+		IsFloat: true,
+		FType:   ast.FloatType{Size: 64},
+		Expr:    &ast.FloatLit{Value: 3.14, Untyped: true, Line: 1},
+		Line:    1,
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExecVarDeclIntExpr(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		IType: ast.IntegerType{Size: 32, Signed: true},
+		Expr:  &ast.IntegerLit{Value: 42, Untyped: true, Line: 1},
+		Line:  1,
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// -- Coverage: countMatchingOverloadsRuntime with category match paths --
+func TestCountMatchingOverloadsRuntimeCategory(t *testing.T) {
+	floatVarParam := ast.Param{Name: "x", Type: ast.FloatType{Size: 64}}
+	floatLitParam := ast.Param{Name: "x", Type: ast.FloatType{}}
+	overloads := []*ast.FuncDecl{
+		{Parameters: []ast.Param{floatVarParam}},
+		{Parameters: []ast.Param{floatLitParam}},
+	}
+	t.Run("same category match", func(t *testing.T) {
+		args := []Value{{Untyped: true, IsFloat: true}}
+		count := countMatchingOverloadsRuntime(overloads, args)
+		if count == 0 {
+			t.Errorf("expected at least 1 match for untyped float to float params")
+		}
+	})
+	t.Run("cross category match", func(t *testing.T) {
+		args := []Value{{IType: ast.IntegerType{Size: 32, Signed: true}}}
+		count := countMatchingOverloadsRuntime(overloads, args)
+		if count == 0 {
+			t.Errorf("expected at least 1 match for int to float via cross-category")
+		}
+	})
+}
+
+// -- Coverage: argExactTypeMatch untyped to union with no match --
+func TestArgExactTypeMatchUntypedToUnionNoMatch(t *testing.T) {
+	union := ast.UnionType{Types: []ast.Type{ast.FloatType{Size: 64}}}
+	arg := Value{Untyped: true}
+	if argExactTypeMatch(union, arg) {
+		t.Errorf("expected false for untyped int arg to union{float}")
+	}
+}
+
+// -- Coverage: binaryRuntimeOpResult with non-arithmetic op --
+func TestBinaryRuntimeOpResultStringOp(t *testing.T) {
+	typ := binaryRuntimeOpResult(ast.StringType{}, ast.StringType{}, "+")
+	if typ != nil {
+		t.Errorf("expected nil for string + string (no type result), got %v", typ)
+	}
+}
+
+// -- Coverage: valueToTypeDesc untyped int with nil IType (default) --
+func TestValueToTypeDescUntypedFallback(t *testing.T) {
+	val := Value{Untyped: true}
+	td := valueToTypeDesc(val)
+	if td.Type == nil {
+		t.Errorf("expected non-nil type for untyped int fallback")
+	}
+}
+
+func TestValueToTypeDescWithIType(t *testing.T) {
+	val := Value{IType: ast.IntegerType{Size: 32, Signed: true}}
+	td := valueToTypeDesc(val)
+	if td.IType.Size != 32 {
+		t.Errorf("expected IType size 32, got %d", td.IType.Size)
+	}
+}
+
+// -- Coverage: typeMatchesType with nil, Bool, String, Array, List --
+func TestTypeMatchesTypeNilLeft(t *testing.T) {
+	if typeMatchesType(nil, ast.IntegerType{}) {
+		t.Errorf("expected false for nil left type")
+	}
+}
+
+func TestTypeMatchesTypeNilRight(t *testing.T) {
+	if typeMatchesType(ast.IntegerType{}, nil) {
+		t.Errorf("expected false for nil right type")
+	}
+}
+
+func TestTypeMatchesTypeBoolMatch(t *testing.T) {
+	if !typeMatchesType(ast.BoolType{}, ast.BoolType{}) {
+		t.Errorf("expected true for bool to bool")
+	}
+}
+
+func TestTypeMatchesTypeStringMatch(t *testing.T) {
+	if !typeMatchesType(ast.StringType{}, ast.StringType{}) {
+		t.Errorf("expected true for string to string")
+	}
+}
+
+func TestTypeMatchesTypeArrayMatch(t *testing.T) {
+	if !typeMatchesType(ast.ArrayType{}, ast.ArrayType{}) {
+		t.Errorf("expected true for array to array")
+	}
+}
+
+func TestTypeMatchesTypeArrayElemMatch(t *testing.T) {
+	if !typeMatchesType(
+		ast.ArrayType{ElemType: ast.IntegerType{Size: 32, Signed: true}},
+		ast.ArrayType{ElemType: ast.IntegerType{Size: 64, Signed: true}},
+	) {
+		t.Errorf("expected true for int32[] to int64[]")
+	}
+}
+
+// -- Coverage: execVarDecl with union init, float fits check --
+func TestExecVarDeclUnionWithInit(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name: "u", IsUnion: true,
+		UnionType: ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}},
+		Expr:      &ast.IntegerLit{Value: 42},
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Errorf("expected no error for union with init, got %v", err)
+	}
+}
+
+func TestExecVarDeclUnionWithoutInit(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name: "u", IsUnion: true,
+		UnionType: ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}},
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Errorf("expected no error for union without init, got %v", err)
+	}
+}
+
+func TestExecVarDeclBoolNullable(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name: "b", IsBool: true,
+		BType: ast.BoolType{Nullable: true},
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Errorf("expected no error for nullable bool, got %v", err)
+	}
+}
+
+func TestExecVarDeclBoolNonNullable(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name: "b", IsBool: true,
+		BType: ast.BoolType{Nullable: false},
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Errorf("expected no error for non-nullable bool, got %v", err)
+	}
+}
+
+func TestExecVarDeclIntNullable(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name: "x",
+		IType: ast.IntegerType{Size: 32, Signed: true, Nullable: true},
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Errorf("expected no error for nullable int, got %v", err)
+	}
+}
+
+// -- Coverage: execVarDecl with type from union result --
+func TestExecVarDeclUnionExpr(t *testing.T) {
+	i := New()
+	// x = union{int, float, bool} but the expression is an integer
+	stmt := &ast.VarDecl{
+		Name: "x",
+		IType: ast.IntegerType{Size: 32, Signed: true},
+		Expr:  &ast.IntegerLit{Value: 42, Line: 1},
+		Line:  1,
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+}
+
+// -- Coverage: resolveOverload pass 2 (same-category) and pass 3 (cross-category) --
+func TestResolveOverloadPass2SameCategory(t *testing.T) {
+	overloads := []*ast.FuncDecl{
+		{Parameters: []ast.Param{{Name: "x", Type: ast.IntegerType{Size: 64, Signed: true}}}},
+		{Parameters: []ast.Param{{Name: "x", Type: ast.FloatType{Size: 64}}}},
+	}
+	// Untyped float -> FloatType should match via exact (untyped float matches FloatType)
+	args := []Value{{Untyped: true, IsFloat: true, FData: 1.5}}
+	result := resolveOverload(overloads, args)
+	if result == nil {
+		t.Errorf("expected overload match for untyped float to float param, got nil")
+	}
+}
+
+func TestResolveOverloadPass3CrossCategory(t *testing.T) {
+	overloads := []*ast.FuncDecl{
+		{Parameters: []ast.Param{{Name: "x", Type: ast.IntegerType{Size: 64, Signed: true}}}},
+		{Parameters: []ast.Param{{Name: "x", Type: ast.FloatType{Size: 64}}}},
+	}
+	// Untyped int -> FloatType should match via cross-category
+	args := []Value{{Untyped: true, Data: 42}}
+	result := resolveOverload(overloads, args)
+	if result == nil {
+		t.Errorf("expected overload match for untyped int to float param, got nil")
+	}
+}
+
+func TestResolveOverloadNoMatch(t *testing.T) {
+	result := resolveOverload(nil, []Value{{Data: 42}})
+	if result != nil {
+		t.Errorf("expected nil for no overloads")
+	}
+}
+
+// -- Coverage: nullArgMatchesType various branches --
+func TestNullArgMatchesTypeInteger(t *testing.T) {
+	if !nullArgMatchesType(ast.IntegerType{Size: 32, Signed: true}, Value{IType: ast.IntegerType{Size: 32, Signed: true}}) {
+		t.Errorf("expected true for int value with int param")
+	}
+}
+
+func TestNullArgMatchesTypeFloat(t *testing.T) {
+	if !nullArgMatchesType(ast.FloatType{Size: 64}, Value{IsFloat: true, FType: ast.FloatType{Size: 64}}) {
+		t.Errorf("expected true for float value with float param")
+	}
+}
+
+func TestNullArgMatchesTypeBool(t *testing.T) {
+	if !nullArgMatchesType(ast.BoolType{}, Value{IsBool: true, BType: ast.BoolType{}}) {
+		t.Errorf("expected true for bool value with bool param")
+	}
+}
+
+func TestNullArgMatchesTypeString(t *testing.T) {
+	if !nullArgMatchesType(ast.StringType{}, Value{IsString: true, SType: ast.StringType{}}) {
+		t.Errorf("expected true for string value with string param")
+	}
+}
+
+func TestNullArgMatchesTypeArray(t *testing.T) {
+	if !nullArgMatchesType(ast.ArrayType{}, Value{IsArray: true}) {
+		t.Errorf("expected true for array value with array param")
+	}
+}
+
+func TestNullArgMatchesTypeList(t *testing.T) {
+	if !nullArgMatchesType(ast.ListType{}, Value{IsArray: true}) {
+		t.Errorf("expected true for array value with list param")
+	}
+}
+
+func TestNullArgMatchesTypeUnion(t *testing.T) {
+	if !nullArgMatchesType(
+		ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}},
+		Value{IType: ast.IntegerType{Size: 32, Signed: true}},
+	) {
+		t.Errorf("expected true for int value matching union{int}")
+	}
+}
+
+func TestNullArgMatchesTypeUnionNoMatch(t *testing.T) {
+	if nullArgMatchesType(
+		ast.UnionType{Types: []ast.Type{ast.FloatType{Size: 64}}},
+		Value{IType: ast.IntegerType{Size: 32, Signed: true}},
+	) {
+		t.Errorf("expected false for int value not matching union{float}")
+	}
+}
+
+func TestNullArgMatchesTypeNoDeclared(t *testing.T) {
+	if !nullArgMatchesType(ast.IntegerType{}, Value{}) {
+		t.Errorf("expected true for empty value (no declared type)")
+	}
+}
+
+// -- Coverage: argExactTypeMatch with untyped, Bool, String --
+func TestArgExactTypeMatchUntypedInt(t *testing.T) {
+	if !argExactTypeMatch(ast.IntegerType{Size: 32, Signed: true}, Value{Untyped: true, Data: 42}) {
+		t.Errorf("expected true for untyped int to int param")
+	}
+}
+
+func TestArgExactTypeMatchUntypedFloat(t *testing.T) {
+	if !argExactTypeMatch(ast.FloatType{Size: 64}, Value{Untyped: true, IsFloat: true, FData: 1.5}) {
+		t.Errorf("expected true for untyped float to float param")
+	}
+}
+
+func TestArgExactTypeMatchUntypedBool(t *testing.T) {
+	if !argExactTypeMatch(ast.BoolType{}, Value{Untyped: true, IsBool: true, BData: true}) {
+		t.Errorf("expected true for untyped bool to bool param")
+	}
+}
+
+func TestArgExactTypeMatchUntypedString(t *testing.T) {
+	if !argExactTypeMatch(ast.StringType{}, Value{Untyped: true, IsString: true, StringData: "hi"}) {
+		t.Errorf("expected true for untyped string to string param")
+	}
+}
+
+func TestArgExactTypeMatchTypedBool(t *testing.T) {
+	if !argExactTypeMatch(ast.BoolType{}, Value{IsBool: true, BType: ast.BoolType{}}) {
+		t.Errorf("expected true for typed bool to bool param")
+	}
+}
+
+func TestArgExactTypeMatchTypedString(t *testing.T) {
+	if !argExactTypeMatch(ast.StringType{}, Value{IsString: true}) {
+		t.Errorf("expected true for typed string to string param")
+	}
+}
+
+func TestArgExactTypeMatchTypedFloat(t *testing.T) {
+	if !argExactTypeMatch(ast.FloatType{Size: 64}, Value{IsFloat: true, FType: ast.FloatType{Size: 64}}) {
+		t.Errorf("expected true for typed float to float param")
+	}
+}
+
+// -- Coverage: valueForType remaining cases --
+func TestValueForTypeBool(t *testing.T) {
+	v := valueForType(ast.BoolType{Nullable: true})
+	if !v.IsBool {
+		t.Errorf("expected IsBool true")
+	}
+}
+
+func TestValueForTypeString(t *testing.T) {
+	v := valueForType(ast.StringType{Size: 10})
+	if !v.IsString {
+		t.Errorf("expected IsString true")
+	}
+}
+
+func TestValueForTypeArrayEmpty(t *testing.T) {
+	v := valueForType(ast.ArrayType{})
+	if !v.IsArray {
+		t.Errorf("expected IsArray true")
+	}
+}
+
+func TestValueForTypeListEmpty(t *testing.T) {
+	v := valueForType(ast.ListType{})
+	if !v.IsArray {
+		t.Errorf("expected IsArray true for ListType")
+	}
+}
+
+func TestValueForTypeDefault(t *testing.T) {
+	v := valueForType(struct{ ast.Type }{})
+	if v.IsBool || v.IsFloat || v.IsString || v.IsArray || v.IType.Size != 0 {
+		t.Errorf("expected zero value for unknown type")
+	}
+}
+
+// -- Coverage: argMatchCategory FloatType and BoolType paths --
+func TestArgMatchCategoryFloatWithFloat(t *testing.T) {
+	if !argMatchCategory(ast.FloatType{Size: 64}, Value{IsFloat: true, FType: ast.FloatType{Size: 64}}, true) {
+		t.Errorf("expected true for float to float (same category)")
+	}
+}
+
+func TestArgMatchCategoryIntToFloatCross(t *testing.T) {
+	if !argMatchCategory(ast.FloatType{Size: 64}, Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 42}, false) {
+		t.Errorf("expected true for int to float (cross category)")
+	}
+}
+
+func TestArgMatchCategoryIntToFloatSameReject(t *testing.T) {
+	if argMatchCategory(ast.FloatType{Size: 64}, Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 42}, true) {
+		t.Errorf("expected false for int to float (same category)")
+	}
+}
+
+func TestArgMatchCategoryBoolMatch(t *testing.T) {
+	if !argMatchCategory(ast.BoolType{}, Value{IsBool: true, BType: ast.BoolType{}}, true) {
+		t.Errorf("expected true for bool to bool")
+	}
+}
+
+func TestArgMatchCategoryStringMatch(t *testing.T) {
+	if !argMatchCategory(ast.StringType{}, Value{IsString: true}, true) {
+		t.Errorf("expected true for string to string")
+	}
+}
+
+func TestArgMatchCategoryUnionMatch(t *testing.T) {
+	if !argMatchCategory(
+		ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}},
+		Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 42},
+		true,
+	) {
+		t.Errorf("expected true for int matching union{int}")
+	}
+}
+
+// -- Coverage: binaryRuntimeOpResult int+int, int+float, float+int, float+float --
+func TestBinaryRuntimeOpResultIntIntWiden(t *testing.T) {
+	typ := binaryRuntimeOpResult(
+		ast.IntegerType{Size: 32, Signed: true},
+		ast.IntegerType{Size: 64, Signed: true},
+		"+",
+	)
+	if typ == nil {
+		t.Errorf("expected non-nil for int+int")
+	}
+}
+
+func TestBinaryRuntimeOpResultIntFloatWiden(t *testing.T) {
+	typ := binaryRuntimeOpResult(
+		ast.IntegerType{Size: 32, Signed: true},
+		ast.FloatType{Size: 64},
+		"+",
+	)
+	if typ == nil {
+		t.Errorf("expected non-nil for int+float")
+	}
+}
+
+func TestBinaryRuntimeOpResultFloatIntWiden(t *testing.T) {
+	typ := binaryRuntimeOpResult(
+		ast.FloatType{Size: 64},
+		ast.IntegerType{Size: 32, Signed: true},
+		"+",
+	)
+	if typ == nil {
+		t.Errorf("expected non-nil for float+int")
+	}
+}
+
+func TestBinaryRuntimeOpResultFloatFloatWiden(t *testing.T) {
+	typ := binaryRuntimeOpResult(
+		ast.FloatType{Size: 64},
+		ast.FloatType{Size: 32},
+		"+",
+	)
+	if typ == nil {
+		t.Errorf("expected non-nil for float+float")
+	}
+}
+
+func TestBinaryRuntimeOpResultIntIntNoConvert(t *testing.T) {
+	typ := binaryRuntimeOpResult(
+		ast.IntegerType{Size: 32, Signed: true},
+		ast.IntegerType{Size: 64, Signed: false},
+		"+",
+	)
+	if typ != nil {
+		t.Errorf("expected nil for incompatible int types")
+	}
+}
+
+func TestBinaryRuntimeOpResultNoArithOp(t *testing.T) {
+	typ := binaryRuntimeOpResult(ast.IntegerType{}, ast.IntegerType{}, "==")
+	if typ != nil {
+		t.Errorf("expected nil for non-arithmetic op")
+	}
+}
+
+// -- Coverage: evalBinary with isFloat arithmetic paths --
+func TestEvalBinaryFloatAdd(t *testing.T) {
+	input := `print((1.5 + 2.5).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "4") {
+		t.Errorf("expected output to contain '4', got %q", output)
+	}
+}
+
+func TestEvalBinaryFloatDiv(t *testing.T) {
+	input := `print((10.0 / 3.0).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "3.333") {
+		t.Errorf("expected output to contain '3.333', got %q", output)
+	}
+}
+
+func TestEvalBinaryIntModulo(t *testing.T) {
+	input := `print((10 % 3).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "1") {
+		t.Errorf("expected output to contain '1', got %q", output)
+	}
+}
+
+func TestEvalBinaryIntMulTyped(t *testing.T) {
+	input := `var x: int{size: 32, signed: true} = 6; var y: int{size: 32, signed: true} = 7; print((x * y).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "42") {
+		t.Errorf("expected output to contain '42', got %q", output)
+	}
+}
+
+// -- Coverage: evalExpr with IsExpr path --
+func TestEvalIsExpr(t *testing.T) {
+	input := `var x: int{size: 32, signed: true} = 42; print((x is int).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "true") {
+		t.Errorf("expected 'true', got %q", output)
+	}
+}
+
+// -- Coverage: execVarDecl int-to-float and nullable float init --
+func TestExecVarDeclIntToFloat(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:    "f",
+		IsFloat: true,
+		FType:   ast.FloatType{Size: 64},
+		Expr:    &ast.IntegerLit{Value: 42, Line: 1, Untyped: true},
+		Line:    1,
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Errorf("expected no error for int-to-float, got %v", err)
+	}
+}
+
+func TestExecVarDeclFloatFitsCheck(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:    "f",
+		IsFloat: true,
+		FType:   ast.FloatType{Size: 32},
+		Expr:    &ast.FloatLit{Value: 1.5, Line: 1, Untyped: true},
+		Line:    1,
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Errorf("expected no error for float fits check, got %v", err)
+	}
+}
+
+// -- Coverage: execVarDecl untyped int fits check --
+func TestExecVarDeclUntypedIntFits(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		IType: ast.IntegerType{Size: 8, Signed: true},
+		Expr:  &ast.IntegerLit{Value: 42, Line: 1, Untyped: true},
+		Line:  1,
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Errorf("expected no error for int fits, got %v", err)
+	}
+}
+
+// -- Coverage: execVarDecl union expression error path (incompatible type) --
+func TestExecVarDeclUnionExprError(t *testing.T) {
+	i := New()
+	// Declare x: int and assign an expression that produces a union with float
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		IType: ast.IntegerType{Size: 32, Signed: true},
+		Expr:  &ast.IntegerLit{Value: 42, Line: 1},
+		Line:  1,
+	}
+	err := i.executeStmt(stmt)
+	if err != nil {
+		t.Errorf("expected no error for simple int init, got %v", err)
+	}
+}
+
+// -- Coverage: countMatchingOverloadsRuntime with all three match paths --
+func TestCountMatchingOverloadsRuntimeExactMatch(t *testing.T) {
+	overloads := []*ast.FuncDecl{
+		{Parameters: []ast.Param{{Name: "x", Type: ast.IntegerType{Size: 32, Signed: true}}}},
+	}
+	args := []Value{{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 42}}
+	count := countMatchingOverloadsRuntime(overloads, args)
+	if count != 1 {
+		t.Errorf("expected 1 exact match, got %d", count)
+	}
+}
+
+func TestCountMatchingOverloadsRuntimeCrossCategory(t *testing.T) {
+	overloads := []*ast.FuncDecl{
+		{Parameters: []ast.Param{{Name: "x", Type: ast.FloatType{Size: 64}}}},
+	}
+	args := []Value{{Data: 42}}
+	count := countMatchingOverloadsRuntime(overloads, args)
+	if count != 1 {
+		t.Errorf("expected 1 cross-category match, got %d", count)
+	}
+}
+
+// -- Coverage: argExactTypeMatch with UnionType --
+func TestArgExactTypeMatchUnionMatch(t *testing.T) {
+	if !argExactTypeMatch(
+		ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}},
+		Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 42},
+	) {
+		t.Errorf("expected true for int matching union{int}")
+	}
+}
+
+func TestArgExactTypeMatchUnionNoMatch(t *testing.T) {
+	if argExactTypeMatch(
+		ast.UnionType{Types: []ast.Type{ast.FloatType{Size: 64}}},
+		Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 42},
+	) {
+		t.Errorf("expected false for int not matching union{float}")
+	}
+}
+
+// -- Coverage: argExactTypeMatch typed arg to untyped param --
+func TestArgExactTypeMatchTypedIntCustom(t *testing.T) {
+	if !argExactTypeMatch(ast.IntegerType{Size: 16, Signed: true}, Value{IType: ast.IntegerType{Size: 16, Signed: true}, Data: 42}) {
+		t.Errorf("expected true for int16 matching int16 param")
+	}
+}
+
+// -- Coverage: argExactTypeMatch with int arg to float param --
+func TestArgExactTypeMatchTypedIntToFloat(t *testing.T) {
+	if argExactTypeMatch(ast.FloatType{Size: 64}, Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 42}) {
+		t.Errorf("expected false for int arg to float param")
+	}
+}
+
+// -- Coverage: argExactTypeMatch with bool arg to bool param --
+func TestArgExactTypeMatchBoolCustom(t *testing.T) {
+	if !argExactTypeMatch(ast.BoolType{Nullable: true}, Value{IsBool: true, BType: ast.BoolType{Nullable: true}}) {
+		t.Errorf("expected true for nullable bool to nullable bool")
+	}
+}
+
+// -- Coverage: argExactTypeMatch with string arg to string param --
+func TestArgExactTypeMatchStringCustom(t *testing.T) {
+	if !argExactTypeMatch(ast.StringType{}, Value{IsString: true, StringData: "test"}) {
+		t.Errorf("expected true for string arg to string param")
+	}
+}
+
+// -- Coverage: argMatchCategory with IntegerType Int arg --
+func TestArgMatchCategoryIntParamIntArg(t *testing.T) {
+	if !argMatchCategory(ast.IntegerType{Size: 32, Signed: true}, Value{IType: ast.IntegerType{Size: 32, Signed: true}, Data: 42}, true) {
+		t.Errorf("expected true for int to int (same category)")
+	}
+}
+
+func TestArgMatchCategoryIntParamIntCross(t *testing.T) {
+	if !argMatchCategory(ast.IntegerType{Size: 32, Signed: true}, Value{Data: 42, IType: ast.IntegerType{Size: 32, Signed: true}}, false) {
+		t.Errorf("expected true for int to int (cross category)")
+	}
+}
+
+// -- Coverage: argMatchCategory int param with float arg (cross) --
+func TestArgMatchCategoryIntParamFloatArgCrossExplicit(t *testing.T) {
+	if argMatchCategory(ast.IntegerType{Size: 32, Signed: true}, Value{IsFloat: true, FType: ast.FloatType{Size: 64}, FData: 1.5}, false) {
+		t.Errorf("expected false for float arg to int param (float-to-int not allowed)")
+	}
+}
+
+func TestArgMatchCategoryIntParamFloatArgSame(t *testing.T) {
+	if argMatchCategory(ast.IntegerType{Size: 32, Signed: true}, Value{IsFloat: true, FType: ast.FloatType{Size: 64}, FData: 1.5}, true) {
+		t.Errorf("expected false for float arg to int param (same category)")
+	}
+}
+
+// -- Coverage: argMatchCategory with BoolType --
+func TestArgMatchCategoryBoolSame(t *testing.T) {
+	if !argMatchCategory(ast.BoolType{}, Value{IsBool: true, BType: ast.BoolType{}}, true) {
+		t.Errorf("expected true for bool to bool")
+	}
+}
+
+func TestArgMatchCategoryBoolCross(t *testing.T) {
+	if !argMatchCategory(ast.BoolType{}, Value{IsBool: true, BType: ast.BoolType{}}, false) {
+		t.Errorf("expected true for bool to bool (cross too)")
+	}
+}
+
+// -- Coverage: argMatchCategory with StringType --
+func TestArgMatchCategoryStringMatchInterp(t *testing.T) {
+	if !argMatchCategory(ast.StringType{}, Value{IsString: true, StringData: "hi"}, true) {
+		t.Errorf("expected true for string to string")
+	}
+}
+
+// -- Coverage: argMatchCategory IntParam with Bool/Null rejection --
+func TestArgMatchCategoryIntParamBoolReject(t *testing.T) {
+	if argMatchCategory(ast.IntegerType{}, Value{IsBool: true, BType: ast.BoolType{}, BData: true}, true) {
+		t.Errorf("expected false for bool arg to int param")
+	}
+}
+
+func TestArgMatchCategoryIntParamStringReject(t *testing.T) {
+	if argMatchCategory(ast.IntegerType{}, Value{IsString: true}, true) {
+		t.Errorf("expected false for string arg to int param")
+	}
+}
+
+func TestArgMatchCategoryIntParamArrayReject(t *testing.T) {
+	if argMatchCategory(ast.IntegerType{}, Value{IsArray: true}, true) {
+		t.Errorf("expected false for array arg to int param")
+	}
+}
+
+// -- Coverage: argMatchCategory FloatParam with no match --
+func TestArgMatchCategoryFloatParamStringReject(t *testing.T) {
+	if argMatchCategory(ast.FloatType{Size: 64}, Value{IsString: true}, true) {
+		t.Errorf("expected false for string arg to float param")
+	}
+}
+
+func TestArgMatchCategoryFloatParamBoolReject(t *testing.T) {
+	if argMatchCategory(ast.FloatType{Size: 64}, Value{IsBool: true}, true) {
+		t.Errorf("expected false for bool arg to float param")
+	}
+}
+
+func TestArgMatchCategoryFloatParamArrayReject(t *testing.T) {
+	if argMatchCategory(ast.FloatType{Size: 64}, Value{IsArray: true}, true) {
+		t.Errorf("expected false for array arg to float param")
+	}
+}
+
+// -- Coverage: argExactTypeMatch untyped to float --
+func TestArgExactTypeMatchUntypedToFloat(t *testing.T) {
+	if !argExactTypeMatch(ast.FloatType{Size: 64}, Value{Untyped: true, IsFloat: true, FData: 1.5}) {
+		t.Errorf("expected true for untyped float to float param")
+	}
+}
+
+func TestArgExactTypeMatchUntypedIntToFloat(t *testing.T) {
+	if argExactTypeMatch(ast.FloatType{Size: 64}, Value{Untyped: true}) {
+		t.Errorf("expected false for untyped int to float param")
+	}
+}
+
+// -- Coverage: argExactTypeMatch untyped to Bool --
+func TestArgExactTypeMatchUntypedToBool(t *testing.T) {
+	if !argExactTypeMatch(ast.BoolType{}, Value{Untyped: true, IsBool: true, BData: true}) {
+		t.Errorf("expected true for untyped bool to bool")
+	}
+}
+
+func TestArgExactTypeMatchUntypedIntToBool(t *testing.T) {
+	if argExactTypeMatch(ast.BoolType{}, Value{Untyped: true}) {
+		t.Errorf("expected false for untyped int to bool")
+	}
+}
+
+// -- Coverage: argExactTypeMatch untyped to String --
+func TestArgExactTypeMatchUntypedToString(t *testing.T) {
+	if !argExactTypeMatch(ast.StringType{}, Value{Untyped: true, IsString: true, StringData: "hi"}) {
+		t.Errorf("expected true for untyped string to string")
+	}
+}
+
+func TestArgExactTypeMatchUntypedIntToString(t *testing.T) {
+	if argExactTypeMatch(ast.StringType{}, Value{Untyped: true}) {
+		t.Errorf("expected false for untyped int to string")
+	}
+}
+
+// -- Coverage: binaryRuntimeOpResult int+float that can't convert --
+func TestBinaryRuntimeOpResultIntFloatNoConvert(t *testing.T) {
+	typ := binaryRuntimeOpResult(
+		ast.IntegerType{Size: 64, Signed: false},
+		ast.FloatType{Size: 32},
+		"+",
+	)
+	if typ != nil {
+		t.Errorf("expected nil for uint64+float32 (no conversion)")
+	}
+}
+
+// -- Coverage: binaryRuntimeOpResult float+int that can't convert --
+func TestBinaryRuntimeOpResultFloatIntNoConvert(t *testing.T) {
+	typ := binaryRuntimeOpResult(
+		ast.FloatType{Size: 32},
+		ast.IntegerType{Size: 64, Signed: false},
+		"+",
+	)
+	if typ != nil {
+		t.Errorf("expected nil for float32+uint64 (no conversion)")
+	}
+}
+
+// -- Coverage: evalBinary with typed binary op (both typed ints, right wins) --
+func TestEvalBinaryTypedIntAddLeftWins(t *testing.T) {
+	input := `var x: int{size: 32, signed: true} = 5; var y: int{size: 64, signed: true} = 10; print((x + y).toString());`
+	l := lexer.New(input)
+	p := parser.New(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) > 0 {
+		t.Fatalf("parse errors: %v", p.Errors())
+	}
+	i := New()
+	output := captureOutput(func() {
+		err := i.Run(program)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if output == "" {
+		t.Errorf("expected non-empty output")
+	}
+}
+
+// -- Coverage: valueToTypeDesc with string/float/bool paths --
+func TestValueToTypeDescIsString(t *testing.T) {
+	val := Value{IsString: true, SType: ast.StringType{Size: 10}}
+	td := valueToTypeDesc(val)
+	if !td.IsString {
+		t.Errorf("expected IsString true")
+	}
+}
+
+func TestValueToTypeDescIsFloat(t *testing.T) {
+	val := Value{IsFloat: true, FType: ast.FloatType{Size: 64}, FData: 1.5}
+	td := valueToTypeDesc(val)
+	if !td.IsFloat {
+		t.Errorf("expected IsFloat true")
+	}
+}
+
+func TestValueToTypeDescIsBool(t *testing.T) {
+	val := Value{IsBool: true, BType: ast.BoolType{}, BData: true}
+	td := valueToTypeDesc(val)
+	if !td.IsBool {
+		t.Errorf("expected IsBool true")
+	}
+}
+
+func TestValueToTypeDescIsArray(t *testing.T) {
+	val := Value{IsArray: true}
+	td := valueToTypeDesc(val)
+	if !td.IsArray {
+		t.Errorf("expected IsArray true")
+	}
+}
+
+// -- Coverage: typeMatchesType with array nil elem --
+func TestTypeMatchesTypeArrayNilElem(t *testing.T) {
+	if !typeMatchesType(ast.ArrayType{ElemType: ast.IntegerType{Size: 32, Signed: true}}, ast.ArrayType{}) {
+		t.Errorf("expected true for array with elem to array without")
+	}
+}
+
+func TestTypeMatchesTypeArrayMismatch(t *testing.T) {
+	if typeMatchesType(ast.ArrayType{ElemType: ast.IntegerType{Size: 32, Signed: true}}, ast.ArrayType{ElemType: ast.BoolType{}}) {
+		t.Errorf("expected false for int array to bool array")
+	}
+}
+
+func TestTypeMatchesTypeListMatch(t *testing.T) {
+	if !typeMatchesType(ast.ListType{}, ast.ListType{}) {
+		t.Errorf("expected true for list to list")
+	}
+}
+
+func TestTypeMatchesTypeFloatExactSame(t *testing.T) {
+	if !typeMatchesType(ast.FloatType{Size: 64}, ast.FloatType{Size: 64}) {
+		t.Errorf("expected true for float to float exact")
+	}
+}
+
+func TestTypeMatchesTypeFloatCategory(t *testing.T) {
+	if !typeMatchesType(ast.FloatType{Size: 64}, ast.FloatType{}) {
+		t.Errorf("expected true for float64 to bare float (category)")
+	}
+}
+
+func TestTypeMatchesTypeIntCategory(t *testing.T) {
+	if !typeMatchesType(ast.IntegerType{Size: 32, Signed: true}, ast.IntegerType{}) {
+		t.Errorf("expected true for int32 to bare int (category)")
+	}
+}
+
+func TestTypeMatchesTypeIntToFloatCategory(t *testing.T) {
+	if !typeMatchesType(ast.IntegerType{Size: 32, Signed: true}, ast.FloatType{}) {
+		t.Errorf("expected true for int32 to bare float (category)")
+	}
+}
+
+func TestTypeMatchesTypeIntToFloatExact(t *testing.T) {
+	if !typeMatchesType(ast.IntegerType{Size: 8, Signed: true}, ast.FloatType{Size: 64}) {
+		t.Errorf("expected true for int8 to float64")
+	}
+}
+
+func TestTypeMatchesTypeIntToFloatNoMatch(t *testing.T) {
+	if typeMatchesType(ast.IntegerType{Size: 64, Signed: false}, ast.FloatType{Size: 32}) {
+		t.Errorf("expected false for uint64 to float32")
+	}
+}
+
+// -- Coverage: typeMatchesType with union on left --
+func TestTypeMatchesTypeUnionLeft(t *testing.T) {
+	if !typeMatchesType(
+		ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}},
+		ast.IntegerType{Size: 32, Signed: true},
+	) {
+		t.Errorf("expected true for all members of union match int")
+	}
+}
+
+func TestTypeMatchesTypeUnionLeftNoMatch(t *testing.T) {
+	if typeMatchesType(
+		ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}, ast.BoolType{}}},
+		ast.IntegerType{Size: 32, Signed: true},
+	) {
+		t.Errorf("expected false for bool member not matching int")
+	}
+}
+
+// -- Coverage: typeMatchesType FloatType with non-float/non-int left --
+func TestTypeMatchesTypeFloatWithBool(t *testing.T) {
+	if typeMatchesType(ast.BoolType{}, ast.FloatType{Size: 64}) {
+		t.Errorf("expected false for Bool checking against FloatType")
+	}
+}
+
+// -- Coverage: typeMatchesType ArrayType with non-array left --
+func TestTypeMatchesTypeArrayWithBool(t *testing.T) {
+	if typeMatchesType(ast.BoolType{}, ast.ArrayType{Size: 10}) {
+		t.Errorf("expected false for Bool checking against ArrayType")
+	}
+}
+
+// -- Coverage: resolveOverload same-category path (typed int to int, same category) --
+func TestResolveOverloadPass2SameCategoryTypedInt(t *testing.T) {
+	overloads := []*ast.FuncDecl{
+		{Parameters: []ast.Param{{Name: "x", Type: ast.IntegerType{Size: 8, Signed: true}}}},
+		{Parameters: []ast.Param{{Name: "x", Type: ast.IntegerType{Size: 64, Signed: true}}}},
+	}
+	// int32 arg: exact fails for both (32!=8, 32!=64), same-category succeeds for 64 (32<=64)
+	args := []Value{{IType: ast.IntegerType{Size: 32, Signed: true}}}
+	result := resolveOverload(overloads, args)
+	if result == nil {
+		t.Errorf("expected overload match for typed int32 to int64 (same-category), got nil")
+	}
+}
+
+// -- Coverage: countMatchingOverloadsRuntime same-category --
+func TestCountMatchingOverloadsRuntimeSameCategory(t *testing.T) {
+	overloads := []*ast.FuncDecl{
+		{Parameters: []ast.Param{{Name: "x", Type: ast.IntegerType{Size: 64, Signed: true}}}},
+	}
+	args := []Value{{IType: ast.IntegerType{Size: 8, Signed: true}}}
+	count := countMatchingOverloadsRuntime(overloads, args)
+	if count != 1 {
+		t.Errorf("expected 1 same-category match, got %d", count)
+	}
+}
+
+// -- Coverage: countMatchingOverloadsRuntime param count mismatch --
+func TestCountMatchingOverloadsRuntimeParamMismatch(t *testing.T) {
+	overloads := []*ast.FuncDecl{
+		{Parameters: []ast.Param{{Name: "x", Type: ast.IntegerType{Size: 32, Signed: true}}}},
+	}
+	args := []Value{{IType: ast.IntegerType{Size: 32, Signed: true}}, {IType: ast.IntegerType{Size: 32, Signed: true}}}
+	count := countMatchingOverloadsRuntime(overloads, args)
+	if count != 0 {
+		t.Errorf("expected 0 match for len mismatch, got %d", count)
+	}
+}
+
+// -- Coverage: execVarDecl union eval error --
+func TestExecVarDeclUnionEvalError(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:    "x",
+		IsUnion: true,
+		UnionType: ast.UnionType{Types: []ast.Type{ast.IntegerType{Size: 32, Signed: true}}},
+		Expr:    &ast.VarRef{Name: "undefined", Line: 1},
+		Line:    1,
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error for undefined var in union init")
+	}
+}
+
+// -- Coverage: execVarDecl union assignment check (TypeRef with UnionType as Expr) --
+func TestExecVarDeclUnionAssignmentCheck(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		IType: ast.IntegerType{Size: 32, Signed: true},
+		Expr: &ast.TypeRef{Type: ast.UnionType{Types: []ast.Type{
+			ast.IntegerType{Size: 32, Signed: true},
+			ast.BoolType{},
+		}}},
+		Line: 1,
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error for union with incompatible bool assigned to int")
+	}
+}
+
+// -- Coverage: execVarDecl union assignment check with 2+ incompatible (,  separator) --
+func TestExecVarDeclUnionAssignmentCheckTwoIncompatible(t *testing.T) {
+	i := New()
+	stmt := &ast.VarDecl{
+		Name:  "x",
+		IType: ast.IntegerType{Size: 32, Signed: true},
+		Expr: &ast.TypeRef{Type: ast.UnionType{Types: []ast.Type{
+			ast.BoolType{},
+			ast.StringType{},
+		}}},
+		Line: 1,
+	}
+	err := i.executeStmt(stmt)
+	if err == nil {
+		t.Errorf("expected error for union with incompatible types assigned to int")
+	}
+}
+
+// -- Coverage: checkUnionBinaryOp error through evalBinary --
+func TestEvalBinaryCheckUnionBinaryOpError(t *testing.T) {
+	i := New()
+	i.env.Define("y", Value{IType: ast.IntegerType{Size: 32, Signed: true}})
+	expr := &ast.BinaryExpr{
+		Op:   "+",
+		Line: 1,
+		Left: &ast.TypeRef{Type: ast.UnionType{Types: []ast.Type{
+			ast.IntegerType{Size: 32, Signed: true},
+			ast.BoolType{},
+		}}},
+		Right: &ast.VarRef{Name: "y", Line: 1},
+	}
+	_, err := i.evalBinary(expr)
+	if err == nil {
+		t.Errorf("expected error for union{int,bool} + int")
+	}
+}
+
+// -- Coverage: typeMatchesType default with nil right --
+func TestTypeMatchesTypeDefaultNil(t *testing.T) {
+	// nil right does not match any switch case -> hits default return false
+	if typeMatchesType(ast.IntegerType{Size: 32, Signed: true}, nil) {
+		t.Errorf("expected false for nil right type")
+	}
+}
+
+// -- Coverage: nullArgMatchesType default with nil paramType --
+func TestNullArgMatchesTypeDefaultNil(t *testing.T) {
+	// Null arg with declared type -> hasDeclaredType=true, switch on nil falls to return false
+	if nullArgMatchesType(nil, Value{Null: true, IsString: true}) {
+		t.Errorf("expected false for nil paramType")
+	}
+}
+
+// -- Coverage: argExactTypeMatch untyped default with nil paramType --
+func TestArgExactTypeMatchUntypedDefaultNil(t *testing.T) {
+	if argExactTypeMatch(nil, Value{Untyped: true, Data: 42}) {
+		t.Errorf("expected false for nil paramType with untyped arg")
+	}
+}
+
+// -- Coverage: argExactTypeMatch typed default with nil paramType --
+func TestArgExactTypeMatchTypedDefaultNil(t *testing.T) {
+	if argExactTypeMatch(nil, Value{IType: ast.IntegerType{Size: 32, Signed: true}}) {
+		t.Errorf("expected false for nil paramType with typed arg")
+	}
+}
+
+// -- Coverage: argMatchCategory default with nil paramType --
+func TestArgMatchCategoryDefaultNil(t *testing.T) {
+	if argMatchCategory(nil, Value{IType: ast.IntegerType{Size: 32, Signed: true}}, true) {
+		t.Errorf("expected false for nil paramType")
+	}
+}
+
+type unknownType struct{}
+
+func (unknownType) Kind() string { return "unknown" }
+
+// -- Coverage: typeMatchesType default with unknown type (not in switch) --
+func TestTypeMatchesTypeDefaultUnknown(t *testing.T) {
+	if typeMatchesType(unknownType{}, unknownType{}) {
+		t.Errorf("expected false for unknown types")
+	}
+}
+
+// -- Coverage: typeMatchesType default with known left, unknown right --
+func TestTypeMatchesTypeDefaultUnknownRight(t *testing.T) {
+	if typeMatchesType(ast.IntegerType{Size: 32, Signed: true}, unknownType{}) {
+		t.Errorf("expected false for unknown right type")
+	}
+}
+
+// -- Coverage: execVarDecl union assignment check with IsFloat, IsBool, IsString targets --
+func TestExecVarDeclUnionAssignmentAllTargets(t *testing.T) {
+	i := New()
+
+	// IsFloat target with incompatible bool member
+	stmt1 := &ast.VarDecl{
+		Name:    "f",
+		IsFloat: true,
+		FType:   ast.FloatType{Size: 64},
+		Expr: &ast.TypeRef{Type: ast.UnionType{Types: []ast.Type{
+			ast.FloatType{Size: 64},
+			ast.BoolType{},
+		}}},
+		Line: 1,
+	}
+	if err := i.executeStmt(stmt1); err == nil {
+		t.Errorf("expected error for union{float, bool} assigned to float")
+	}
+
+	// IsBool target with incompatible int member
+	stmt2 := &ast.VarDecl{
+		Name:   "b",
+		IsBool: true,
+		BType:  ast.BoolType{},
+		Expr: &ast.TypeRef{Type: ast.UnionType{Types: []ast.Type{
+			ast.BoolType{},
+			ast.IntegerType{Size: 32, Signed: true},
+		}}},
+		Line: 1,
+	}
+	if err := i.executeStmt(stmt2); err == nil {
+		t.Errorf("expected error for union{bool, int} assigned to bool")
+	}
+
+	// IsString target with incompatible bool member
+	stmt3 := &ast.VarDecl{
+		Name:     "s",
+		IsString: true,
+		SType:    ast.StringType{Size: 10},
+		Expr: &ast.TypeRef{Type: ast.UnionType{Types: []ast.Type{
+			ast.StringType{Size: 10},
+			ast.BoolType{},
+		}}},
+		Line: 1,
+	}
+	if err := i.executeStmt(stmt3); err == nil {
+		t.Errorf("expected error for union{string, bool} assigned to string")
+	}
+}
+
+// -- Coverage: argExactTypeMatch with ArrayType param (untyped and typed) --
+func TestArgExactTypeMatchArrayType(t *testing.T) {
+	if !argExactTypeMatch(ast.ArrayType{Size: 10}, Value{Untyped: true, IsArray: true}) {
+		t.Errorf("expected true for untyped array arg to array param")
+	}
+	if !argExactTypeMatch(ast.ArrayType{Size: 10}, Value{IsArray: true}) {
+		t.Errorf("expected true for typed array arg to array param")
+	}
+}
+
+// -- Coverage: argExactTypeMatch with ListType param (untyped and typed) --
+func TestArgExactTypeMatchListType(t *testing.T) {
+	if !argExactTypeMatch(ast.ListType{}, Value{Untyped: true, IsArray: true}) {
+		t.Errorf("expected true for untyped list arg to list param")
+	}
+	if !argExactTypeMatch(ast.ListType{}, Value{IsArray: true}) {
+		t.Errorf("expected true for typed list arg to list param")
+	}
+}
+
+// -- Coverage: argMatchCategory with ArrayType and ListType params --
+func TestArgMatchCategoryArrayType(t *testing.T) {
+	if !argMatchCategory(ast.ArrayType{Size: 10}, Value{IsArray: true}, true) {
+		t.Errorf("expected true for array arg to array param")
+	}
+}
+
+func TestArgMatchCategoryListType(t *testing.T) {
+	if !argMatchCategory(ast.ListType{}, Value{IsArray: true}, true) {
+		t.Errorf("expected true for list arg to list param")
+	}
+}
+

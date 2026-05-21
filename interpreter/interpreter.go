@@ -227,8 +227,13 @@ func valueToTypeDesc(val Value) Value {
 		td.IsBool = true
 		td.BType = val.BType
 	} else {
-		td.Type = val.IType
-		td.IType = val.IType
+		if val.IType.Size == 0 && val.IType.Signed == false {
+			td.Type = ast.IntegerType{Size: 64, Signed: true}
+			td.IType = ast.IntegerType{Size: 64, Signed: true}
+		} else {
+			td.Type = val.IType
+			td.IType = val.IType
+		}
 	}
 	return td
 }
@@ -470,6 +475,15 @@ func typeDescForType(t ast.Type) string {
 			s += "}"
 		}
 		return s + "<" + typeDescForType(typ.ElemType) + ">"
+	case ast.UnionType:
+		s := ""
+		for i, m := range typ.Types {
+			if i > 0 {
+				s += " | "
+			}
+			s += typeDescForType(m)
+		}
+		return s
 	case ast.StringType:
 		s := "string"
 		if typ.Size > 0 {
@@ -1064,6 +1078,38 @@ func (i *Interpreter) execVarDecl(s *ast.VarDecl) error {
 		rightVal, err := i.evalExpr(s.Expr)
 		if err != nil {
 			return err
+		}
+		if ut, ok := rightVal.Type.(ast.UnionType); ok {
+			var targetType ast.Type
+			if s.IsFloat {
+				targetType = s.FType
+			} else if s.IsBool {
+				targetType = s.BType
+			} else if s.IsString {
+				targetType = s.SType
+			} else {
+				targetType = s.IType
+			}
+			var incompatible []string
+			for _, t := range ut.Types {
+				v := valueForType(t)
+				if !argExactTypeMatch(targetType, v) &&
+					!argMatchCategory(targetType, v, true) &&
+					!argMatchCategory(targetType, v, false) {
+					incompatible = append(incompatible, typeDescForType(t))
+				}
+			}
+			if len(incompatible) > 0 {
+				msg := "cannot assign union (" + typeDescForType(rightVal.Type) + ") to " + typeDescFromVar(s.IType, s.FType, s.BType, s.IsFloat, s.IsBool, s.IsString)
+				msg += ": incompatible type(s) "
+				for i, b := range incompatible {
+					if i > 0 {
+						msg += ", "
+					}
+					msg += b
+				}
+				return i.errorf(s.Line, "%s", msg)
+			}
 		}
 		if rightVal.Null {
 			if !s.IsBool && !s.IType.Nullable && !s.FType.Nullable || (s.IsBool && !s.BType.Nullable) {
@@ -1843,7 +1889,10 @@ func (i *Interpreter) evalExpr(expr ast.Expr) (Value, error) {
 		}
 		// If right side is a type reference, do type checking
 		if rightVal.IsType {
-			return Value{Untyped: true, BData: valueMatchesType(leftVal, rightVal), IsBool: true}, nil
+			// Strip declared type so is checks the actual value type, not the declared union
+			checkVal := leftVal
+			checkVal.Type = nil
+			return Value{Untyped: true, BData: valueMatchesType(checkVal, rightVal), IsBool: true}, nil
 		}
 		// Otherwise, pointer identity (reference comparison)
 		var leftPtr, rightPtr *Value
@@ -2168,6 +2217,10 @@ func argExactTypeMatch(paramType ast.Type, arg Value) bool {
 				}
 			}
 			return false
+		case ast.ArrayType:
+			return arg.IsArray
+		case ast.ListType:
+			return arg.IsArray
 		}
 		return false
 	}
@@ -2187,8 +2240,30 @@ func argExactTypeMatch(paramType ast.Type, arg Value) bool {
 			}
 		}
 		return false
+	case ast.ArrayType:
+		return arg.IsArray
+	case ast.ListType:
+		return arg.IsArray
 	}
 	return false
+}
+
+func valueForType(t ast.Type) Value {
+	switch typ := t.(type) {
+	case ast.IntegerType:
+		return Value{IType: typ}
+	case ast.FloatType:
+		return Value{IsFloat: true, FType: typ}
+	case ast.BoolType:
+		return Value{IsBool: true, BType: typ}
+	case ast.StringType:
+		return Value{IsString: true, SType: typ}
+	case ast.ArrayType:
+		return Value{IsArray: true, Type: t}
+	case ast.ListType:
+		return Value{IsArray: true, Type: t}
+	}
+	return Value{}
 }
 
 func typeIsNullableRuntime(t ast.Type) bool {
@@ -2263,6 +2338,10 @@ func argMatchCategory(paramType ast.Type, arg Value, sameCategory bool) bool {
 			}
 		}
 		return false
+	case ast.ArrayType:
+		return arg.IsArray
+	case ast.ListType:
+		return arg.IsArray
 	}
 	return false
 }
@@ -2483,6 +2562,10 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 		return Value{Null: true}, nil
 	}
 
+	if err := i.checkUnionBinaryOp(expr.Line, left, right, expr.Op); err != nil {
+		return Value{}, err
+	}
+
 	// String concatenation
 	if expr.Op == "+" && (left.IsString || right.IsString) {
 		if !left.IsString {
@@ -2597,6 +2680,96 @@ func (i *Interpreter) evalBinary(expr *ast.BinaryExpr) (Value, error) {
 		return Value{Untyped: true, Data: result}, nil
 	}
 	return Value{IType: resultType, Data: convertInt(result, resultType)}, nil
+}
+
+func (i *Interpreter) checkUnionBinaryOp(line int, left, right Value, op string) error {
+	leftTypes := valueRuntimeTypes(left)
+	rightTypes := valueRuntimeTypes(right)
+	if len(leftTypes) <= 1 && len(rightTypes) <= 1 {
+		return nil
+	}
+	for _, lt := range leftTypes {
+		for _, rt := range rightTypes {
+			if binaryRuntimeOpResult(lt, rt, op) == nil {
+				return i.errorf(line, "cannot %s %s and %s", opToVerb(op), typeDesc(lt, false), typeDesc(rt, false))
+			}
+		}
+	}
+	return nil
+}
+
+func valueRuntimeTypes(v Value) []ast.Type {
+	if t, ok := v.Type.(ast.UnionType); ok {
+		return t.Types
+	}
+	if v.IsFloat {
+		return []ast.Type{v.FType}
+	}
+	if v.IsString {
+		return []ast.Type{v.SType}
+	}
+	if v.IsArray {
+		return []ast.Type{v.Type}
+	}
+	if v.IType.Size != 0 || v.IType.Signed != false {
+		return []ast.Type{v.IType}
+	}
+	return nil
+}
+
+func binaryRuntimeOpResult(left, right ast.Type, op string) ast.Type {
+	li, leftInt := left.(ast.IntegerType)
+	lf, leftFloat := left.(ast.FloatType)
+	ri, rightInt := right.(ast.IntegerType)
+	rf, rightFloat := right.(ast.FloatType)
+
+	switch op {
+	case "+", "-", "*", "/", "%":
+		if leftInt && rightInt {
+			if canImplicitConvert(li, ast.FloatType{}, false, ri, ast.FloatType{}, false) {
+				return ri
+			}
+			if canImplicitConvert(ri, ast.FloatType{}, false, li, ast.FloatType{}, false) {
+				return li
+			}
+			return nil
+		}
+		if leftInt && rightFloat {
+			if canImplicitConvert(li, ast.FloatType{}, false, ast.IntegerType{}, rf, true) {
+				return rf
+			}
+			return nil
+		}
+		if leftFloat && rightInt {
+			if canImplicitConvert(ri, ast.FloatType{}, false, ast.IntegerType{}, lf, true) {
+				return lf
+			}
+			return nil
+		}
+		if leftFloat && rightFloat {
+			if lf.Size >= rf.Size {
+				return lf
+			}
+			return rf
+		}
+	}
+	return nil
+}
+
+func opToVerb(op string) string {
+	switch op {
+	case "+":
+		return "add"
+	case "-":
+		return "subtract"
+	case "*":
+		return "multiply"
+	case "/":
+		return "divide"
+	case "%":
+		return "modulo"
+	}
+	return op
 }
 
 func (i *Interpreter) evalShortCircuit(expr *ast.BinaryExpr) (Value, error) {

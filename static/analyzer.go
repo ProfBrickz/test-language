@@ -43,6 +43,7 @@ type AbsValue struct {
 
 	nullable       bool
 	definitelyNull bool
+	untyped        bool
 
 	intType    ast.IntegerType
 	floatType  ast.FloatType
@@ -352,8 +353,31 @@ func (a *Analyzer) analyzeReturn(s *ast.ReturnStmt) {
 		return
 	}
 	if s.Value != nil {
-		a.analyzeExpr(s.Value)
+		val := a.analyzeExpr(s.Value)
+		a.checkReturnType(s.Line, val, a.insideFunc.ReturnType)
 	}
+}
+
+func (a *Analyzer) checkReturnType(line int, val AbsValue, retType ast.Type) {
+	if retType == nil || val.kind == AbsUnion {
+		return
+	}
+	if !isTypeAssignableTo(val, retType) {
+		a.addError(line, fmt.Sprintf("cannot return %s from function returning %s",
+			typeDescFromAbs(val), typeDescFromType(retType)))
+	}
+}
+
+func isTypeAssignableTo(val AbsValue, retType ast.Type) bool {
+	if u, ok := retType.(ast.UnionType); ok {
+		for _, t := range u.Types {
+			if argExactTypeMatchStatic(t, val) || argMatchCategoryStatic(t, val, true) || argMatchCategoryStatic(t, val, false) {
+				return true
+			}
+		}
+		return false
+	}
+	return argExactTypeMatchStatic(retType, val) || argMatchCategoryStatic(retType, val, true) || argMatchCategoryStatic(retType, val, false)
 }
 
 func (a *Analyzer) pushScope() {
@@ -428,13 +452,40 @@ func (a *Analyzer) analyzeIncDec(s *ast.IncDecStmt) {
 }
 
 func (a *Analyzer) checkAssignmentType(line int, name string, rhs AbsValue, decl *ast.VarDecl) {
+	if decl == nil {
+		return
+	}
 	if rhs.definitelyNull {
-		if decl != nil {
-			if !isNullableDecl(decl) {
-				a.addError(line, fmt.Sprintf("cannot assign null to %s", typeDescFromDecl(decl)))
-				return
+		if !isNullableDecl(decl) {
+			a.addError(line, fmt.Sprintf("cannot assign null to %s", typeDescFromDecl(decl)))
+			return
+		}
+	}
+	if rhs.kind == AbsUnion && !decl.IsUnion {
+		unionDesc := unionDescFromTypes(rhs.unionTypes)
+		targetType := declTypeFromDecl(decl)
+		targetDesc := typeDescFromDecl(decl)
+		var bad []string
+		for _, t := range rhs.unionTypes {
+			v := absValueFromType(t)
+			if !argExactTypeMatchStatic(targetType, v) &&
+				!argMatchCategoryStatic(targetType, v, true) &&
+				!argMatchCategoryStatic(targetType, v, false) {
+				bad = append(bad, typeDescFromType(t))
 			}
 		}
+		if len(bad) > 0 {
+			msg := "cannot assign union (" + unionDesc + ") to " + targetDesc
+			msg += ": incompatible type(s) "
+			for i, b := range bad {
+				if i > 0 {
+					msg += ", "
+				}
+				msg += b
+			}
+			a.addError(line, msg)
+		}
+		return
 	}
 }
 
@@ -515,9 +566,45 @@ func typeDescFromType(t ast.Type) string {
 		return fmt.Sprintf("bool{nullable: %v}", typ.Nullable)
 	case ast.StringType:
 		return "string"
+	case ast.UnionType:
+		s := ""
+		for i, m := range typ.Types {
+			if i > 0 {
+				s += " | "
+			}
+			s += typeDescFromType(m)
+		}
+		return s
 	default:
 		return fmt.Sprintf("%T", t)
 	}
+}
+
+func unionDescFromTypes(types []ast.Type) string {
+	s := ""
+	for i, t := range types {
+		if i > 0 {
+			s += " | "
+		}
+		s += typeDescFromType(t)
+	}
+	return s
+}
+
+func declTypeFromDecl(decl *ast.VarDecl) ast.Type {
+	if decl.IsUnion {
+		return decl.UnionType
+	}
+	if decl.IsFloat {
+		return decl.FType
+	}
+	if decl.IsBool {
+		return decl.BType
+	}
+	if decl.IsString {
+		return decl.SType
+	}
+	return decl.IType
 }
 
 func typeDescFromDecl(d *ast.VarDecl) string {
@@ -748,6 +835,7 @@ func (a *Analyzer) analyzeExpr(expr ast.Expr) AbsValue {
 			t = ast.IntegerType{Size: 64, Signed: true, Nullable: true}
 		}
 		v := knownIntValue(e.Value, t)
+		v.untyped = e.Untyped
 		v.nullable = false
 		return v
 	case *ast.FloatLit:
@@ -756,6 +844,7 @@ func (a *Analyzer) analyzeExpr(expr ast.Expr) AbsValue {
 			t = ast.FloatType{Size: 64, Nullable: true}
 		}
 		v := knownFloatValue(e.Value, t)
+		v.untyped = e.Untyped
 		v.nullable = false
 		return v
 	case *ast.BoolLit:
@@ -898,15 +987,68 @@ func argsExactMatchStatic(params []ast.Param, argTypes []AbsValue) bool {
 	return true
 }
 
+func canImplicitConvertStatic(srcInt ast.IntegerType, srcFloat ast.FloatType, srcIsFloat bool, dstInt ast.IntegerType, dstFloat ast.FloatType, dstIsFloat bool) bool {
+	if srcIsFloat && dstIsFloat {
+		return srcFloat.Size <= dstFloat.Size
+	}
+	if !srcIsFloat && dstIsFloat {
+		if srcInt.Size <= 8 {
+			return dstFloat.Size >= 16
+		}
+		if srcInt.Size <= 16 {
+			return dstFloat.Size >= 32
+		}
+		if srcInt.Size <= 32 {
+			return dstFloat.Size >= 64
+		}
+		return false
+	}
+	if srcIsFloat && !dstIsFloat {
+		return false
+	}
+	if !srcIsFloat && !dstIsFloat {
+		if srcInt.Size == dstInt.Size && srcInt.Signed == dstInt.Signed {
+			return true
+		}
+		if srcInt.Size > dstInt.Size {
+			return false
+		}
+		if srcInt.Signed && dstInt.Signed {
+			return true
+		}
+		if !srcInt.Signed && !dstInt.Signed {
+			return true
+		}
+		if !srcInt.Signed && dstInt.Signed && srcInt.Size < dstInt.Size {
+			return true
+		}
+	}
+	return false
+}
+
 func argExactTypeMatchStatic(paramType ast.Type, arg AbsValue) bool {
 	if arg.kind == AbsNull || arg.definitelyNull {
 		return typeIsNullable(paramType)
 	}
+	if arg.untyped {
+		switch paramType.(type) {
+		case ast.IntegerType:
+			return arg.kind == AbsInt
+		case ast.FloatType:
+			return arg.kind == AbsFloat
+		}
+	}
 	switch pt := paramType.(type) {
 	case ast.IntegerType:
-		return arg.kind == AbsInt
+		if arg.kind == AbsInt {
+			return arg.intType.Size == pt.Size && arg.intType.Signed == pt.Signed
+		}
+		return false
 	case ast.FloatType:
-		return arg.kind == AbsFloat
+		if arg.kind == AbsFloat {
+			return arg.floatType.Size == pt.Size
+		}
+		return false
 	case ast.BoolType:
 		return arg.kind == AbsBool
 	case ast.StringType:
@@ -941,15 +1083,31 @@ func argMatchCategoryStatic(paramType ast.Type, arg AbsValue, sameCategory bool)
 	}
 	switch pt := paramType.(type) {
 	case ast.IntegerType:
-		if sameCategory {
-			return arg.kind == AbsInt
+		if arg.kind == AbsInt {
+			if arg.untyped {
+				return true
+			}
+			return canImplicitConvertStatic(arg.intType, ast.FloatType{}, false, pt, ast.FloatType{}, false)
 		}
-		return arg.kind == AbsInt || arg.kind == AbsFloat
+		// float → int is not allowed (cross-category or not)
+		return false
 	case ast.FloatType:
-		if sameCategory {
-			return arg.kind == AbsFloat
+		if arg.kind == AbsFloat {
+			if arg.untyped {
+				return true
+			}
+			return canImplicitConvertStatic(ast.IntegerType{}, arg.floatType, true, ast.IntegerType{}, pt, true)
 		}
-		return arg.kind == AbsFloat || arg.kind == AbsInt
+		if arg.kind == AbsInt {
+			if sameCategory {
+				return false
+			}
+			if arg.untyped {
+				return true
+			}
+			return canImplicitConvertStatic(arg.intType, ast.FloatType{}, false, ast.IntegerType{}, pt, true)
+		}
+		return false
 	case ast.BoolType:
 		return arg.kind == AbsBool
 	case ast.StringType:
@@ -982,6 +1140,13 @@ func (a *Analyzer) analyzeBinaryExpr(e *ast.BinaryExpr) AbsValue {
 		if left.kind == AbsInt && right.kind == AbsInt {
 			return a.foldIntArith(left, right, e.Op)
 		}
+		if left.kind == AbsFloat && right.kind == AbsFloat {
+			return AbsValue{}
+		}
+		// Handle union operands: compute cross-product of result types
+		if left.kind == AbsUnion || right.kind == AbsUnion {
+			return a.analyzeUnionBinaryExpr(e.Line, left, right, e.Op)
+		}
 	case "<", ">", "<=", ">=", "==", "!=":
 		return AbsValue{kind: AbsBool, isAnyBool: true}
 	case "&&", "||":
@@ -993,6 +1158,109 @@ func (a *Analyzer) analyzeBinaryExpr(e *ast.BinaryExpr) AbsValue {
 	}
 
 	return AbsValue{}
+}
+
+func binaryOpResultType(left, right ast.Type, op string) ast.Type {
+	li, leftInt := left.(ast.IntegerType)
+	lf, leftFloat := left.(ast.FloatType)
+	ri, rightInt := right.(ast.IntegerType)
+	rf, rightFloat := right.(ast.FloatType)
+
+	switch op {
+	case "+", "-", "*", "/", "%":
+		if leftInt && rightInt {
+			if canImplicitConvertStatic(li, ast.FloatType{}, false, ri, ast.FloatType{}, false) {
+				return ri
+			}
+			if canImplicitConvertStatic(ri, ast.FloatType{}, false, li, ast.FloatType{}, false) {
+				return li
+			}
+			return nil
+		}
+		if leftInt && rightFloat {
+			if canImplicitConvertStatic(li, ast.FloatType{}, false, ast.IntegerType{}, rf, true) {
+				return rf
+			}
+			return nil
+		}
+		if leftFloat && rightInt {
+			if canImplicitConvertStatic(ri, ast.FloatType{}, false, ast.IntegerType{}, lf, true) {
+				return lf
+			}
+			return nil
+		}
+		if leftFloat && rightFloat {
+			if lf.Size >= rf.Size {
+				return lf
+			}
+			return rf
+		}
+	}
+	return nil
+}
+
+func (a *Analyzer) analyzeUnionBinaryExpr(line int, left, right AbsValue, op string) AbsValue {
+	leftTypes := getTypesFromAbs(left)
+	rightTypes := getTypesFromAbs(right)
+
+	var resultTypes []ast.Type
+	for _, lt := range leftTypes {
+		for _, rt := range rightTypes {
+			res := binaryOpResultType(lt, rt, op)
+			if res != nil {
+				resultTypes = append(resultTypes, res)
+			} else {
+				a.addError(line, fmt.Sprintf("cannot %s %s and %s", opToVerb(op), typeDescFromType(lt), typeDescFromType(rt)))
+			}
+		}
+	}
+	resultTypes = dedupTypes(resultTypes)
+	if len(resultTypes) == 1 {
+		return absValueFromType(resultTypes[0])
+	}
+	return AbsValue{kind: AbsUnion, unionTypes: resultTypes}
+}
+
+func getTypesFromAbs(v AbsValue) []ast.Type {
+	if v.kind == AbsUnion {
+		return v.unionTypes
+	}
+	switch v.kind {
+	case AbsInt:
+		return []ast.Type{v.intType}
+	case AbsFloat:
+		return []ast.Type{v.floatType}
+	}
+	return nil
+}
+
+func dedupTypes(types []ast.Type) []ast.Type {
+	var out []ast.Type
+	for _, t := range types {
+		dup := false
+		for _, o := range out {
+			if typesEqual(t, o) {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+func typesEqual(a, b ast.Type) bool {
+	switch at := a.(type) {
+	case ast.IntegerType:
+		bt, ok := b.(ast.IntegerType)
+		return ok && at.Size == bt.Size && at.Signed == bt.Signed
+	case ast.FloatType:
+		bt, ok := b.(ast.FloatType)
+		return ok && at.Size == bt.Size
+	}
+	return false
 }
 
 func (a *Analyzer) checkNullArith(e *ast.BinaryExpr, left, right AbsValue) {
@@ -1014,6 +1282,22 @@ func (a *Analyzer) checkNullArith(e *ast.BinaryExpr, left, right AbsValue) {
 
 func isArithmeticOp(op string) bool {
 	return op == "+" || op == "-" || op == "*" || op == "/" || op == "%"
+}
+
+func opToVerb(op string) string {
+	switch op {
+	case "+":
+		return "add"
+	case "-":
+		return "subtract"
+	case "*":
+		return "multiply"
+	case "/":
+		return "divide"
+	case "%":
+		return "modulo"
+	}
+	return op
 }
 
 func (a *Analyzer) addNullMessage(line int, op string) {
