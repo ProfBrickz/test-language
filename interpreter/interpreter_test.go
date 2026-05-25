@@ -11861,19 +11861,43 @@ func TestEvalStringMemberRemoveSuccessVarRef(t *testing.T) {
 	}
 }
 
-func TestPrintRequiresString(t *testing.T) {
-	input := "print(42);"
-	l := lexer.New(input)
-	p := parser.New(l)
-	program := p.ParseProgram()
-
-	i := New()
-	err := i.Run(program)
-	if err == nil {
-		t.Errorf("expected error for print with non-string, got none")
+func TestPrintAcceptsAllTypes(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{`print(42);`, "42"},
+		{`print("hello");`, "hello"},
+		{`print(true);`, "true"},
+		{`print(false);`, "false"},
+		{`print(3.14);`, "3.14"},
+		{`print([1, 2, 3]);`, "[1, 2, 3]"},
+		{`print([]);`, "[]"},
+		{`print(null);`, "null"},
 	}
-	if err.Error() != "line 1: print requires a string argument, got untyped int literal" {
-		t.Errorf("wrong error message: %v", err)
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			l := lexer.New(tt.input)
+			p := parser.New(l)
+			program := p.ParseProgram()
+
+			if len(p.Errors()) > 0 {
+				t.Fatalf("parse errors: %v", p.Errors())
+			}
+
+			i := New()
+			output := captureOutput(func() {
+				err := i.Run(program)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			})
+
+			if output != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, output)
+			}
+		})
 	}
 }
 

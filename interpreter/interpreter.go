@@ -51,6 +51,25 @@ func valueToStr(v Value) Value {
 	return Value{IsString: true, StringData: intToStr(v.Data, v.IType, v.Untyped)}
 }
 
+func valueToPrintString(v Value) string {
+	if v.Null {
+		return "null"
+	}
+	if v.IsString {
+		return v.StringData
+	}
+	if v.IsBool {
+		return strconv.FormatBool(v.BData)
+	}
+	if v.IsFloat {
+		return formatFloat(v.FData)
+	}
+	if v.IsArray {
+		return v.String()
+	}
+	return intToStr(v.Data, v.IType, v.Untyped)
+}
+
 func formatFloat(val float64) string {
 	if math.IsInf(val, 1) {
 		return "infinity"
@@ -971,10 +990,7 @@ func (i *Interpreter) executeStmt(stmt ast.Stmt) error {
 		if err != nil {
 			return err
 		}
-		if !val.IsString {
-			return i.errorf(s.Line, "print requires a string argument, got %s", typeDescForVal(val))
-		}
-		fmt.Println(val.StringData)
+		fmt.Println(valueToPrintString(val))
 	case *ast.ExprStmt:
 		_, err := i.evalExpr(s.Expr)
 		if err != nil {
