@@ -1,49 +1,34 @@
-# Overview
+# test-language
 
-An expression-based, statically-typed programming language with integers, floats, and booleans that let you configure their size, signedness, and whether they can be null.
-
-## How It Works
-
-Source code goes through three phases:
-
-1. **Lexer** - splits text into tokens
-2. **Parser** - builds an abstract syntax tree
-3. **Interpreter** - walks the tree and runs it
-
-No bytecode, no VM, no compiler - the tree runs directly.
-
-## Usage
-
-Run a file:
-
-```bash
-./interp program.lang
-```
-
-Start the REPL:
-
-```bash
-./interp
-```
+An expression-based, statically-typed programming language with configurable primitive types, strings, arrays, lists, functions, and more.
 
 ```
-Welcome to the language interpreter (type 'exit' to quit)
-> var x: int{size: 32} = 42;
-> print(x);
-42
-> exit
+print("Hello, World!");
 ```
 
-Build from source:
+## Tutorial
 
-```bash
-go build -o interp .
-```
+Learn the language step by step, from basics to advanced features:
 
-## Comments
+| # | Topic | What You'll Learn |
+|---|-------|-------------------|
+| 1 | [Overview](01-overview.md) | What the language is and how it works |
+| 2 | [Getting Started](02-getting-started.md) | Build, run, REPL, hello world |
+| 3 | [Syntax](03-syntax.md) | Statements, comments, blocks, identifiers |
+| 4 | [Variables](04-variables.md) | Declarations, assignment, primitive types |
+| 5 | [Operators](05-operators.md) | Arithmetic, comparison, logical, precedence |
+| 6 | [Strings](06-strings.md) | Literals, escapes, concatenation, methods |
+| 7 | [Type Conversion](07-type-conversion.md) | Automatic widening rules |
+| 8 | [Arrays and Lists](08-arrays-and-lists.md) | Fixed-size and variable-size sequences |
+| 9 | [Control Flow](09-control-flow.md) | If, else, switch, scoping |
+| 10 | [Loops](10-loops.md) | For, for-in/at/of, while, break, skip |
+| 11 | [Functions](11-functions.md) | Declaration, parameters, return, overloading |
+| 12 | [References](12-references.md) | ref, copy, is |
+| 13 | [Type Parameters](13-type-parameters.md) | Size, signed, nullable, auto, type members |
+| 14 | [Union Types](14-unions.md) | Variables that hold multiple types |
 
-Single-line comments use `//`:
+## Also See
 
-```
-var x: int = 42; // anything after // is ignored
-```
+| Page | Description |
+|------|-------------|
+| [CLI & Config](cli.md) | CLI flags, config file, static analysis |

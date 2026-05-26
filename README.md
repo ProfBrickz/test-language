@@ -11,7 +11,7 @@ Inspired by **C**, **Java**, **JavaScript**, **Python**, **C#**, **Rust** and **
 - **Well-defined automatic conversion rules** - Widening conversions only, with safe numeric promotion across types
 - **No dependencies beyond the standard library** - small, simple tree-walking interpreter
 
-See [`docs/`](docs/) for full language documentation.
+See [`docs/overview.md`](docs/overview.md) for full language documentation and tutorials.
 
 ## Quick Start
 
