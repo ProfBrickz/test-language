@@ -30,20 +30,20 @@ The value's runtime type becomes one of the union's member types:
 
 ```
 var val: int | string = "hello";
-print(val is string);  // true
+print(val instanceOf string);  // true
 ```
 
-## Checking with `is`
+## Checking with `instanceOf`
 
-Use the `is` operator to determine which type a union variable holds:
+Use the `instanceOf` operator to determine which type a union variable holds:
 
 ```
 var val: int | string | float = 3.14;
-if (val is int) {
+if (val instanceOf int) {
     print("integer");
-} else if (val is string) {
+} else if (val instanceOf string) {
     print("string");
-} else if (val is float) {
+} else if (val instanceOf float) {
     print("float");  // runs
 }
 ```
@@ -57,5 +57,9 @@ var a: int | float = 10;
 var b: int | string = "hello";
 // a + b: error — cannot add int/float and string
 ```
+
+## Next
+
+Learn about [Structs](15-structs.md).
 
 

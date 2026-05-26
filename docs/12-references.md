@@ -42,19 +42,7 @@ print(a[0]);  // 1 (independent)
 
 For non-array types, returns the value unchanged.
 
-## is (Type Check / Identity)
-
-### Type Checking
-
-```
-var val: int | string = "hello";
-print(val is string);  // true
-print(val is int);     // false
-```
-
-Checks runtime type against a type reference.
-
-### Reference Identity
+## is (Reference Identity)
 
 ```
 var a: int{size: 32} = 42;
@@ -63,6 +51,16 @@ print(a is r);  // true (same storage)
 ```
 
 Returns `true` only if both sides refer to the same storage in memory.
+
+## instanceOf (Type Check)
+
+```
+var val: int | string = "hello";
+print(val instanceOf string);  // true
+print(val instanceOf int);     // false
+```
+
+Checks the runtime type against a type reference. Works with all types — primitives, structs, and classes. For class types, `instanceOf` is inheritance-aware (returns `true` if the value is an instance of the type or any of its subclasses).
 
 ## Next
 

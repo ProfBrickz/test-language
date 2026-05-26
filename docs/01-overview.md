@@ -14,6 +14,8 @@ print("Hello, World!");
 - **Functions** — typed parameters, return types, overloading
 - **References** — aliases to variables, shallow copy, type checking
 - **Unions** — variables that can hold multiple types
+- **Structs** — named collections of typed fields with methods
+- **Classes** — reference types with inheritance, virtual methods, access control, interfaces, static members
 - **No dependencies** beyond the standard library
 
 ## How It Works

@@ -23,9 +23,11 @@ Learn the language step by step, from basics to advanced features:
 | 9 | [Control Flow](09-control-flow.md) | If, else, switch, scoping |
 | 10 | [Loops](10-loops.md) | For, for-in/at/of, while, break, skip |
 | 11 | [Functions](11-functions.md) | Declaration, parameters, return, overloading |
-| 12 | [References](12-references.md) | ref, copy, is |
+| 12 | [References](12-references.md) | ref, copy, is, instanceOf |
 | 13 | [Type Parameters](13-type-parameters.md) | Size, signed, nullable, auto, type members |
 | 14 | [Union Types](14-unions.md) | Variables that hold multiple types |
+| 15 | [Structs](15-structs.md) | Named collections of typed fields with methods |
+| 16 | [Classes](16-classes.md) | Reference types with inheritance, virtual methods, interfaces, and more |
 
 ## Also See
 
