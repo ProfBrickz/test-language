@@ -76,6 +76,25 @@ var r: Rectangle = Rectangle {
 print(r.top_left.x);  // 0
 ```
 
+## Copy with Modifications
+
+The `...` spread syntax creates a new struct from an existing one, overriding select fields:
+
+```
+var p1: Point = Point { x: 1, y: 2 };
+var p2: Point = { ...p1, y: 5 };
+print(p2);  // Point { x: 1, y: 5 }
+```
+
+The source struct is unchanged — all its fields are copied, then explicitly listed fields override. This works in any context where a struct literal is expected:
+
+```
+var points: Point[] = [
+    { ...origin, x: 10 },
+    { ...origin, x: 20, y: 30 }
+];
+```
+
 ## Methods
 
 Functions can be defined inside a struct body. The first parameter is the receiver, conventionally named `self`:
@@ -154,7 +173,7 @@ print(a.x);  // 99
 
 ## Equality
 
-Structs can be compared with `==` and `!=`. Two structs are equal if all their fields are equal:
+Structs are compared with `==` and `!=`. Two structs are equal if all their fields are equal. This behavior can be overridden (see Operator Overloading below):
 
 ```
 var a: Point = Point { x: 1, y: 2 };
@@ -162,12 +181,68 @@ var b: Point = Point { x: 1, y: 2 };
 print(a == b);  // true
 ```
 
-## Type Checking with `instanceOf`
+## Operator Overloading
+
+Structs can define custom behavior for operators by declaring methods with specific names:
+
+| Operator | Method Name |
+|----------|-------------|
+| `==` | `equals` |
+| `!=` | `notEquals` |
+| `<` | `lessThan` |
+| `>` | `greaterThan` |
+| `<=` | `lessThanOrEqual` |
+| `>=` | `greaterThanOrEqual` |
+| `+` | `add` |
+| `-` | `subtract` |
+| `*` | `multiply` |
+| `/` | `divide` |
+| `%` | `modulo` |
+
+The method takes the right-hand operand as its single parameter:
+
+```
+struct Vector2 {
+    x: float;
+    y: float;
+
+    function add(self: Vector2, other: Vector2): Vector2 {
+        return Vector2 { x: self.x + other.x, y: self.y + other.y };
+    }
+
+    function equals(self: Vector2, other: Vector2): bool {
+        return self.x == other.x && self.y == other.y;
+    }
+
+    function lessThan(self: Vector2, other: Vector2): bool {
+        return self.x < other.x && self.y < other.y;
+    }
+}
+
+var v1: Vector2 = Vector2 { x: 1, y: 2 };
+var v2: Vector2 = Vector2 { x: 3, y: 4 };
+var v3: Vector2 = v1 + v2;
+print(v3 == Vector2 { x: 4, y: 6 });  // true
+```
+
+The operand types do not need to match — mixed-type operations are allowed:
+
+```
+function add(self: Vector2, scalar: float): Vector2 {
+    return Vector2 { x: self.x + scalar, y: self.y + scalar };
+}
+
+var v: Vector2 = Vector2 { x: 1, y: 2 } + 0.5;  // (1.5, 2.5)
+```
+
+For classes, only `==` and `!=` are overloadable (see classes docs).
+
+## Type Checking with `is`
 
 ```
 var p: Point = Point { x: 1, y: 2 };
-print(p instanceOf Point);   // true
-print(p instanceOf int);     // false
+print(p is Point);   // true
+print(p is int);     // false
 ```
 
 ## In Functions

@@ -1,4 +1,4 @@
-# References, Copy, and Is
+# References, Copy, Type and Reference Checks
 
 ## ref (Reference)
 
@@ -42,25 +42,25 @@ print(a[0]);  // 1 (independent)
 
 For non-array types, returns the value unchanged.
 
-## is (Reference Identity)
+## isRef (Reference Identity)
 
 ```
 var a: int{size: 32} = 42;
 ref r: int{size: 32} = a;
-print(a is r);  // true (same storage)
+print(a isRef r);  // true (same storage)
 ```
 
 Returns `true` only if both sides refer to the same storage in memory.
 
-## instanceOf (Type Check)
+## is (Type Check)
 
 ```
 var val: int | string = "hello";
-print(val instanceOf string);  // true
-print(val instanceOf int);     // false
+print(val is string);  // true
+print(val is int);     // false
 ```
 
-Checks the runtime type against a type reference. Works with all types — primitives, structs, and classes. For class types, `instanceOf` is inheritance-aware (returns `true` if the value is an instance of the type or any of its subclasses).
+Checks the runtime type against a type reference. Works with all types — primitives, structs, and classes. For class types, `is` is inheritance-aware (returns `true` if the value is an instance of the type or any of its subclasses). Does not trigger implicit conversions — the runtime type must match or be a subclass.
 
 ## Next
 

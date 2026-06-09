@@ -40,29 +40,35 @@ class Name {
 ```
 
 - Members without an access modifier default to `private`
-- Methods use `method` keyword (or omit when a modifier is present)
-- Fields use `var` keyword (or omit when a modifier is present)
+- When an access modifier is present, `method` and `var` are implied — `public speak()` is parsed as `public method speak()`
+- When no modifier is present, `method` and `var` are required
 - `this` is implicit inside all methods and constructors — refers to the current instance
 - Inside a class body, `method` replaces the top-level `function` keyword
 
 ### Field Declarations
 
-Field without modifier (requires `var`):
+Field without modifier — `var` keyword required:
 
 ```
 var name: string;
 ```
 
-Field with modifier (`var` is optional):
+Field with modifier — `var` is implied, not written:
 
 ```
 private name: string;
-public var age: int;
+public age: int;
+```
+
+Same rule as methods — the modifier makes `var` redundant:
+
+```
+public var age: int;   // valid but redundant — use public age: int instead
 ```
 
 ### Method Declarations
 
-Method without modifier (requires `method`):
+Method without modifier — `method` keyword required:
 
 ```
 method speak(): string {
@@ -70,7 +76,7 @@ method speak(): string {
 }
 ```
 
-Method with modifier (`method` is optional):
+Method with modifier — `method` is implied, not written:
 
 ```
 public speak(): string {
@@ -79,6 +85,14 @@ public speak(): string {
 
 private doSomething(): void {
     // ...
+}
+```
+
+The access modifier makes the declaration's intent clear — the `method` keyword would be redundant:
+
+```
+public method speak(): string {   // valid but redundant — use public speak() instead
+    return "...";
 }
 ```
 
@@ -194,7 +208,7 @@ a.greet();     // "Hi" — no dispatch, runs Animal's version
 ```
 abstract class Shape {
     public abstract area(): float;
-    private abstract draw(): void;
+    protected abstract draw(): void;
 
     public describe(): string {
         return "Area: " + this.area();
@@ -213,7 +227,7 @@ class Circle extends Shape {
         return 3.14159 * this.radius * this.radius;
     }
 
-    private draw(): void {
+    protected draw(): void {
         // implementation
     }
 }
@@ -223,7 +237,7 @@ class Circle extends Shape {
 - `abstract function` has no body — ends with `;`
 - Abstract methods are implicitly `virtual`
 - Concrete subclasses must implement all inherited abstract methods
-- Abstract methods can have any access modifier (private, protected, public)
+- Abstract methods can have any access modifier except `private` (subclasses must be able to see them to implement them)
 
 ## Interfaces
 
@@ -318,16 +332,16 @@ var a = new Dog("Rex", "Husky");
 var b = new Dog("Rex", "Husky");
 var c = a;
 
-print(a is c);            // true — same object (reference identity)
-print(a is b);            // false — different objects
-print(a instanceOf Dog);  // true — type check with inheritance
-print(a instanceOf Animal); // true — Dog extends Animal
+print(a isRef c);            // true — same object (reference identity)
+print(a isRef b);            // false — different objects
+print(a is Dog);  // true — type check with inheritance
+print(a is Animal); // true — Dog extends Animal
 // print(a == b);        // error — == not supported on class types
 ```
 
-- `is` — reference identity (same heap object)
-- `instanceOf` — type check including inheritance (true if subclass)
-- `==` is not defined for class types — use a custom `.equals()` method for value comparison
+- `isRef` — reference identity (same heap object)
+- `is` — type check including inheritance (true if subclass)
+- `==` and `!=` work only if the class defines `.equals()` — otherwise they are a compile error
 
 ### Type Narrowing
 
@@ -335,13 +349,13 @@ print(a instanceOf Animal); // true — Dog extends Animal
 function handle(a: Animal): void {
     // a.bark();        // error — bark not on Animal
 
-    if (a instanceOf Dog) {
+    if (a is Dog) {
         a.bark();       // ok — narrowed to Dog in this branch
     }
 }
 ```
 
-After an `instanceOf` check, the static type is narrowed within the branch body.
+After an `is` check, the static type is narrowed within the branch body.
 
 ## `.equals()` Method
 
@@ -362,7 +376,7 @@ class Person {
 ```
 
 - Classes must implement their own `.equals()` for value comparison
-- No default `==` exists for class instances
+- Defining `.equals()` also enables `==` and `!=` on the class — they delegate to `.equals()`
 
 ## Value Semantics
 
@@ -374,7 +388,7 @@ var b = a;
 b.name = "Max";
 
 print(a.name);  // "Max" — a and b share the same object
-print(a is b);  // true
+print(a isRef b);  // true
 ```
 
 Use structs for value-type behavior with automatic copying.
@@ -382,13 +396,14 @@ Use structs for value-type behavior with automatic copying.
 ## Restrictions
 
 - No multiple inheritance (but multiple interface implementation is allowed)
-- No operator overloading
+- Operator overloading is limited to `==` and `!=` (via `.equals()`)
 - No destructors (Go garbage collector handles cleanup)
 - No anonymous classes
 - Classes cannot be forward-declared (must be declared before use)
-- `==` cannot be used on class instances
+- `==` and `!=` work on classes only if `.equals()` is defined — otherwise a compile error
 - Methods cannot be `static` and `virtual` simultaneously
-- `instanceOf` works on all types, including primitives, structs, and classes
+- Abstract methods cannot be `private` (subclasses must be able to implement them)
+- `is` works on all types, including primitives, structs, and classes
 
 ## See Also
 
