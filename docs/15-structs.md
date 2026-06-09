@@ -264,3 +264,8 @@ function midpoint(a: Point, b: Point): Point {
 - Self-referencing structs are not supported
 - Methods cannot mutate the receiver through `self` (it is a copy)
 - Anonymous struct types are not supported — all structs must be named
+
+## See Also
+
+- [Properties, Getters, and Setters](17-properties.md) — custom accessor logic for fields
+- [Classes](16-classes.md) — reference type alternative to structs

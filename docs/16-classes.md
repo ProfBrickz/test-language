@@ -407,5 +407,6 @@ Use structs for value-type behavior with automatic copying.
 
 ## See Also
 
+- [Properties, Getters, and Setters](17-properties.md) — custom accessor logic for fields
 - [Structs](15-structs.md) — value-type alternative to classes
 - [Functions](11-functions.md) — top-level function declaration

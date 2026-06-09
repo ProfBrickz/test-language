@@ -28,6 +28,7 @@ Learn the language step by step, from basics to advanced features:
 | 14 | [Union Types](14-unions.md) | Variables that hold multiple types |
 | 15 | [Structs](15-structs.md) | Named collections of typed fields with methods |
 | 16 | [Classes](16-classes.md) | Reference types with inheritance, virtual methods, interfaces, and more |
+| 17 | [Properties](17-properties.md) | Getters, setters, calculated members, and access modifiers |
 
 ## Also See
 
