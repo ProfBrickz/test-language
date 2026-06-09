@@ -173,69 +173,13 @@ print(a.x);  // 99
 
 ## Equality
 
-Structs are compared with `==` and `!=`. Two structs are equal if all their fields are equal. This behavior can be overridden (see Operator Overloading below):
+Structs are compared with `==` and `!=`. Two structs are equal if all their fields are equal. This behavior can be overridden (see [Operator Overloading](18-operator-overloading.md)):
 
 ```
 var a: Point = Point { x: 1, y: 2 };
 var b: Point = Point { x: 1, y: 2 };
 print(a == b);  // true
 ```
-
-## Operator Overloading
-
-Structs can define custom behavior for operators by declaring methods with specific names:
-
-| Operator | Method Name |
-|----------|-------------|
-| `==` | `equals` |
-| `!=` | `notEquals` |
-| `<` | `lessThan` |
-| `>` | `greaterThan` |
-| `<=` | `lessThanOrEqual` |
-| `>=` | `greaterThanOrEqual` |
-| `+` | `add` |
-| `-` | `subtract` |
-| `*` | `multiply` |
-| `/` | `divide` |
-| `%` | `modulo` |
-
-The method takes the right-hand operand as its single parameter:
-
-```
-struct Vector2 {
-    x: float;
-    y: float;
-
-    function add(self: Vector2, other: Vector2): Vector2 {
-        return Vector2 { x: self.x + other.x, y: self.y + other.y };
-    }
-
-    function equals(self: Vector2, other: Vector2): bool {
-        return self.x == other.x && self.y == other.y;
-    }
-
-    function lessThan(self: Vector2, other: Vector2): bool {
-        return self.x < other.x && self.y < other.y;
-    }
-}
-
-var v1: Vector2 = Vector2 { x: 1, y: 2 };
-var v2: Vector2 = Vector2 { x: 3, y: 4 };
-var v3: Vector2 = v1 + v2;
-print(v3 == Vector2 { x: 4, y: 6 });  // true
-```
-
-The operand types do not need to match — mixed-type operations are allowed:
-
-```
-function add(self: Vector2, scalar: float): Vector2 {
-    return Vector2 { x: self.x + scalar, y: self.y + scalar };
-}
-
-var v: Vector2 = Vector2 { x: 1, y: 2 } + 0.5;  // (1.5, 2.5)
-```
-
-For classes, only `==` and `!=` are overloadable (see classes docs).
 
 ## Type Checking with `is`
 
@@ -267,5 +211,6 @@ function midpoint(a: Point, b: Point): Point {
 
 ## See Also
 
+- [Operator Overloading](18-operator-overloading.md) — custom operator behavior for structs and classes
 - [Properties, Getters, and Setters](17-properties.md) — custom accessor logic for fields
 - [Classes](16-classes.md) — reference type alternative to structs

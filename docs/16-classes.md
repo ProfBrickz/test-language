@@ -341,7 +341,7 @@ print(a is Animal); // true — Dog extends Animal
 
 - `isRef` — reference identity (same heap object)
 - `is` — type check including inheritance (true if subclass)
-- `==` and `!=` work only if the class defines `.equals()` — otherwise they are a compile error
+- `==` and `!=` work only if the class defines `operator ==` (see [Operator Overloading](18-operator-overloading.md)) — otherwise they are a compile error
 
 ### Type Narrowing
 
@@ -375,8 +375,8 @@ class Person {
 }
 ```
 
-- Classes must implement their own `.equals()` for value comparison
-- Defining `.equals()` also enables `==` and `!=` on the class — they delegate to `.equals()`
+- Classes can implement their own `.equals()` for value comparison, but it is a plain method — not connected to `==` or `!=`
+- For `==` and `!=` support, define `operator ==` instead (see [Operator Overloading](18-operator-overloading.md))
 
 ## Value Semantics
 
@@ -396,17 +396,18 @@ Use structs for value-type behavior with automatic copying.
 ## Restrictions
 
 - No multiple inheritance (but multiple interface implementation is allowed)
-- Operator overloading is limited to `==` and `!=` (via `.equals()`)
+- Operator overloading is limited to `==` and `!=` (via `operator ==`)
 - No destructors (Go garbage collector handles cleanup)
 - No anonymous classes
 - Classes cannot be forward-declared (must be declared before use)
-- `==` and `!=` work on classes only if `.equals()` is defined — otherwise a compile error
+- `==` and `!=` work on classes only if `operator ==` is defined — otherwise a compile error
 - Methods cannot be `static` and `virtual` simultaneously
 - Abstract methods cannot be `private` (subclasses must be able to implement them)
 - `is` works on all types, including primitives, structs, and classes
 
 ## See Also
 
+- [Operator Overloading](18-operator-overloading.md) — custom operator behavior for structs and classes
 - [Properties, Getters, and Setters](17-properties.md) — custom accessor logic for fields
 - [Structs](15-structs.md) — value-type alternative to classes
 - [Functions](11-functions.md) — top-level function declaration
