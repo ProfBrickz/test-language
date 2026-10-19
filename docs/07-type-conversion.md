@@ -36,6 +36,46 @@ var g: int{nullable: false} = 5;
 var h: int{nullable: true} = g;         // OK
 ```
 
+## Optional Chaining and Null-Coalescing
+
+### Optional Chaining (`?.`)
+
+Use `?.` to safely access properties or call methods on potentially null values. Returns `null` if the chain is broken:
+
+```
+// Safe property access
+var name = user?.name;           // null if user is null
+var email = user?.profile?.email; // null if profile is null
+
+// Safe method calls
+var count = user?.getName?.();   // null if getName is null or user is null
+
+// Optional member access in expressions
+var displayName = user?.displayName ?? "Anonymous";
+```
+
+### Null-Coalescing (`??`)
+
+Use `??` to provide a default value when a value is `null`:
+
+```
+// Basic null-coalescing
+var name = userInput ?? "default";          // "default" if userInput is null
+var age = ageInput ?? 0;                    // 0 if ageInput is null
+var config = configValue ?? {timeout: 30};  // default object if null
+```
+
+The right-hand side is evaluated only when the left-hand side is `null`.
+
+### Combined Usage
+
+```
+// Common pattern: safe access with default
+var displayName = user?.displayName ?? "Guest";
+var email = user?.email ?? "user@example.com";
+var status = user?.getStatus?.() ?? "unknown";
+```
+
 ## Next
 
 Learn about [Arrays and Lists](08-arrays-and-lists.md).
