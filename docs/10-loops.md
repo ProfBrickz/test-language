@@ -101,6 +101,34 @@ while (condition) {
 
 Condition must be a `bool`. Each iteration creates a new scope.
 
+## Do-While Loops
+
+```
+do {
+    body;
+} while (condition);
+```
+
+Also written as:
+
+```
+do while (condition) {
+    body;
+}
+```
+
+The body executes at least once, then the condition is checked. If true, the body runs again. Each iteration creates a new scope.
+
+The body executes at least once, then the condition is checked. If true, the body runs again. Each iteration creates a new scope.
+
+```
+do {
+    var i: int{size: 32} = 0;
+    print(i);  // 0, 1, 2
+    i++;
+} while (i < 3);
+```
+
 ## Break / Skip
 
 ```
