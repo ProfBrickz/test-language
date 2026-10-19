@@ -13,17 +13,21 @@ Values are automatically converted in assignments and operator assignments follo
 - **Nullable** — non-nullable can be assigned to nullable, but not the reverse
 
 ## Examples
-
 ```
 // Integer widening
 var a: int{size: 8, signed: true} = 10;
 var b: int{size: 32, signed: true} = a;  // OK: int8 to int32
 
-// Integer to float
+// Explicit type conversion (C-style syntax)
 var c: int{size: 8} = 10;
-var d: float{size: 32} = c;             // OK: int8 to float32
+var d: float{size: 32} = (float{size: 32})c;  // OK: explicit conversion
+var e = (int)c;  // implicit narrowing not allowed
 
 // Float widening
+var e: float{size: 16} = 1.5;
+var f: float{size: 32} = e;             // OK: float16 to float32
+
+// Non-nullable to nullable
 var e: float{size: 16} = 1.5;
 var f: float{size: 32} = e;             // OK: float16 to float32
 

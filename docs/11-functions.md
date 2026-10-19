@@ -9,6 +9,7 @@ function name(param1: type, param2: type): returnType {
 ```
 
 - Parameters are typed
+- Parameters can have default values
 - Return type comes after a colon (optional — omit for void functions)
 - Body is a block `{ }`
 
@@ -29,6 +30,40 @@ function greet(name: string) {
 ```
 var result: int{size: 32} = add(1, 2);
 greet("world");
+```
+
+### Default Parameters
+
+Parameters can have default values, which are used when no argument is provided:
+
+```
+function greet(name: string = "Guest"): string {
+    return "Hello, " + name + "!";
+}
+
+function add(a: int, b: int = 0): int {
+    return a + b;
+}
+
+print(greet());           // Hello, Guest!
+print(greet("Alice"));    // Hello, Alice!
+print(add(5));            // 5
+print(add(5, 3));         // 8
+```
+
+Defaults are evaluated at call time. You can use simple expressions, constant variables, or even pure functions with known parameters.
+
+```
+const zero: int = 0;
+
+function getNumber(a: int, b: int) {
+	return a + (b * 3)
+}
+
+function myFunction(a: int = zero, b: int = getNumber(1, 2), message: string = "Hello, " + "world!") {
+	print(message);
+	return a + b;
+}
 ```
 
 Calls can be used as expressions (returning a value) or as statements (value discarded).
@@ -83,14 +118,20 @@ If no overload matches, it is a compile-time error.
 
 ### Ambiguous Null Calls
 
-Passing `null` when multiple overloads could accept it is rejected:
+When multiple overloads could accept `null`, direct use of a `null` literal is ambiguous and rejected. However, you can pass a variable set to `null` or use type conversion on a null literal:
 
 ```
 function foo(x: int{nullable: true}): void { }
 function foo(x: string{nullable: true}): void { }
 
-foo(null);  // error: ambiguous
+var n: int{nullable: true} = null;
+foo(n);  // OK: n is explicitly typed as nullable int
+
+foo((int{nullable: true})null);  // OK: type conversion disambiguates
+foo(null);  // error: ambiguous null literal
 ```
+
+The ambiguity arises because the compiler cannot determine which nullable type to use from a bare `null` literal when multiple overloads are possible.
 
 ## Next
 
